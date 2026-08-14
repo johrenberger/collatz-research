@@ -122,3 +122,24 @@ def test_explicit_budget_blocks_before_an_unbounded_tool_loop(project: Path) -> 
     assert (
         _run(project, "consume", "--turn-id", "turn-1", "--kind", "tool")["decision"] == "blocked"
     )
+
+
+def test_finished_turn_cannot_create_a_new_external_operation(project: Path) -> None:
+    _run(project, "begin", "--packet-id", "packet-1", "--turn-id", "turn-1", "--payload-json", "{}")
+    _run(project, "finish", "--turn-id", "turn-1", "--status", "passed", "--evidence-json", "{}")
+    blocked = _run(
+        project,
+        "begin-operation",
+        "--turn-id",
+        "turn-1",
+        "--step-id",
+        "late-write",
+        "--operation-kind",
+        "github-comment",
+        "--target",
+        "pull/23",
+        "--input-json",
+        "{}",
+        expect=2,
+    )
+    assert "cannot create" in blocked["error"]

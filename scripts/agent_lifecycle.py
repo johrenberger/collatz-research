@@ -157,6 +157,9 @@ def begin_operation(args: argparse.Namespace) -> dict[str, Any]:
     input_value = _load_json(args.input_json)
     with _locked_ledger(project) as (_, ledger):
         turn = _turn_or_error(ledger, args.turn_id)
+        if turn["status"] not in {"running", "resumable"}:
+            raise ValueError(f"cannot create an operation for turn in {turn['status']}")
+        turn["status"] = "running"
         key = _digest(
             {
                 "packet_id": turn["identity"]["packet_id"],
