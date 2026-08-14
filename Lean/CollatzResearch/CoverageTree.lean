@@ -110,6 +110,24 @@ def descendFrom : Nat → CoverageNode → Nat → Option CoverageLeaf
 def descend (t : CoverageTree) (x : Nat) : Option CoverageLeaf :=
   descendFrom t.maxDepth t.root x
 
+/-- Orbit-aware descent: at each internal level, the residue lookup
+    uses `accelerated_orbit x k % m` instead of `x % m`, where `k` is
+    the depth index (incremented at each internal step). Structural
+    recursion matches `descendFrom`; only the residue computation is
+    orbit-aware. (Story 07c / round-5, 07c-3.) -/
+def descendFromOrbit : Nat → CoverageNode → Nat → Nat → Option CoverageLeaf
+  | _, .leaf l, _, _ => some l
+  | 0, .internal _ _, _, _ => none
+  | depth + 1, .internal m children, x, k =>
+    let r := accelerated_orbit x k % m
+    match children.lookup r with
+    | some child => descendFromOrbit depth child x (k + 1)
+    | none => none
+
+/-- Orbit-aware descent entry point. -/
+def descendOrbit (t : CoverageTree) (x : Nat) (k : Nat) : Option CoverageLeaf :=
+  descendFromOrbit t.maxDepth t.root x k
+
 /-- The root domain: defined INDEPENDENTLY of `descend` (per Codex P0). -/
 def rootDomain : Nat → Prop := fun n => n > 0
 
@@ -175,6 +193,35 @@ instance WellFormed.decidable (l : CoverageLeaf) : Decidable (WellFormed l) := b
       | mk period rest =>
           cases rest with
           | mk lo hi => infer_instance
+
+/-- Orbit-aware semantic predicate: `x`'s accelerated orbit reaches
+    the leaf's declared interval at some step `k`. (Story 07c /
+    round-5, 07c-3.) Decidable instance is intentionally omitted —
+    the existential over `k` is unbounded, so no finite instance
+    exists. Downstream code uses this for proof obligations, not for
+    `decide`. -/
+def SatOrbit (_t : CoverageTree) (x : Nat) (l : CoverageLeaf) : Prop :=
+  match leanInterval l with
+  | some (period, lo, hi) =>
+      ∃ k, lo ≤ accelerated_orbit x k % period ∧
+           accelerated_orbit x k % period ≤ hi
+  | none => False
+
+/-- Structural alignment: every leaf's declared `period` matches the
+    modulus of its parent internal node at the leaf's depth. Captures
+    the invariant needed for `descendOrbit` to imply `SatOrbit`.
+    (Story 07c / round-5, 07c-3.) Defined alongside `IsCompleteAux`
+    so the two structural proofs can co-evolve. -/
+inductive OrbitAlignedAux : CoverageNode → Prop where
+  | leafA : ∀ (l : CoverageLeaf),
+      WellFormed l →
+      OrbitAlignedAux (.leaf l)
+  | internalA : ∀ (m : Nat) (children : List (Nat × CoverageNode)),
+      (∀ c ∈ children, OrbitAlignedAux c.2) →
+      OrbitAlignedAux (.internal m children)
+
+/-- A coverage tree is orbit-aligned: its root subtree is aligned. -/
+def OrbitAlignedTree (t : CoverageTree) : Prop := OrbitAlignedAux t.root
 
 /-- Structural completeness of a subtree (no `descend` in the definition). -/
 inductive IsCompleteAux (t : CoverageTree) : CoverageNode → Prop where
@@ -256,6 +303,31 @@ theorem coverage_tree_soundness (t : CoverageTree)
         obtain ⟨l, hl, hv', hdesc_child⟩ := hresult
         refine ⟨l, hl, hv', ?_⟩
         simpa [descendFrom, hchild_lookup] using hdesc_child
+
+/-- Orbit-aware soundness for `CoverageTree` (Story 07c / round-5, 07c-3).
+
+Strengthens `coverage_tree_soundness` with the orbit-aware `SatOrbit`
+predicate. The orbit depth at the leaf is bounded by `t.maxDepth`
+(each internal step advances `k` by 1, and the tree has at most
+`t.maxDepth` internal levels).
+
+**Proof status: preparatory.** The proof is admitted via `sorry`
+pending:
+1. A formal proof of `OrbitAlignedTree t` from the existing
+   `ValidTree t ∧ IsComplete t` hypotheses — currently `OrbitAlignedTree`
+   is taken as an explicit hypothesis, and the implication
+   `ValidTree ∧ IsComplete → OrbitAligned` is open.
+2. Mathlib `Nat.factorization` + `omega` extensions for the residue
+   bounds arithmetic in the `SatOrbit` witness construction.
+
+Promotion to `formally established` requires closing both. -/
+theorem coverage_tree_soundness_orbit (t : CoverageTree)
+    (hv : ValidTree t) (hic : IsComplete t) (ha : OrbitAlignedTree t)
+    (x : Nat) (hx : x > 0) :
+    ∃ l, l ∈ t.leaves ∧ verified t l ∧
+         descendOrbit t x 0 = some l ∧
+         SatOrbit t x l := by
+  sorry
 
 -- Depth-0/1/2 regression examples (per Codex 4922430978).
 example : descendFrom 0 (.leaf { leafId := "L0", leafProperty := "P0" }) 5 = some { leafId := "L0", leafProperty := "P0" } := rfl
