@@ -124,7 +124,11 @@ Before every provider call, validate the provider-visible transcript:
    from the compact packet.
 
 The archived transcript is diagnostic evidence. Never automatically append to
-or replay it. The reset must occur before a retry, not after repeated 400s.
+or replay it. **Archive and reset are automatic:** no operator confirmation is
+required on a detected corruption. Record the original session ID, archive
+path, reset timestamp, packet ID, and failure class in the transport
+diagnostic. Do not automatically delete archives; apply a separately reviewed
+retention policy. The reset must occur before a retry, not after repeated 400s.
 
 ## Exactly-once external effects
 
@@ -162,6 +166,7 @@ becomes `transport_blocked` with diagnostics; it is not a source failure.
 | --- | --- | --- |
 | provider returns no assistant content once | controller runs a valid packet | retry after 2 seconds; packet remains `open`; no repair counter changes |
 | transcript contains an empty/orphan assistant entry | controller performs preflight | archive transcript, create a new session, and send only compact resume state |
+| transcript corruption is detected | controller resets automatically | atomic archive exists, diagnostic identifies it, and no operator prompt delays the fresh-session attempt |
 | provider returns schema 400 after no content | controller classifies failure | quarantine session before any retry; no old transcript is replayed |
 | provider returns 401 or 403 | controller classifies failure | record `transport_blocked`; do not consume retries or change provider silently |
 | timeout occurs with a valid transcript | controller retries | retry with bounded jitter while the packet lease is current |
