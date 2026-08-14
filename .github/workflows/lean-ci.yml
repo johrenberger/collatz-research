@@ -29,6 +29,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Enforce Lean admission budget
+        run: python3 scripts/check_sorry_budget.py
+
       - name: Build and validate Lean
         uses: leanprover/lean-action@v1
         with:
@@ -37,3 +40,12 @@ jobs:
 
       - name: Build CoverageTree target
         run: lake build CollatzResearch.CoverageTree
+
+      # A test-first orbit-routing module is permitted only within an
+      # implementation PR. If it exists, it must elaborate at the PR head;
+      # intentionally failing Lean source is never silently excluded from CI.
+      - name: Build CoverageTree orbit-routing tests when present
+        run: |
+          if [ -f Lean/CollatzResearch/CoverageTreeOrbitTests.lean ]; then
+            lake build CollatzResearch.CoverageTreeOrbitTests
+          fi
