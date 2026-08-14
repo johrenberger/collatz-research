@@ -27,6 +27,7 @@ from collatz_research.tree import (
     accelerated_orbit,
     check_tree,
     descend,
+    descend_orbit,
     deterministic_children,
     from_dict,
     has_child_for_each_declared_residue,
@@ -39,6 +40,7 @@ from collatz_research.tree import (
     reaches_one_within,
     sample_tree,
     sat,
+    sat_orbit,
     to_dict,
     well_formed,
 )
@@ -643,3 +645,100 @@ def test_reaches_one_within_rejects_invalid_inputs():
         reaches_one_within(-1, 10)
     with pytest.raises(ValueError):
         reaches_one_within(1, -1)
+
+
+# ---- 07c-3 orbit-aware descent + SatOrbit tests ----
+
+
+def test_descend_orbit_leaf_short_circuits():
+    """A leaf node is reachable regardless of orbit step or remaining depth."""
+    leaf = CoverageLeaf(leaf_id="L0", leaf_property="3:0-2")
+    # depth > 0, k = 7 -> still returns the leaf (leaf-first semantics)
+    result = descend_orbit(CoverageTree(root=leaf, leaves=[leaf], max_depth=3), 5, 7)
+    assert result is leaf
+
+
+def test_descend_orbit_depth_zero_internal_returns_none():
+    """An internal node at depth 0 returns None (depth exhausted)."""
+    internal = CoverageNode(
+        modulus=4,
+        partition=(1,),
+        children={1: CoverageLeaf(leaf_id="L1", leaf_property="3:0-2")},
+    )
+    tree = CoverageTree(root=internal, leaves=[internal.children[1]], max_depth=0)
+    assert descend_orbit(tree, 5, 0) is None
+
+
+def test_descend_orbit_matches_descend_at_k0_for_aligned_tree():
+    """When each leaf's `period` equals its parent's modulus, `descend_orbit`
+    at `k = 0` should agree with `descend` (because `accelerated_orbit(x, 0) = x`)."""
+    # Build a 2-level tree where the parent's modulus (3) equals each leaf's period (3).
+    leaves = [
+        CoverageLeaf(leaf_id="L0", leaf_property="3:0-0"),
+        CoverageLeaf(leaf_id="L1", leaf_property="3:1-1"),
+        CoverageLeaf(leaf_id="L2", leaf_property="3:2-2"),
+    ]
+    internal = CoverageNode(
+        modulus=3,
+        partition=(0, 1, 2),
+        children={0: leaves[0], 1: leaves[1], 2: leaves[2]},
+    )
+    tree = CoverageTree(root=internal, leaves=leaves, max_depth=2)
+    for x in [1, 2, 3, 4, 5, 7, 8, 100]:
+        assert descend_orbit(tree, x, 0) == descend(
+            tree, x
+        ), f"orbit-aware descend at k=0 must match static descend for aligned tree at x={x}"
+
+
+def test_descend_orbit_advances_k_per_internal_level():
+    """At depth-1 internal with modulus 3, residue lookup uses
+    `accelerated_orbit(x, 0) % 3 = x % 3` (k=0 at root) for the
+    first lookup. Deeper internal levels would advance k."""
+    leaves = [
+        CoverageLeaf(leaf_id="L0", leaf_property="3:0-0"),
+        CoverageLeaf(leaf_id="L1", leaf_property="3:1-1"),
+        CoverageLeaf(leaf_id="L2", leaf_property="3:2-2"),
+    ]
+    internal = CoverageNode(
+        modulus=3,
+        partition=(0, 1, 2),
+        children={0: leaves[0], 1: leaves[1], 2: leaves[2]},
+    )
+    tree = CoverageTree(root=internal, leaves=leaves, max_depth=2)
+    # At k=0, descend_orbit uses accelerated_orbit(x, 0) % 3 = x % 3
+    # So for x=5, residue = 2 -> leaf L2 (3:2-2)
+    assert descend_orbit(tree, 5, 0) is leaves[2]
+    # For x=4, residue = 1 -> leaf L1 (3:1-1)
+    assert descend_orbit(tree, 4, 0) is leaves[1]
+
+
+def test_sat_orbit_returns_true_within_bound():
+    """sat_orbit(leaf, x, bound) returns True iff some k ≤ bound witnesses."""
+    leaf = CoverageLeaf(leaf_id="L1", leaf_property="3:0-2")
+    # accelerated_orbit(5, 0) = 5 -> 5 % 3 = 2 -> in [0, 2] -> True at k=0
+    assert sat_orbit(leaf, 5, 0) is True
+    # accelerated_orbit(1, 0) = 1 -> 1 % 3 = 1 -> in [0, 2] -> True at k=0
+    assert sat_orbit(leaf, 1, 0) is True
+
+
+def test_sat_orbit_returns_false_past_bound():
+    """sat_orbit returns False when no witness appears within the bound;
+    this is not mathematical negative evidence, only a search cutoff."""
+    # Narrow interval that doesn't include x's residue at any small step.
+    leaf = CoverageLeaf(leaf_id="L1", leaf_property="5:3-3")
+    # accelerated_orbit(2, 0) = 2 -> 2 % 5 = 2, not in [3, 3]
+    # accelerated_orbit(2, 1) = acceleratedStep(2) = 1 -> 1 % 5 = 1, not in [3, 3]
+    assert sat_orbit(leaf, 2, 1) is False
+    # With bound=2 still False (no witness)
+    assert sat_orbit(leaf, 2, 2) is False
+
+
+def test_sat_orbit_unparseable_leaf_returns_false():
+    """Unparseable leaves return False (mirrors Lean SatOrbit False branch)."""
+    leaf = CoverageLeaf(leaf_id="L1", leaf_property="garbage")
+    assert sat_orbit(leaf, 5, 10) is False
+
+
+def test_sat_orbit_rejects_negative_bound():
+    with pytest.raises(ValueError):
+        sat_orbit(CoverageLeaf(leaf_id="L1", leaf_property="3:0-2"), 5, -1)

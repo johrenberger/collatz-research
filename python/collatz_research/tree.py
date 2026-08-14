@@ -491,6 +491,34 @@ def well_formed(leaf: CoverageLeaf) -> bool:
     return period > 0 and lo <= hi and hi < period
 
 
+def sat_orbit(leaf: CoverageLeaf, x: int, bound: int) -> bool:
+    """Orbit-aware semantic predicate: `x`'s accelerated orbit reaches
+    the leaf's declared interval at some step `k ≤ bound`.
+
+    This is a bounded, untrusted exploration helper mirroring Lean's
+    `SatOrbit`. Lean's `SatOrbit` is `∃ k, lo ≤ accelerated_orbit x k
+    % period ∧ accelerated_orbit x k % period ≤ hi` (unbounded).
+    Returning `False` here means no witness was found within `bound`,
+    not mathematical negative evidence.
+
+    Mirrors `Lean/CollatzResearch/CoverageTree.lean` `SatOrbit`
+    (Story 07c / round-5, 07c-3).
+    """
+    if bound < 0:
+        raise ValueError("bound must be a natural number")
+    interval = lean_interval(leaf)
+    if interval is None:
+        return False
+    period, lo, hi = interval
+    if period == 0:
+        # Lean: Nat.mod n 0 = n by convention. Mirror that.
+        return any(lo <= accelerated_orbit(x, k) <= hi for k in range(bound + 1))
+    for k in range(bound + 1):
+        if lo <= accelerated_orbit(x, k) % period <= hi:
+            return True
+    return False
+
+
 # ---- Descend (mirrors Lean's leaf-first `descendFrom`) ----
 
 
@@ -525,6 +553,44 @@ def descend(tree: CoverageTree, x: int) -> CoverageLeaf | None:
     Mirrors Lean's `descend` (Story 07b / round-4 regression).
     """
     return _descend_from(tree.max_depth, tree.root, x)
+
+
+def _descend_from_orbit(depth: int, node: CoverageNode, x: int, k: int) -> CoverageLeaf | None:
+    """Internal helper for `descend_orbit`. Leaf-first semantics:
+
+    - Leaf: always reachable (returns the leaf regardless of remaining depth).
+    - Internal at depth 0: returns None (depth exhausted).
+    - Internal at depth > 0: follows `accelerated_orbit(x, k) % modulus`
+      to the matching child and recurses with `depth - 1` and `k + 1`.
+
+    Mirrors `Lean/CollatzResearch/CoverageTree.lean` `descendFromOrbit`
+    (Story 07c / round-5, 07c-3).
+    """
+    if isinstance(node, CoverageLeaf):
+        return node
+    # node is CoverageNode (internal)
+    if depth == 0:
+        return None
+    r = accelerated_orbit(x, k) % node.modulus
+    child = node.children.get(r)
+    if child is None:
+        return None
+    return _descend_from_orbit(depth - 1, child, x, k + 1)
+
+
+def descend_orbit(tree: CoverageTree, x: int, k: int) -> CoverageLeaf | None:
+    """Orbit-aware descent: at each internal level, the residue lookup
+    uses `accelerated_orbit(x, k) % modulus` (with `k` advancing by 1
+    per internal step), instead of `x % modulus`. Leaf-first: a leaf
+    is reachable regardless of remaining depth; depth-0 internal
+    returns None.
+
+    Mirrors Lean's `descendOrbit` (Story 07c / round-5, 07c-3). For
+    `k = 0` and trees where each leaf's `period` equals its parent's
+    modulus, `descend_orbit(tree, x, 0)` agrees with
+    `descend(tree, x)`.
+    """
+    return _descend_from_orbit(tree.max_depth, tree.root, x, k)
 
 
 def check_tree(tree: CoverageTree) -> None:
