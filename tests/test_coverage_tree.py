@@ -661,7 +661,9 @@ def test_descend_orbit_leaf_short_circuits():
 def test_descend_orbit_depth_zero_internal_returns_none():
     """An internal node at depth 0 returns None (depth exhausted)."""
     internal = CoverageNode(
-        modulus=4, children={1: CoverageLeaf(leaf_id="L1", leaf_property="3:0-2")}
+        modulus=4,
+        partition=(1,),
+        children={1: CoverageLeaf(leaf_id="L1", leaf_property="3:0-2")},
     )
     tree = CoverageTree(root=internal, leaves=[internal.children[1]], max_depth=0)
     assert descend_orbit(tree, 5, 0) is None
@@ -678,6 +680,7 @@ def test_descend_orbit_matches_descend_at_k0_for_aligned_tree():
     ]
     internal = CoverageNode(
         modulus=3,
+        partition=(0, 1, 2),
         children={0: leaves[0], 1: leaves[1], 2: leaves[2]},
     )
     tree = CoverageTree(root=internal, leaves=leaves, max_depth=2)
@@ -698,6 +701,7 @@ def test_descend_orbit_advances_k_per_internal_level():
     ]
     internal = CoverageNode(
         modulus=3,
+        partition=(0, 1, 2),
         children={0: leaves[0], 1: leaves[1], 2: leaves[2]},
     )
     tree = CoverageTree(root=internal, leaves=leaves, max_depth=2)
