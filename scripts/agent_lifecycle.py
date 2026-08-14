@@ -16,9 +16,10 @@ import os
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 SCHEMA_VERSION = 1
 
@@ -54,7 +55,9 @@ def _repo_snapshot(project_root: Path) -> dict[str, Any]:
 
 
 @contextlib.contextmanager
-def _locked_ledger(project_root: Path, timeout_seconds: float = 10) -> Iterator[tuple[Path, dict[str, Any]]]:
+def _locked_ledger(
+    project_root: Path, timeout_seconds: float = 10
+) -> Iterator[tuple[Path, dict[str, Any]]]:
     state = project_root / "state"
     state.mkdir(parents=True, exist_ok=True)
     lock = state / ".turn-ledger.lock"
@@ -66,7 +69,7 @@ def _locked_ledger(project_root: Path, timeout_seconds: float = 10) -> Iterator[
             os.write(fd, f"pid={os.getpid()} at={_utc_now()}\n".encode())
         except FileExistsError:
             if time.monotonic() >= deadline:
-                raise TimeoutError(f"lifecycle lock is held: {lock}")
+                raise TimeoutError(f"lifecycle lock is held: {lock}") from None
             time.sleep(0.05)
     ledger_path = state / "turn-ledger.json"
     try:
@@ -104,7 +107,11 @@ def begin(args: argparse.Namespace) -> dict[str, Any]:
     project = Path(args.project_root).resolve()
     payload = _load_json(args.payload_json)
     snapshot = _repo_snapshot(project)
-    identity = {"packet_id": args.packet_id, "snapshot": snapshot, "payload_digest": _digest(payload)}
+    identity = {
+        "packet_id": args.packet_id,
+        "snapshot": snapshot,
+        "payload_digest": _digest(payload),
+    }
     with _locked_ledger(project) as (_, ledger):
         previous = ledger["turns"].get(args.turn_id)
         if previous:
@@ -245,7 +252,9 @@ def _parser() -> argparse.ArgumentParser:
     resume_parser.set_defaults(handler=resume)
     finish_parser = commands.add_parser("finish")
     finish_parser.add_argument("--turn-id", required=True)
-    finish_parser.add_argument("--status", choices=("passed", "blocked", "transport_blocked"), required=True)
+    finish_parser.add_argument(
+        "--status", choices=("passed", "blocked", "transport_blocked"), required=True
+    )
     finish_parser.add_argument("--evidence-json", required=True)
     finish_parser.set_defaults(handler=finish)
     return parser

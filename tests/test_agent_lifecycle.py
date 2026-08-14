@@ -65,7 +65,9 @@ def test_duplicate_turn_is_a_noop_and_identity_mismatch_is_rejected(project: Pat
     assert "reused" in mismatch["error"]
 
 
-def test_operation_intent_prevents_duplicate_mutation_and_resume_preserves_receipt(project: Path) -> None:
+def test_operation_intent_prevents_duplicate_mutation_and_resume_preserves_receipt(
+    project: Path,
+) -> None:
     _run(project, "begin", "--packet-id", "packet-1", "--turn-id", "turn-1", "--payload-json", "{}")
     first = _run(
         project,
@@ -114,5 +116,9 @@ def test_explicit_budget_blocks_before_an_unbounded_tool_loop(project: Path) -> 
         "--max-tool-calls",
         "1",
     )
-    assert _run(project, "consume", "--turn-id", "turn-1", "--kind", "tool")["decision"] == "consumed"
-    assert _run(project, "consume", "--turn-id", "turn-1", "--kind", "tool")["decision"] == "blocked"
+    assert (
+        _run(project, "consume", "--turn-id", "turn-1", "--kind", "tool")["decision"] == "consumed"
+    )
+    assert (
+        _run(project, "consume", "--turn-id", "turn-1", "--kind", "tool")["decision"] == "blocked"
+    )
