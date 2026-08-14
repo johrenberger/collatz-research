@@ -555,9 +555,7 @@ def descend(tree: CoverageTree, x: int) -> CoverageLeaf | None:
     return _descend_from(tree.max_depth, tree.root, x)
 
 
-def _descend_from_orbit(
-    depth: int, node: CoverageNode, x: int, k: int
-) -> CoverageLeaf | None:
+def _descend_from_orbit(depth: int, node: CoverageNode, x: int, k: int) -> CoverageLeaf | None:
     """Internal helper for `descend_orbit`. Leaf-first semantics:
 
     - Leaf: always reachable (returns the leaf regardless of remaining depth).

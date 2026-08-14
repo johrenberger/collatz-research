@@ -110,6 +110,17 @@ def descendFrom : Nat → CoverageNode → Nat → Option CoverageLeaf
 def descend (t : CoverageTree) (x : Nat) : Option CoverageLeaf :=
   descendFrom t.maxDepth t.root x
 
+/-- The accelerated orbit: `accelerated_orbit n 0 = n`,
+    `accelerated_orbit n (k+1) = acceleratedStep (accelerated_orbit n k)`.
+    (Story 07c / round-5, 07c-2.) -/
+def accelerated_orbit : Nat → Nat → Nat
+  | n, Nat.zero => n
+  | n, k + 1 => acceleratedStep (accelerated_orbit n k)
+
+/-- `ReachesOne n` iff applying `acceleratedStep` repeatedly to `n`
+    eventually reaches 1. (Story 07c / round-5, 07c-2.) -/
+def ReachesOne (n : Nat) : Prop := ∃ k, accelerated_orbit n k = 1
+
 /-- Orbit-aware descent: at each internal level, the residue lookup
     uses `accelerated_orbit x k % m` instead of `x % m`, where `k` is
     the depth index (incremented at each internal step). Structural
@@ -235,17 +246,6 @@ inductive IsCompleteAux (t : CoverageTree) : CoverageNode → Prop where
     IsCompleteAux t (.internal m children)
 
 def IsComplete (t : CoverageTree) : Prop := IsCompleteAux t t.root
-
-/-- The accelerated orbit: `accelerated_orbit n 0 = n`,
-    `accelerated_orbit n (k+1) = acceleratedStep (accelerated_orbit n k)`.
-    (Story 07c / round-5, 07c-2.) -/
-def accelerated_orbit : Nat → Nat → Nat
-  | n, Nat.zero => n
-  | n, k + 1 => acceleratedStep (accelerated_orbit n k)
-
-/-- `ReachesOne n` iff applying `acceleratedStep` repeatedly to `n`
-    eventually reaches 1. (Story 07c / round-5, 07c-2.) -/
-def ReachesOne (n : Nat) : Prop := ∃ k, accelerated_orbit n k = 1
 
 /-- An input satisfies a leaf's property: `descend t x` returns `l`. -/
 def satisfies (t : CoverageTree) (x : Nat) (l : CoverageLeaf) : Prop :=

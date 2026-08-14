@@ -654,15 +654,15 @@ def test_descend_orbit_leaf_short_circuits():
     """A leaf node is reachable regardless of orbit step or remaining depth."""
     leaf = CoverageLeaf(leaf_id="L0", leaf_property="3:0-2")
     # depth > 0, k = 7 -> still returns the leaf (leaf-first semantics)
-    result = descend_orbit(
-        CoverageTree(root=leaf, leaves=[leaf], max_depth=3), 5, 7
-    )
+    result = descend_orbit(CoverageTree(root=leaf, leaves=[leaf], max_depth=3), 5, 7)
     assert result is leaf
 
 
 def test_descend_orbit_depth_zero_internal_returns_none():
     """An internal node at depth 0 returns None (depth exhausted)."""
-    internal = CoverageNode(modulus=4, children={1: CoverageLeaf(leaf_id="L1", leaf_property="3:0-2")})
+    internal = CoverageNode(
+        modulus=4, children={1: CoverageLeaf(leaf_id="L1", leaf_property="3:0-2")}
+    )
     tree = CoverageTree(root=internal, leaves=[internal.children[1]], max_depth=0)
     assert descend_orbit(tree, 5, 0) is None
 
@@ -682,9 +682,9 @@ def test_descend_orbit_matches_descend_at_k0_for_aligned_tree():
     )
     tree = CoverageTree(root=internal, leaves=leaves, max_depth=2)
     for x in [1, 2, 3, 4, 5, 7, 8, 100]:
-        assert descend_orbit(tree, x, 0) == descend(tree, x), (
-            f"orbit-aware descend at k=0 must match static descend for aligned tree at x={x}"
-        )
+        assert descend_orbit(tree, x, 0) == descend(
+            tree, x
+        ), f"orbit-aware descend at k=0 must match static descend for aligned tree at x={x}"
 
 
 def test_descend_orbit_advances_k_per_internal_level():
