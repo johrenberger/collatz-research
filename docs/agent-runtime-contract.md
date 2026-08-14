@@ -81,6 +81,38 @@ escalation packet containing the failing command, full SHA, relevant log path,
 attempts, and the smallest suspected cause. This prevents token-loop failure
 without suppressing legitimate debugging.
 
+### No-content assistant-turn failure
+
+`assistant turn failed before producing content` is a controller/provider
+failure, not a MiniMax decision, tool result, or packet outcome. It must never
+mark a packet `passed`, `failed`, or `blocked`, consume a repair attempt, or
+terminate the workflow by itself.
+
+On this error the controller must write a transport diagnostic containing UTC
+time, provider/model, request or trace ID, HTTP status/error payload when
+available, packet ID, full repository SHA, tool-call count, and serialized
+turn-packet byte size. Do not write prompts, secrets, or certificate contents
+to this diagnostic.
+
+Retry the same turn at most twice with exponential delays of 2 and 8 seconds.
+If both retries fail, create a `transport_blocked` record and restart the
+assistant session with a compact packet. A new session may make one final
+attempt; then escalate to the operator with the diagnostic. Transport retries
+are distinct from source-repair attempts.
+
+The compact packet contains only the objective, repository-relative paths,
+full SHA, acceptance commands, prior error summary, and the relevant
+checkpoint record. Never inject all of `GUARDS.md`, `checkpoints.json`,
+`merged.json`, CI logs, or chat history into every turn. The controller reads
+and validates those files locally, then supplies a bounded summary (target:
+under 12 KiB / roughly 3,000 tokens). The assistant requests one named source
+or log excerpt at a time when more evidence is necessary.
+
+If no-content failures correlate with a packet size, a particular tool schema,
+or an oversized tool result, split the packet before another model attempt.
+The controller must preserve the original packet ID and evidence so the split
+does not duplicate Git mutations, PR comments, or validation records.
+
 ## Packet discipline
 
 1. Read guards, current Git status, current full SHA, and relevant checkpoints.
