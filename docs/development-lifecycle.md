@@ -80,6 +80,23 @@ The MiniMax M3 API-key path is `minimax/MiniMax-M3` through the native
 Anthropic-messages adapter with reasoning enabled. Do not route it through an
 OpenAI-completions compatibility adapter or inherit `thinking: false`.
 
+## OpenClaw runtime enforcement
+
+Install `integrations/openclaw-lifecycle-plugin` into the OpenClaw host. It is
+the controller wrapper for every admitted agent turn: `before_agent_run`
+creates/reuses the durable turn and consumes a model attempt before submission;
+`before_tool_call` consumes the tool budget and writes an operation intent;
+`after_tool_call` stores the result; and `agent_end` records the terminal
+outcome. A blocked hook fails closed, so a missing ledger, exhausted budget, or
+duplicate external operation never becomes a prompt-only instruction.
+
+The plugin requires `hooks.allowConversationAccess: true` because it uses
+`before_agent_run` and `agent_end`, but it does **not** inject conversation
+context. See `integrations/openclaw-lifecycle-plugin/README.md` for the exact
+configuration and post-install validation. For embedded harnesses that miss
+`agent_end`, the durable record intentionally remains resumable; do not infer
+success from an absent event.
+
 ## Explicit budgets
 
 Budgets are controller inputs, not hidden model limits. Every packet declares:

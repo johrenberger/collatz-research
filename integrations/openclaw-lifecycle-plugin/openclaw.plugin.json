@@ -1,0 +1,45 @@
+{
+  "id": "collatz-lifecycle",
+  "name": "Collatz lifecycle controller",
+  "description": "Durable packet receipts and bounded OpenClaw agent execution.",
+  "version": "0.1.0",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["projectRoot"],
+    "properties": {
+      "projectRoot": {
+        "type": "string",
+        "description": "Outer project directory containing repo/ and state/."
+      },
+      "pythonCommand": {
+        "type": "string",
+        "default": "python3",
+        "description": "Python interpreter used for repo/scripts/agent_lifecycle.py."
+      },
+      "packetPrefix": {
+        "type": "string",
+        "default": "openclaw",
+        "description": "Stable prefix used with the OpenClaw session key for packet IDs."
+      },
+      "maxModelAttempts": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 3
+      },
+      "maxToolCalls": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 20
+      },
+      "maxSeconds": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 900
+      }
+    }
+  }
+}
