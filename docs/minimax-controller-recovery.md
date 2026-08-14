@@ -32,6 +32,35 @@ Classify the provider failure before retrying:
 | `transient_transport` | timeout, connection reset, 429, 5xx before model output | retry with jitter only after confirming the session is valid and no run is active |
 | `tool_failure` | a tool returned an error after a model tool call | retain the session; use normal task recovery |
 
+## MiniMax M3 provider preflight
+
+For the native MiniMax integration, use exactly one matching model reference:
+
+- API key: `minimax/MiniMax-M3`;
+- Coding Plan OAuth: `minimax-portal/MiniMax-M3`.
+
+MiniMax M3 is an Anthropic-messages reasoning model. Its adaptive thinking
+path must remain enabled: do not inherit a generic `thinking: false` setting
+intended for MiniMax M2.x, and do not route M3 through an OpenAI-completions
+compatibility adapter. A disabled M3 thinking path can yield no visible model
+content and look identical to a transport failure.
+
+At gateway startup and before the first packet after a configuration/model
+change, run a read-only preflight and persist only its redacted result:
+
+```text
+openclaw --version
+openclaw models list --provider minimax
+# or, for OAuth:
+openclaw models list --provider minimax-portal
+```
+
+The controller must verify that the selected provider exposes the exact,
+case-sensitive M3 model reference and that the effective model configuration
+has reasoning enabled. If this check fails, create `transport_blocked` with
+class `auth_or_config`; do not send a work packet, silently fall back to a
+different provider, or modify credentials.
+
 ## Reference controller algorithm
 
 ```python
@@ -169,6 +198,7 @@ becomes `transport_blocked` with diagnostics; it is not a source failure.
 | transcript corruption is detected | controller resets automatically | atomic archive exists, diagnostic identifies it, and no operator prompt delays the fresh-session attempt |
 | provider returns schema 400 after no content | controller classifies failure | quarantine session before any retry; no old transcript is replayed |
 | provider returns 401 or 403 | controller classifies failure | record `transport_blocked`; do not consume retries or change provider silently |
+| M3 inherits `thinking: false` or resolves to the wrong provider ID | controller runs startup preflight | block before the packet; diagnostic names the effective model/provider without exposing credentials |
 | timeout occurs with a valid transcript | controller retries | retry with bounded jitter while the packet lease is current |
 | restarted session repeats a mutation request | controller dispatches it | return prior result by idempotency key; no duplicate commit, comment, or message |
 | checkpoint cache is 200 KiB | turn is built | model packet is ≤12 KiB and contains only the relevant record |
