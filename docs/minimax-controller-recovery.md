@@ -39,6 +39,40 @@ For the native MiniMax integration, use exactly one matching model reference:
 - API key: `minimax/MiniMax-M3`;
 - Coding Plan OAuth: `minimax-portal/MiniMax-M3`.
 
+### API-key baseline
+
+For this project, use the API-key provider path. Keep the key in the gateway
+secret environment, never in `openclaw.json`, checkpoints, diagnostics, or
+repository files:
+
+```json5
+{
+  env: { MINIMAX_API_KEY: "${MINIMAX_API_KEY}" },
+  agents: {
+    defaults: {
+      model: { primary: "minimax/MiniMax-M3" },
+      // Do not set thinking: false for MiniMax M3.
+    }
+  },
+  models: {
+    mode: "merge",
+    providers: {
+      minimax: {
+        baseUrl: "https://api.minimax.io/anthropic",
+        apiKey: "${MINIMAX_API_KEY}",
+        api: "anthropic-messages",
+        models: [{ id: "MiniMax-M3", reasoning: true, input: ["text"] }]
+      }
+    }
+  }
+}
+```
+
+For the China endpoint, replace only the base URL with
+`https://api.minimaxi.com/anthropic`; preserve the `minimax` provider ID and
+the `anthropic-messages` API type. Do not configure both global and China
+endpoints under the same provider ID.
+
 MiniMax M3 is an Anthropic-messages reasoning model. Its adaptive thinking
 path must remain enabled: do not inherit a generic `thinking: false` setting
 intended for MiniMax M2.x, and do not route M3 through an OpenAI-completions
