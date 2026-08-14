@@ -29,6 +29,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Enforce Lean admission budget
+        run: python3 scripts/check_sorry_budget.py
+
       - name: Build and validate Lean
         uses: leanprover/lean-action@v1
         with:
