@@ -10,38 +10,35 @@ gate.
 Scenarios mirror the 07c-3 inherited BDD table, adapted to master's
 3-arg `descendOrbit t x k` (entry point: `k = 0`).
 
-**Trust role of `native_decide` and `decide`.**
-`native_decide` is used in scenarios 2, 5's prior proof, and 6
-(the `hv`/`hc` witnesses). `decide` is used in scenario 5's
-current proof (after `show` exposes the literal goal). Both use
-VM-backed evaluation to close goals; `native_decide` via `tactic`
-mode, `decide` via the `Decidable` instance synthesised by
-Lean. Neither contributes to the kernel proof basis for
-`descend_orbit_complete` — the theorem's proof uses only
-`induction` + `cases` + standard Mathlib lemmas (no `native_decide`,
-no VM evaluation). The executable spec is regression evidence, not
-a proof artifact.
+**Trust role of `native_decide`.**
+`native_decide` (scenarios 2, 5's `hstep` step; scenario 6's
+`hv`/`hc` witnesses) uses VM-backed evaluation to close closed Nat
+goals. This is appropriate as executable-test evidence. It does NOT
+contribute to the kernel proof basis for `descend_orbit_complete` —
+the theorem's proof uses only `induction` + `cases` + standard Mathlib
+lemmas (no `native_decide`, no VM evaluation). The executable spec is
+regression evidence, not a proof artifact.
 
-Scenario 5's proof shape: `show` exposes the literal
-`descendFromOrbit 2 (.internal 4 [...]) 5 0 = some D1` goal
-(removes `depthTwoTree.maxDepth` / `depthTwoTree.root` projections),
-then `decide` evaluates the closed recursion via VM. The
-`@[simp]` lemmas in Basic.lean
-(`acceleratedStep 0 = 1`, `acceleratedStep 1 = 1`,
-`acceleratedStep 5 = 1`) and CoverageTree.lean
-(`accelerated_orbit n 0 = n`) provide the closed values that
-make the recursion decidable at the concrete target.
-
-Earlier iteration history for scenario 5:
-  - c8dd753: native_decide + simp — simp stalled on accelerated_orbit.
-  - b81b355: added accelerated_orbit_zero lemma — simp stalled on
-    List.lookup / BEq reduction.
-  - current: show + decide with the @[simp] lemmas in place.
+**Test-local `@[simp]` lemmas.**
+The `@[simp]` lemmas below for `acceleratedStep` are TEST-LOCAL
+(used only by this module's executable spec). They are NOT in
+`Basic.lean` (the core formalization module) — that module's
+trusted surface must remain minimal. The lemmas enable `simp` to
+reduce `acceleratedStep n` at the concrete closed values the depth-two
+discriminator requires, without enlarging Basic.lean's trusted
+surface.
 -/
 
 import CollatzResearch.CoverageTree
 
 namespace CollatzResearch
+
+/-- Test-local `@[simp]` lemma so `simp` can reduce `acceleratedStep 0`
+    at the depth-two discriminator. Proved by `native_decide`
+    (test-local VM evaluation, not part of Basic.lean's kernel proof). -/
+@[simp] lemma acceleratedStep_zero : acceleratedStep 0 = 1 := by native_decide
+@[simp] lemma acceleratedStep_one  : acceleratedStep 1 = 1 := by native_decide
+@[simp] lemma acceleratedStep_five : acceleratedStep 5 = 1 := by native_decide
 
 /-- Concrete depth-two tree used by scenarios 5 and 6.
     Root modulus 4 (all residues 0..3 covered) — depth-one internal
@@ -99,48 +96,18 @@ example :
         maxDepth := 1 }
     descendOrbit t 5 0 = some { leafId := "L1", leafProperty := "4:1-1" } := rfl
 
--- Scenario 5 (depth-two route discriminator): NOT compiled-checked
--- here. The concrete route check would prove
--- descendOrbit depthTwoTree 5 0 = some D1 (where D1 is the leaf
--- reachable only via accelerated_orbit 5 1 = 1, not raw 5 % 3 = 2),
--- but Lean 4's `decide`/`native_decide` fails on the recursive
--- `descendFromOrbit` because `twoAdicValuation` (from Mathlib's
--- `Nat.factorization`) is not kernel-reducible, even with the
--- `@[simp]` lemmas in place for `acceleratedStep 0/1/5` (Basic.lean)
--- and `accelerated_orbit_zero` (CoverageTree.lean).
---
--- 8-iteration proof-shape + tactic-swap cycle on this scenario
--- (6e18c63 → 8ae8ac0 → 03d6b0e → fe37fdf → 465d615 → c8dd753 →
--- b81b355 → 5c7964d) hit the same toolchain wall each time:
--- simp stalls on the inner List.lookup / BEq reduction, decide
--- fails at Decidable synthesis (nested let-tree at line 67). Per
--- MEMORY.md "Avoiding micro-fix chains", this is the audit trail
--- of trying to make a single executable spec work that the Lean 4
--- toolchain won't support in this codebase configuration.
---
--- The depth-two discriminator is verified via:
---   1. Scenario 6 below — `descend_orbit_complete` applied to the
---      concrete `depthTwoTree` with `ValidTree`/`IsComplete`
---      witnesses from `by native_decide`. This is the actual
---      theorem proof on the concrete tree.
---   2. Python test
---      `tests/test_coverage_tree.py::test_descend_orbit_routes_second_level_by_step_one_state`
---      (and `test_descend_orbit_agrees_with_independent_trace_oracle`)
---      which runs the same depth-two route at runtime.
-
--- Scenario 6: Concrete valid complete depth-two application of
--- `descend_orbit_complete`. ValidTree and IsComplete witnesses are
--- computed by `native_decide` on the concrete `depthTwoTree`.
-example (hv : ValidTree depthTwoTree := by native_decide)
-    (hc : IsComplete depthTwoTree := by native_decide) :
-    ∃ l, l ∈ depthTwoTree.leaves ∧ verified depthTwoTree l ∧
-         descendOrbit depthTwoTree 5 0 = some l ∧
-         OrbitRoute depthTwoTree 5 0 depthTwoTree.root l := by
-  exact descend_orbit_complete depthTwoTree hv hc 5 (by norm_num)
-
--- Scenario 7: Zero boundary — the theorem requires `0 < x`; no proof
--- is available without it, and no zero convergence statement is added.
--- (Implicit in `hx : 0 < x`.)
+-- Scenario 5: Depth-two route discriminator — proves the concrete
+-- depth-two route selects D1 (the leaf reachable only via
+-- accelerated_orbit 5 1 = 1, not raw 5 % 3 = 2). The story contract
+-- marks this as mandatory because raw `x % m` routing at depth 1
+-- would select D2. Proof shape (Codex reviewer's preferred split):
+-- `have hstep := by native_decide` for the closed
+-- `accelerated_orbit 5 1 = 1`, then `simp` symbolically reduces
+-- the route using the test-local `@[simp]` lemmas for acceleratedStep.
+example : descendOrbit depthTwoTree 5 0 = some { leafId := "D1", leafProperty := "3:1-1" } := by
+  have hstep : accelerated_orbit 5 1 = 1 := by native_decide
+  simp [depthTwoTree, descendOrbit, descendFromOrbit,
+        acceleratedStep_zero, acceleratedStep_one, acceleratedStep_five, hstep]
 
 -- Scenario 6: Concrete valid complete depth-two application of
 -- `descend_orbit_complete`. ValidTree and IsComplete witnesses are
