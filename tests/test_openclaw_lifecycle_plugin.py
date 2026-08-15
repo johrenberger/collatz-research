@@ -14,7 +14,7 @@ def test_given_a_native_plugin_when_packaged_then_manifest_and_runtime_entry_agr
 
     assert manifest["id"] == "collatz-lifecycle"
     assert package["openclaw"]["extensions"] == ["./index.js"]
-    assert manifest["configSchema"]["required"] == ["repoPath", "stateDir"]
+    assert "required" not in manifest["configSchema"]
 
 
 def test_given_an_openclaw_turn_when_the_controller_loads_then_all_receipt_hooks_exist() -> None:
