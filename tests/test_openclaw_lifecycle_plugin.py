@@ -39,5 +39,6 @@ def test_canonical_checkout_requires_external_state_and_observation_mode() -> No
 
     properties = manifest["configSchema"]["properties"]
     assert properties["enforcementMode"]["default"] == "observe"
+    assert properties["receiptToolNames"]["default"] == []
     assert "repoPath" in properties
     assert "stateDir" in properties

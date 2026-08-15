@@ -42,7 +42,8 @@ Git checkout and `stateDir` is a writable persistent directory outside it.
           "maxModelAttempts": 3,
           "maxToolCalls": 20,
           "maxSeconds": 900,
-          "enforcementMode": "observe"
+          "enforcementMode": "observe",
+          "receiptToolNames": []
         }
       }
     }
@@ -52,6 +53,8 @@ Git checkout and `stateDir` is a writable persistent directory outside it.
 
 Start in `observe` mode. It preserves chat availability while logging controller
 failures. Switch to `enforce` only after the host smoke tests below pass.
+Add only known mutation-capable tool names to `receiptToolNames`; ordinary
+read-only tool calls deliberately receive budgets but no external-effect receipt.
 
 On Windows, use an absolute Windows `repoPath` and set `pythonCommand` to
 the interpreter executable OpenClaw can invoke (for example `py` only when its

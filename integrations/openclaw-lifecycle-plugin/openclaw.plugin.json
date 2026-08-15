@@ -49,6 +49,13 @@
         "enum": ["observe", "enforce"],
         "default": "observe",
         "description": "Observe records controller failures; enforce blocks a run or tool call."
+      },
+      "receiptToolNames": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true,
+        "default": [],
+        "description": "Tool names whose calls create durable external-effect receipts."
       }
     }
   }

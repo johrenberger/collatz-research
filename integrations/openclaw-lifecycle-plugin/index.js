@@ -113,6 +113,7 @@ export default definePluginEntry({
         const budget = lifecycle(config, ["consume", "--turn-id", run, "--kind", "tool"]);
         if (budget.decision === "blocked") return block("tool budget is exhausted");
         const target = String(event.toolName ?? "unknown-tool");
+        if (!new Set(config.receiptToolNames ?? []).has(target)) return undefined;
         const intent = lifecycle(config, [
           "begin-operation", "--turn-id", run, "--step-id", String(event.toolCallId ?? target),
           "--operation-kind", "openclaw-tool", "--target", target,
