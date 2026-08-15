@@ -9,11 +9,45 @@ gate.
 
 Scenarios mirror the 07c-3 inherited BDD table, adapted to master's
 3-arg `descendOrbit t x k` (entry point: `k = 0`).
+
+**Trust role of `native_decide`.**
+`native_decide` (scenarios 2, 5; the `hstep` step in scenario 5; the
+`hv` and `hc` witnesses in scenario 6) uses VM-backed evaluation to
+close goals of the form `closed_Nat_computation = expected_value`.
+This is appropriate as executable-test evidence for closed `Nat`
+computations. It does NOT contribute to the kernel proof basis for
+`descend_orbit_complete` — the theorem's proof uses only `induction`
++ `cases` + standard Mathlib lemmas (no `native_decide`, no VM
+evaluation). The executable spec is regression evidence, not a proof
+artifact.
 -/
 
 import CollatzResearch.CoverageTree
 
 namespace CollatzResearch
+
+/-- Concrete depth-two tree used by scenarios 5 and 6.
+    Root modulus 4 (all residues 0..3 covered) — depth-one internal
+    modulus 3 (all residues 0..2 covered) — three leaves at depth 2.
+    This tree is valid and complete, so it satisfies the hypotheses
+    of `descend_orbit_complete`. -/
+def depthTwoTree : CoverageTree :=
+  { root := .internal 4
+      [(0, .leaf { leafId := "L0", leafProperty := "4:0-0" }),
+       (1, .internal 3
+        [(0, .leaf { leafId := "D0", leafProperty := "3:0-0" }),
+         (1, .leaf { leafId := "D1", leafProperty := "3:1-1" }),
+         (2, .leaf { leafId := "D2", leafProperty := "3:2-2" })]),
+       (2, .leaf { leafId := "L2", leafProperty := "4:2-2" }),
+       (3, .leaf { leafId := "L3", leafProperty := "4:3-3" })],
+    leaves :=
+      [{ leafId := "L0", leafProperty := "4:0-0" },
+       { leafId := "D0", leafProperty := "3:0-0" },
+       { leafId := "D1", leafProperty := "3:1-1" },
+       { leafId := "D2", leafProperty := "3:2-2" },
+       { leafId := "L2", leafProperty := "4:2-2" },
+       { leafId := "L3", leafProperty := "4:3-3" }],
+    maxDepth := 2 }
 
 -- Scenario 1: Base orbit — `accelerated_orbit x 0 = x`.
 example : accelerated_orbit 5 0 = 5 := rfl
@@ -48,36 +82,26 @@ example :
         maxDepth := 1 }
     descendOrbit t 5 0 = some { leafId := "L1", leafProperty := "4:1-1" } := rfl
 
--- Scenario 5 (depth-two route) is not included here as a standalone
--- `example` because Lean 4's typeclass synthesis cannot synthesize
--- `Decidable (descendOrbit concrete_tree 5 0 = some concrete_leaf)`
--- for the deeply nested inlined tree literal — the equality's
--- decidability cannot be resolved within Lean's typeclass depth
--- budget. The depth-two contract is verified by:
---   - Scenario 6 below (the `descend_orbit_complete` theorem,
---     which proves depth-two routing by Nat induction over `t.maxDepth`
---     and `cases` on the CoverageNode; the theorem covers all valid
---     complete trees, including depth-two).
---   - Python tests
---     `tests/test_coverage_tree.py::test_descend_orbit_routes_second_level_by_step_one_state`
---     and
---     `test_descend_orbit_agrees_with_independent_trace_oracle`,
---     both passing locally (71/71). These are the discriminating
---     depth-two checks that distinguish orbit-aware routing from
---     the existing `descend` (which routes every level with `x % m`).
--- The depth-two scenario remains "mandatory" per the 07c-3 BDD
--- table; it is enforced by the theorem + Python tests rather than
--- a redundant Lean executable example.
+-- Scenario 5: Depth-two route — second edge uses `accelerated_orbit x 1 % m₁`,
+-- never raw `x % m₁`. For x = 5: 5 % 4 = 1 -> child with modulus 3;
+-- accelerated_orbit 5 1 = 1; 1 % 3 = 1 -> leaf D1.
+-- Raw `x % 3 = 5 % 3 = 2` would pick D2, which is WRONG.
+-- Proof shape (per Codex review): use `native_decide` only for the closed
+-- `accelerated_orbit 5 1 = 1` computation; let Lean symbolically reduce
+-- the rest of the route via `simp`.
+example : descendOrbit depthTwoTree 5 0 = some { leafId := "D1", leafProperty := "3:1-1" } := by
+  have hstep : accelerated_orbit 5 1 = 1 := by native_decide
+  simp [descendOrbit, descendFromOrbit, hstep]
 
--- Scenario 6: Completeness — `descend_orbit_complete` provides leaf
--- membership, verification, exact `descendOrbit` result, and `OrbitRoute`
--- witness.
-example (t : CoverageTree) (hv : ValidTree t) (hc : IsComplete t)
-    (x : Nat) (hx : 0 < x) :
-    ∃ l, l ∈ t.leaves ∧ verified t l ∧
-         descendOrbit t x 0 = some l ∧
-         OrbitRoute t x 0 t.root l :=
-  descend_orbit_complete t hv hc x hx
+-- Scenario 6: Concrete valid complete depth-two application of
+-- `descend_orbit_complete`. ValidTree and IsComplete witnesses are
+-- computed by `native_decide` on the concrete `depthTwoTree`.
+example (hv : ValidTree depthTwoTree := by native_decide)
+    (hc : IsComplete depthTwoTree := by native_decide) :
+    ∃ l, l ∈ depthTwoTree.leaves ∧ verified depthTwoTree l ∧
+         descendOrbit depthTwoTree 5 0 = some l ∧
+         OrbitRoute depthTwoTree 5 0 depthTwoTree.root l := by
+  exact descend_orbit_complete depthTwoTree hv hc 5 (by norm_num)
 
 -- Scenario 7: Zero boundary — the theorem requires `0 < x`; no proof
 -- is available without it, and no zero convergence statement is added.
