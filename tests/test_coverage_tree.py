@@ -742,3 +742,106 @@ def test_sat_orbit_unparseable_leaf_returns_false():
 def test_sat_orbit_rejects_negative_bound():
     with pytest.raises(ValueError):
         sat_orbit(CoverageLeaf(leaf_id="L1", leaf_property="3:0-2"), 5, -1)
+
+
+# ---- 07c-4 structural-routing BDD scenarios ----
+# Per docs/story-07c-4-structural-induction.md. Adds structural-routing
+# coverage to complement the existing descend_orbit tests:
+#   - Depth-two route (the discriminating scenario for orbit-aware routing)
+#   - Negative-input enforcement on descend_orbit (mirrors Lean Nat)
+#   - Independent trace oracle that does NOT call descend_orbit
+
+
+def test_descend_orbit_routes_second_level_by_step_one_state():
+    """Depth-two tree: x=5 routes via accelerated_orbit(5, 1) % 3 = 1,
+    not raw 5 % 3 = 2. This is the discriminating scenario — without it,
+    descend_orbit would be indistinguishable from descend on depth-1 trees.
+    """
+    leaves = [
+        CoverageLeaf(leaf_id="D0", leaf_property="3:0-0"),
+        CoverageLeaf(leaf_id="D1", leaf_property="3:1-1"),
+        CoverageLeaf(leaf_id="D2", leaf_property="3:2-2"),
+    ]
+    inner2 = CoverageNode(
+        modulus=3,
+        partition=(0, 1, 2),
+        children={0: leaves[0], 1: leaves[1], 2: leaves[2]},
+    )
+    inner1 = CoverageNode(
+        modulus=4,
+        partition=(1,),
+        children={1: inner2},
+    )
+    tree = CoverageTree(root=inner1, leaves=leaves, max_depth=2)
+    # x = 5: 5 % 4 = 1 -> inner2; accelerated_orbit(5, 1) = 1;
+    # 1 % 3 = 1 -> leaf D1. Raw 5 % 3 = 2 would pick D2 (WRONG).
+    assert descend_orbit(tree, 5, 0) is leaves[1]
+
+
+def test_descend_orbit_rejects_negative_input():
+    """descend_orbit mirrors Lean's Nat domain; negative x raises ValueError.
+
+    Mirrors `test_accelerated_orbit_rejects_negative_inputs` for the
+    orbit-aware entry point. The error may surface from
+    `accelerated_orbit` (reached on the first internal lookup) or from
+    descend_orbit itself; either satisfies the contract.
+    """
+    leaf = CoverageLeaf(leaf_id="L1", leaf_property="3:1-2")
+    tree = CoverageTree(root=leaf, leaves=[leaf], max_depth=1)
+    with pytest.raises(ValueError):
+        descend_orbit(tree, -1, 0)
+
+
+def test_descend_orbit_agrees_with_independent_trace_oracle():
+    """On a depth-2 complete tree, descend_orbit agrees with an iterative
+    trace oracle that does NOT call descend_orbit or its recursion helper.
+
+    The oracle advances `k` by 1 at each internal step and uses
+    `accelerated_orbit(x, k) % modulus` for the residue lookup, mirroring
+    the Lean `descendFromOrbit` recursion (CoverageTree.lean line 129).
+    """
+
+    def trace_oracle(t: CoverageTree, x: int) -> CoverageLeaf | None:
+        if x < 0:
+            raise ValueError(f"x must be non-negative, got {x}")
+        k = 0
+        node = t.root
+        depth = t.max_depth
+        while depth > 0 and not isinstance(node, CoverageLeaf):
+            if node.modulus <= 0:
+                return None
+            residue = accelerated_orbit(x, k) % node.modulus
+            if residue not in node.children:
+                return None
+            node = node.children[residue]
+            k += 1
+            depth -= 1
+        if isinstance(node, CoverageLeaf):
+            return node
+        return None
+
+    leaves = []
+    for j in range(4):
+        for k in range(3):
+            leaves.append(
+                CoverageLeaf(leaf_id=f"L{j}{k}", leaf_property=f"3:{k}-{k}")
+            )
+    children_level2: dict = {}
+    for j in range(4):
+        leaf_block = [l for l in leaves if l.leaf_id.startswith(f"L{j}")]
+        children_level2[j] = CoverageNode(
+            modulus=3,
+            partition=(0, 1, 2),
+            children={idx: leaf_block[idx] for idx in range(3)},
+        )
+    inner1 = CoverageNode(
+        modulus=4,
+        partition=(0, 1, 2, 3),
+        children=children_level2,
+    )
+    tree = CoverageTree(root=inner1, leaves=leaves, max_depth=2)
+    for x in [1, 2, 5, 7, 8, 11, 13, 17, 100]:
+        expected = trace_oracle(tree, x)
+        actual = descend_orbit(tree, x, 0)
+        assert actual == expected, f"x={x}: expected {expected}, got {actual}"
+
