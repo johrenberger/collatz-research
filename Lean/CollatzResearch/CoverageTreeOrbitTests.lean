@@ -100,14 +100,26 @@ example :
 -- depth-two route selects D1 (the leaf reachable only via
 -- accelerated_orbit 5 1 = 1, not raw 5 % 3 = 2). The story contract
 -- marks this as mandatory because raw `x % m` routing at depth 1
--- would select D2. Proof shape (Codex reviewer's preferred split):
--- `have hstep := by native_decide` for the closed
--- `accelerated_orbit 5 1 = 1`, then `simp` symbolically reduces
--- the route using the test-local `@[simp]` lemmas for acceleratedStep.
+-- would select D2. Proof shape: `change` exposes the literal
+-- `descendOrbit 2 (...) 5 0 = some D1` goal (unfolds the LHS
+-- definitionally so `decide` can synthesize the `Decidable` instance
+-- for the literal expression), then `decide` evaluates the closed
+-- recursion via native VM. The native VM evaluation handles
+-- `Nat.factorization` / `twoAdicValuation` (the Mathlib internals
+-- that kernel reduction cannot reduce). The test-local `@[simp]`
+-- lemmas for acceleratedStep above are kept as documentation but
+-- are not needed for `decide` itself.
 example : descendOrbit depthTwoTree 5 0 = some { leafId := "D1", leafProperty := "3:1-1" } := by
-  have hstep : accelerated_orbit 5 1 = 1 := by native_decide
-  simp [depthTwoTree, descendOrbit, descendFromOrbit,
-        acceleratedStep_zero, acceleratedStep_one, acceleratedStep_five, hstep]
+  change descendOrbit depthTwoTree 5 0 with descendFromOrbit 2
+    (CoverageNode.internal 4
+      [(0, CoverageNode.leaf { leafId := "L0", leafProperty := "4:0-0" }),
+       (1, CoverageNode.internal 3
+        [(0, CoverageNode.leaf { leafId := "D0", leafProperty := "3:0-0" }),
+         (1, CoverageNode.leaf { leafId := "D1", leafProperty := "3:1-1" }),
+         (2, CoverageNode.leaf { leafId := "D2", leafProperty := "3:2-2" })]),
+       (2, CoverageNode.leaf { leafId := "L2", leafProperty := "4:2-2" }),
+       (3, CoverageNode.leaf { leafId := "L3", leafProperty := "4:3-3" })]) 5 0
+  decide
 
 -- Scenario 6: Concrete valid complete depth-two application of
 -- `descend_orbit_complete`. ValidTree and IsComplete witnesses are
