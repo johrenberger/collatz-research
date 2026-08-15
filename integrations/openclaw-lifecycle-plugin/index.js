@@ -21,6 +21,14 @@ function valueOr(value, fallback) {
   return value === undefined || value === null || value === "" ? fallback : value;
 }
 
+function pluginConfig(event, context) {
+  const config = event?.context?.pluginConfig ?? context?.pluginConfig;
+  if (!config || typeof config !== "object") {
+    throw new Error("plugin configuration was not provided by the OpenClaw hook event");
+  }
+  return config;
+}
+
 function identifiers(event, context, config) {
   const session = valueOr(context?.sessionKey, context?.sessionId ?? "unknown-session");
   const run = valueOr(event?.runId, context?.runId ?? `prompt-${digest(String(event?.prompt ?? ""))}`);
@@ -55,8 +63,8 @@ export default definePluginEntry({
   description: "Enforces durable receipts and bounded agent execution.",
   register(api) {
     api.on("before_agent_run", async (event, context) => {
-      const config = context.pluginConfig;
       try {
+        const config = pluginConfig(event, context);
         const { packet, run } = identifiers(event, context, config);
         const payload = JSON.stringify({
           source: "openclaw",
@@ -84,9 +92,9 @@ export default definePluginEntry({
     }, { priority: 100, timeoutMs: 10_000 });
 
     api.on("before_tool_call", async (event, context) => {
-      const config = context.pluginConfig;
-      const { run } = identifiers(event, context, config);
       try {
+        const config = pluginConfig(event, context);
+        const { run } = identifiers(event, context, config);
         const budget = lifecycle(config, ["consume", "--turn-id", run, "--kind", "tool"]);
         if (budget.decision === "blocked") return block("tool budget is exhausted");
         const target = String(event.toolName ?? "unknown-tool");
@@ -104,33 +112,36 @@ export default definePluginEntry({
     }, { priority: 100, timeoutMs: 10_000 });
 
     api.on("after_tool_call", async (event, context) => {
-      const config = context.pluginConfig;
-      const { run } = identifiers(event, context, config);
-      const stored = operationKeys.get(String(event.toolCallId ?? `${run}:${event.toolName ?? "unknown-tool"}`));
-      if (!stored) return;
+      let receiptKey;
       try {
+        const config = pluginConfig(event, context);
+        const { run } = identifiers(event, context, config);
+        receiptKey = String(event.toolCallId ?? `${run}:${event.toolName ?? "unknown-tool"}`);
+        const stored = operationKeys.get(receiptKey);
+        if (!stored) return;
         lifecycle(config, [
           "finish-operation", "--turn-id", stored.run, "--operation-key", stored.key,
           "--status", event.isError ? "failed" : "succeeded",
           "--result-json", JSON.stringify({ is_error: Boolean(event.isError) }),
         ]);
       } finally {
-        operationKeys.delete(String(event.toolCallId ?? `${run}:${event.toolName ?? "unknown-tool"}`));
+        if (receiptKey) operationKeys.delete(receiptKey);
       }
     }, { priority: 100, timeoutMs: 10_000 });
 
     api.on("agent_end", async (event, context) => {
-      const config = context.pluginConfig;
-      const { run } = identifiers(event, context, config);
-      if (!turnIds.has(run)) return;
+      let run;
       try {
+        const config = pluginConfig(event, context);
+        ({ run } = identifiers(event, context, config));
+        if (!turnIds.has(run)) return;
         lifecycle(config, [
           "finish", "--turn-id", run,
           "--status", event.isError ? "transport_blocked" : "passed",
           "--evidence-json", JSON.stringify({ source: "openclaw-agent-end", is_error: Boolean(event.isError) }),
         ]);
       } finally {
-        turnIds.delete(run);
+        if (run) turnIds.delete(run);
       }
     }, { priority: 100, timeoutMs: 10_000 });
   },
