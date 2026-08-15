@@ -9,6 +9,7 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
+    "required": ["repoPath", "stateDir"],
     "properties": {
       "repoPath": {
         "type": "string",
