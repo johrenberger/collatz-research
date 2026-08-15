@@ -826,7 +826,7 @@ def test_descend_orbit_agrees_with_independent_trace_oracle():
             leaves.append(CoverageLeaf(leaf_id=f"L{j}{k}", leaf_property=f"3:{k}-{k}"))
     children_level2: dict = {}
     for j in range(4):
-        leaf_block = [l for l in leaves if l.leaf_id.startswith(f"L{j}")]
+        leaf_block = [leaf for leaf in leaves if leaf.leaf_id.startswith(f"L{j}")]
         children_level2[j] = CoverageNode(
             modulus=3,
             partition=(0, 1, 2),
