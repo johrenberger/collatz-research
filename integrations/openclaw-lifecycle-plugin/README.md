@@ -62,3 +62,8 @@ openclaw plugins doctor
 `agent_end` is an observation hook. If an embedded non-Codex harness does not
 emit it, the retained turn remains resumable and `resume` is the safe recovery
 path; the plugin never guesses completion after an aborted provider call.
+
+The plugin obtains its resolved configuration from the typed hook event context.
+After changing a plugin configuration value, restart Gateway before testing a
+chat turn; source inspection alone does not prove that the active Gateway has
+loaded the change.

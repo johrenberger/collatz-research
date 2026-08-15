@@ -25,3 +25,10 @@ def test_given_an_openclaw_turn_when_the_controller_loads_then_all_receipt_hooks
     assert '"begin-operation"' in source
     assert '"finish-operation"' in source
     assert '"consume"' in source
+
+
+def test_given_a_typed_hook_when_it_needs_plugin_settings_then_it_reads_event_context() -> None:
+    source = (PLUGIN / "index.js").read_text(encoding="utf-8")
+
+    assert "event?.context?.pluginConfig" in source
+    assert "const config = context.pluginConfig;" not in source
