@@ -11,13 +11,16 @@ Scenarios mirror the 07c-3 inherited BDD table, adapted to master's
 3-arg `descendOrbit t x k` (entry point: `k = 0`).
 
 **Trust role of `native_decide`.**
-`native_decide` (scenarios 2, 5, 6; the `hv` and `hc` witnesses in
-scenario 6) uses VM-backed evaluation to close goals of the form
-`closed_Nat_computation = expected_value` and (in scenario 5's case,
-after `show`) the concrete closed recursion
-`descendFromOrbit 2 (...) 5 0 = some D1`. This is appropriate as
-executable-test evidence for closed `Nat` computations and concrete
-closed recursions. It does NOT contribute to the kernel proof basis
+`native_decide` is used in scenarios 2, 5 (the `hstep` step only),
+and 6 (the `hv`/`hc` witnesses). It uses VM-backed evaluation to
+close the closed `accelerated_orbit 5 1 = 1` goal. The rest of
+scenario 5's reduction uses `simp` with explicit lemmas (kernel
+reduction); `native_decide` does NOT contribute to the `simp`
+reductions.
+
+`native_decide` is appropriate as executable-test evidence for the
+closed `accelerated_orbit 5 1 = 1` computation (the only place it's
+used in scenario 5). It does NOT contribute to the kernel proof basis
 for `descend_orbit_complete` — the theorem's proof uses only
 `induction` + `cases` + standard Mathlib lemmas (no `native_decide`,
 no VM evaluation). The executable spec is regression evidence, not
@@ -25,13 +28,10 @@ a proof artifact.
 
 Scenario 5's proof shape: `show` exposes the literal
 `descendFromOrbit 2 (...) 5 0 = some D1` goal (removes the
-`depthTwoTree.maxDepth` / `depthTwoTree.root` projections), then
-`native_decide` evaluates the closed recursion via VM. The `show`
-step is the key shape change — without it, `Decidable` synthesis on
-the projection-bearing `descendOrbit depthTwoTree 5 0 = some D1`
-expression fails (the projection path is too deep); with it, the
-literal expression has a synthesizable `Decidable` instance and VM
-evaluation handles the `acceleratedStep` path.
+`depthTwoTree.maxDepth` / `depthTwoTree.root` projections),
+`native_decide` on the closed `accelerated_orbit 5 1 = 1` (per
+reviewer's preferred split), then `simp` with explicit lemmas
+drives the recursion symbolically.
 -/
 
 import CollatzResearch.CoverageTree
@@ -99,19 +99,24 @@ example :
 -- accelerated_orbit 5 1 = 1; 1 % 3 = 1 -> leaf D1.
 -- Raw `x % 3 = 5 % 3 = 2` would pick D2, which is WRONG.
 -- Proof shape: `show` exposes the literal `descendFromOrbit 2 (...) 5 0`
--- goal (no projections), then `native_decide` evaluates the closed
--- recursion via VM. The `show` step is the key shape change — it
--- makes the LHS a concrete expression so `Decidable` synthesis and
--- VM evaluation both work. Earlier attempts at this commit series:
---   - 6e18c63: simp [descendOrbit, descendFromOrbit, hstep] — simp
---     got stuck on projections.
---   - 8ae8ac0: by native_decide on the full (projection-bearing)
---     expression — Decidable synthesis failed on the projection
---     path.
---   - 03d6b0e: show + simp — simp got stuck on an inner match.
--- The current shape (show + native_decide) is the first one where
--- the recursion actually fully reduces.
+-- goal (no projections), `native_decide` on the closed
+-- `accelerated_orbit 5 1 = 1` (per reviewer's preferred split), then
+-- `simp` with explicit lemmas drives the recursion symbolically. The
+-- `show` step is the key shape change — without it, `Decidable`
+-- synthesis on the projection-bearing expression fails; with it, the
+-- literal expression has a synthesizable structure and `simp` can
+-- pattern-match on the recursive equations.
+-- Iteration history at this commit series:
+--   - 6e18c63: simp — stuck on projections.
+--   - 8ae8ac0: by native_decide — Decidable synthesis failed on
+--     projection path.
+--   - 03d6b0e: show + simp — simp got stuck on an inner match
+--     (missing lemmas).
+--   - fe37fdf: show + native_decide — Decidable synthesis still
+--     failed (Decidable synthesizes before VM evaluation).
+--   - current: show + native_decide + simp with explicit lemmas.
 example : descendOrbit depthTwoTree 5 0 = some { leafId := "D1", leafProperty := "3:1-1" } := by
+  have hstep : accelerated_orbit 5 1 = 1 := by native_decide
   show descendFromOrbit 2 (CoverageNode.internal 4
     [(0, CoverageNode.leaf { leafId := "L0", leafProperty := "4:0-0" }),
      (1, CoverageNode.internal 3
@@ -121,7 +126,7 @@ example : descendOrbit depthTwoTree 5 0 = some { leafId := "D1", leafProperty :=
      (2, CoverageNode.leaf { leafId := "L2", leafProperty := "4:2-2" }),
      (3, CoverageNode.leaf { leafId := "L3", leafProperty := "4:3-3" })]) 5 0
     = some { leafId := "D1", leafProperty := "3:1-1" }
-  · native_decide
+  · simp [descendFromOrbit, accelerated_orbit, acceleratedStep, List.lookup, Option.some.get, hstep]
 
 -- Scenario 6: Concrete valid complete depth-two application of
 -- `descend_orbit_complete`. ValidTree and IsComplete witnesses are
