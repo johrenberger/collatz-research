@@ -9,11 +9,15 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "required": ["projectRoot"],
+    "required": ["repoPath", "stateDir"],
     "properties": {
-      "projectRoot": {
+      "repoPath": {
         "type": "string",
-        "description": "Outer project directory containing repo/ and state/."
+        "description": "Absolute path of the canonical Git checkout."
+      },
+      "stateDir": {
+        "type": "string",
+        "description": "Absolute external directory for durable lifecycle state."
       },
       "pythonCommand": {
         "type": "string",
@@ -39,6 +43,12 @@
         "type": "integer",
         "minimum": 1,
         "default": 900
+      },
+      "enforcementMode": {
+        "type": "string",
+        "enum": ["observe", "enforce"],
+        "default": "observe",
+        "description": "Observe records controller failures; enforce blocks a run or tool call."
       }
     }
   }

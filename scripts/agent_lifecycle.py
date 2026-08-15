@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Durable, idempotent packet lifecycle state for an external agent workspace.
+"""Durable, idempotent packet lifecycle state for an agent repository.
 
-The script is intentionally stdlib-only. Invoke it against the *outer* project
-workspace, whose Git checkout is `<project-root>/repo` and mutable state is
-`<project-root>/state`.
+The script is intentionally stdlib-only. New deployments pass an explicit Git
+checkout and external state directory; the former outer-workspace layout remains
+supported only for backwards-compatible recovery.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def _utc_now() -> str:
@@ -40,8 +40,7 @@ def _git(repo: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
 
 
-def _repo_snapshot(project_root: Path) -> dict[str, Any]:
-    repo = project_root / "repo"
+def _repo_snapshot(repo: Path) -> dict[str, Any]:
     if not repo.is_dir():
         raise ValueError(f"missing Git checkout: {repo}")
     top = Path(_git(repo, "rev-parse", "--show-toplevel")).resolve()
@@ -54,11 +53,23 @@ def _repo_snapshot(project_root: Path) -> dict[str, Any]:
     }
 
 
+def _paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    if args.repo_path or args.state_dir:
+        if not args.repo_path or not args.state_dir:
+            raise ValueError("--repo-path and --state-dir must be supplied together")
+        if args.project_root:
+            raise ValueError("use either --project-root or --repo-path/--state-dir")
+        return Path(args.repo_path).resolve(), Path(args.state_dir).resolve()
+    if not args.project_root:
+        raise ValueError("supply --repo-path and --state-dir")
+    project = Path(args.project_root).resolve()
+    return project / "repo", project / "state"
+
+
 @contextlib.contextmanager
 def _locked_ledger(
-    project_root: Path, timeout_seconds: float = 10
+    state: Path, timeout_seconds: float = 10
 ) -> Iterator[tuple[Path, dict[str, Any]]]:
-    state = project_root / "state"
     state.mkdir(parents=True, exist_ok=True)
     lock = state / ".turn-ledger.lock"
     deadline = time.monotonic() + timeout_seconds
@@ -77,8 +88,12 @@ def _locked_ledger(
             ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
         else:
             ledger = {"schema_version": SCHEMA_VERSION, "turns": {}}
+        if ledger.get("schema_version") == 1:
+            ledger["schema_version"] = SCHEMA_VERSION
+            ledger["operations"] = {}
         if ledger.get("schema_version") != SCHEMA_VERSION:
             raise ValueError("unsupported turn ledger schema")
+        ledger.setdefault("operations", {})
         yield ledger_path, ledger
         temporary = ledger_path.with_suffix(".json.tmp")
         temporary.write_text(_canonical(ledger) + "\n", encoding="utf-8")
@@ -104,15 +119,15 @@ def _turn_or_error(ledger: dict[str, Any], turn_id: str) -> dict[str, Any]:
 
 
 def begin(args: argparse.Namespace) -> dict[str, Any]:
-    project = Path(args.project_root).resolve()
+    repo, state = _paths(args)
     payload = _load_json(args.payload_json)
-    snapshot = _repo_snapshot(project)
+    snapshot = _repo_snapshot(repo)
     identity = {
         "packet_id": args.packet_id,
         "snapshot": snapshot,
         "payload_digest": _digest(payload),
     }
-    with _locked_ledger(project) as (_, ledger):
+    with _locked_ledger(state) as (_, ledger):
         previous = ledger["turns"].get(args.turn_id)
         if previous:
             if previous["identity"] != identity:
@@ -136,14 +151,19 @@ def begin(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def consume(args: argparse.Namespace) -> dict[str, Any]:
-    project = Path(args.project_root).resolve()
+    _, state = _paths(args)
     field = "model_attempts" if args.kind == "model" else "tool_calls"
     limit = "max_model_attempts" if args.kind == "model" else "max_tool_calls"
-    with _locked_ledger(project) as (_, ledger):
+    with _locked_ledger(state) as (_, ledger):
         turn = _turn_or_error(ledger, args.turn_id)
         if turn["status"] not in {"running", "resumable"}:
             raise ValueError(f"cannot consume budget for turn in {turn['status']}")
         turn["status"] = "running"
+        created_at = datetime.fromisoformat(turn["created_at"])
+        if (datetime.now(UTC) - created_at).total_seconds() >= turn["budgets"]["max_seconds"]:
+            turn["status"] = "budget_blocked"
+            turn["blocked_at"] = _utc_now()
+            return {"decision": "blocked", "turn": turn}
         if turn["budgets"][field] >= turn["budgets"][limit]:
             turn["status"] = "budget_blocked"
             turn["blocked_at"] = _utc_now()
@@ -153,9 +173,9 @@ def consume(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def begin_operation(args: argparse.Namespace) -> dict[str, Any]:
-    project = Path(args.project_root).resolve()
+    _, state = _paths(args)
     input_value = _load_json(args.input_json)
-    with _locked_ledger(project) as (_, ledger):
+    with _locked_ledger(state) as (_, ledger):
         turn = _turn_or_error(ledger, args.turn_id)
         if turn["status"] not in {"running", "resumable"}:
             raise ValueError(f"cannot create an operation for turn in {turn['status']}")
@@ -169,28 +189,32 @@ def begin_operation(args: argparse.Namespace) -> dict[str, Any]:
                 "input_digest": _digest(input_value),
             }
         )
-        existing = turn["operations"].get(key)
+        existing = ledger["operations"].get(key)
         if existing:
             return {"decision": "duplicate", "operation_key": key, "operation": existing}
         operation = {
+            "turn_id": args.turn_id,
             "step_id": args.step_id,
             "kind": args.operation_kind,
             "target": args.target,
             "status": "intent",
             "created_at": _utc_now(),
         }
+        ledger["operations"][key] = operation
         turn["operations"][key] = operation
         return {"decision": "execute_once", "operation_key": key, "operation": operation}
 
 
 def finish_operation(args: argparse.Namespace) -> dict[str, Any]:
-    project = Path(args.project_root).resolve()
-    with _locked_ledger(project) as (_, ledger):
-        turn = _turn_or_error(ledger, args.turn_id)
+    _, state = _paths(args)
+    with _locked_ledger(state) as (_, ledger):
+        _turn_or_error(ledger, args.turn_id)
         try:
-            operation = turn["operations"][args.operation_key]
+            operation = ledger["operations"][args.operation_key]
         except KeyError as exc:
             raise ValueError("unknown operation key") from exc
+        if operation["turn_id"] != args.turn_id:
+            raise ValueError("operation does not belong to this turn")
         if operation["status"] == "succeeded":
             return {"decision": "already_succeeded", "operation": operation}
         operation["status"] = args.status
@@ -200,20 +224,24 @@ def finish_operation(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def resume(args: argparse.Namespace) -> dict[str, Any]:
-    project = Path(args.project_root).resolve()
-    with _locked_ledger(project) as (_, ledger):
+    _, state = _paths(args)
+    with _locked_ledger(state) as (_, ledger):
         turn = _turn_or_error(ledger, args.turn_id)
         if turn["status"] in {"passed", "budget_blocked", "transport_blocked"}:
             return {"decision": "not_resumable", "turn": turn}
-        intents = [key for key, op in turn["operations"].items() if op["status"] == "intent"]
+        intents = [
+            key
+            for key, op in ledger["operations"].items()
+            if op.get("turn_id") == args.turn_id and op["status"] == "intent"
+        ]
         turn["status"] = "resumable"
         turn["resumed_at"] = _utc_now()
         return {"decision": "resume_from_receipt", "pending_operation_keys": intents, "turn": turn}
 
 
 def finish(args: argparse.Namespace) -> dict[str, Any]:
-    project = Path(args.project_root).resolve()
-    with _locked_ledger(project) as (_, ledger):
+    _, state = _paths(args)
+    with _locked_ledger(state) as (_, ledger):
         turn = _turn_or_error(ledger, args.turn_id)
         turn["status"] = args.status
         turn["finished_at"] = _utc_now()
@@ -223,7 +251,9 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--project-root", required=True)
+    parser.add_argument("--project-root")
+    parser.add_argument("--repo-path")
+    parser.add_argument("--state-dir")
     commands = parser.add_subparsers(required=True, dest="command")
     begin_parser = commands.add_parser("begin")
     begin_parser.add_argument("--packet-id", required=True)
