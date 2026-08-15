@@ -26,12 +26,14 @@ for `descend_orbit_complete` — the theorem's proof uses only
 no VM evaluation). The executable spec is regression evidence, not
 a proof artifact.
 
-Scenario 5's proof shape: `show` exposes the literal
-`descendFromOrbit 2 (...) 5 0 = some D1` goal (removes the
-`depthTwoTree.maxDepth` / `depthTwoTree.root` projections),
-`native_decide` on the closed `accelerated_orbit 5 1 = 1` (per
-reviewer's preferred split), then `simp` with explicit lemmas
-drives the recursion symbolically.
+Scenario 5's proof shape (Codex reviewer's preferred split):
+`native_decide` on the closed `accelerated_orbit 5 1 = 1`, then
+`simp [depthTwoTree, descendOrbit, descendFromOrbit, hstep]`
+symbolically reduces the route. The simp reduction uses
+`@[simp]` lemmas for `acceleratedStep` (in `Basic.lean`) to reduce
+the closed `acceleratedStep 5` that appears at the recursive
+step — without those lemmas, `simp` can't drive the recursion
+because Mathlib's `twoAdicValuation` isn't kernel-reducible.
 -/
 
 import CollatzResearch.CoverageTree
@@ -98,35 +100,14 @@ example :
 -- never raw `x % m₁`. For x = 5: 5 % 4 = 1 -> child with modulus 3;
 -- accelerated_orbit 5 1 = 1; 1 % 3 = 1 -> leaf D1.
 -- Raw `x % 3 = 5 % 3 = 2` would pick D2, which is WRONG.
--- Proof shape: `show` exposes the literal `descendFromOrbit 2 (...) 5 0`
--- goal (no projections), `native_decide` on the closed
--- `accelerated_orbit 5 1 = 1` (per reviewer's preferred split), then
--- `simp` with explicit lemmas drives the recursion symbolically. The
--- `show` step is the key shape change — without it, `Decidable`
--- synthesis on the projection-bearing expression fails; with it, the
--- literal expression has a synthesizable structure and `simp` can
--- pattern-match on the recursive equations.
--- Iteration history at this commit series:
---   - 6e18c63: simp — stuck on projections.
---   - 8ae8ac0: by native_decide — Decidable synthesis failed on
---     projection path.
---   - 03d6b0e: show + simp — simp got stuck on an inner match
---     (missing lemmas).
---   - fe37fdf: show + native_decide — Decidable synthesis still
---     failed (Decidable synthesizes before VM evaluation).
---   - current: show + native_decide + simp with explicit lemmas.
+-- Proof shape (Codex reviewer's preferred split): native_decide on the
+-- closed accelerated_orbit 5 1 = 1, then simp reduces the rest of the
+-- route symbolically. Works because Basic.lean has @[simp] lemmas
+-- for acceleratedStep at the closed values (0, 1, 5), letting simp
+-- reduce the recursive descendFromOrbit computation.
 example : descendOrbit depthTwoTree 5 0 = some { leafId := "D1", leafProperty := "3:1-1" } := by
   have hstep : accelerated_orbit 5 1 = 1 := by native_decide
-  show descendFromOrbit 2 (CoverageNode.internal 4
-    [(0, CoverageNode.leaf { leafId := "L0", leafProperty := "4:0-0" }),
-     (1, CoverageNode.internal 3
-      [(0, CoverageNode.leaf { leafId := "D0", leafProperty := "3:0-0" }),
-       (1, CoverageNode.leaf { leafId := "D1", leafProperty := "3:1-1" }),
-       (2, CoverageNode.leaf { leafId := "D2", leafProperty := "3:2-2" })]),
-     (2, CoverageNode.leaf { leafId := "L2", leafProperty := "4:2-2" }),
-     (3, CoverageNode.leaf { leafId := "L3", leafProperty := "4:3-3" })]) 5 0
-    = some { leafId := "D1", leafProperty := "3:1-1" }
-  · simp [descendFromOrbit, accelerated_orbit, acceleratedStep, List.lookup, Option.some.get, hstep]
+  simp [depthTwoTree, descendOrbit, descendFromOrbit, hstep]
 
 -- Scenario 6: Concrete valid complete depth-two application of
 -- `descend_orbit_complete`. ValidTree and IsComplete witnesses are
