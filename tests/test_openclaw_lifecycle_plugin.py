@@ -14,7 +14,9 @@ def test_given_a_native_plugin_when_packaged_then_manifest_and_runtime_entry_agr
 
     assert manifest["id"] == "collatz-lifecycle"
     assert package["openclaw"]["extensions"] == ["./index.js"]
-    assert manifest["configSchema"]["required"] == ["repoPath", "stateDir"]
+    # OpenClaw 2026.7.1-2 validates during `plugins install`; requiring these
+    # values makes a fresh installation impossible to configure through its CLI.
+    assert "required" not in manifest["configSchema"]
 
 
 def test_given_an_openclaw_turn_when_the_controller_loads_then_all_receipt_hooks_exist() -> None:
@@ -51,3 +53,13 @@ def test_canonical_checkout_requires_external_state_and_observation_mode() -> No
     assert properties["receiptToolNames"]["default"] == []
     assert "repoPath" in properties
     assert "stateDir" in properties
+
+
+def test_fresh_install_bootstrap_is_valid() -> None:
+    manifest = json.loads((PLUGIN / "openclaw.plugin.json").read_text(encoding="utf-8"))
+    source = (PLUGIN / "index.js").read_text(encoding="utf-8")
+    readme = (PLUGIN / "README.md").read_text(encoding="utf-8")
+
+    assert "required" not in manifest["configSchema"]
+    assert "repoPath, stateDir, and scripts/agent_lifecycle.py are required" in source
+    assert "2026.7.1-2" in readme
