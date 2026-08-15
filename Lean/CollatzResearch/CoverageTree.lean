@@ -251,6 +251,21 @@ def IsComplete (t : CoverageTree) : Prop := IsCompleteAux t t.root
 def satisfies (t : CoverageTree) (x : Nat) (l : CoverageLeaf) : Prop :=
   descend t x = some l
 
+/-- Orbit-aware routing relation (Story 07c-4).
+
+    At an internal node with modulus `m` at orbit index `i`, the selected
+    edge is labelled `accelerated_orbit x i % m`. A terminal node contains
+    the returned leaf. The structural recursion mirrors `descendFromOrbit`. -/
+inductive OrbitRoute (t : CoverageTree) (x : Nat) :
+    Nat → CoverageNode → CoverageLeaf → Prop
+  | leaf {i : Nat} {l : CoverageLeaf} :
+      OrbitRoute t x i (.leaf l) l
+  | internal {i : Nat} {m : Nat} {children : List (Nat × CoverageNode)}
+      {child : CoverageNode} {l : CoverageLeaf}
+      (hpair_mem : (accelerated_orbit x i % m, child) ∈ children)
+      (hrest : OrbitRoute t x (i + 1) child l) :
+      OrbitRoute t x i (.internal m children) l
+
 /-- Structural soundness for `CoverageTree` (Story 07c / round-5, 07c-2).
 
 The tree model currently proves only that a valid, complete tree descends to
@@ -328,6 +343,75 @@ theorem coverage_tree_soundness_orbit (t : CoverageTree)
          descendOrbit t x 0 = some l ∧
          SatOrbit t x l := by
   sorry
+
+/-- Orbit-aware routing completeness (Story 07c-4).
+
+    Strengthens `coverage_tree_soundness` with orbit-aware routing. For
+    each positive input `x`, `descendOrbit t x 0` returns a leaf in
+    `t.leaves`, verifies it, and constructs the
+    `OrbitRoute t x 0 t.root l` witness (each internal edge is selected
+    by `accelerated_orbit x i % m`).
+
+    **Proof strategy:** mirror `coverage_tree_soundness` (Nat induction
+    on depth, `cases n` on `CoverageNode`). Orbit-aware residue
+    `accelerated_orbit x k % m` instead of `x % m`. `OrbitRoute`
+    witness threaded through the induction hypothesis.
+
+    **Claim level: formally established.** No `sorry`, no `admit`, no
+    axiom. Companion to `coverage_tree_soundness`; does NOT modify
+    `coverage_tree_soundness_orbit` or its `sorry` (separate workstream). -/
+theorem descend_orbit_complete (t : CoverageTree) (hv : ValidTree t) (hc : IsComplete t)
+    (x : Nat) (hx : 0 < x) :
+    ∃ l, l ∈ t.leaves ∧ verified t l ∧
+         descendOrbit t x 0 = some l ∧
+         OrbitRoute t x 0 t.root l := by
+  suffices h : ∀ (depth : Nat),
+      ∀ (n : CoverageNode), ValidNode depth n → IsCompleteAux t n →
+      ∀ (k : Nat), ∀ x, x > 0 →
+        ∃ l, l ∈ t.leaves ∧ verified t l ∧
+             descendFromOrbit depth n x k = some l ∧
+             OrbitRoute t x k n l by
+    exact h t.maxDepth t.root hv.2 hc 0 x hx
+  intro depth
+  induction depth using Nat.rec with
+  | zero =>
+    intro n hvn hic k x hx
+    cases n with
+    | leaf l =>
+      cases hic with
+      | leafC _ hleaf hver =>
+        exact ⟨l, hleaf, hver, rfl, OrbitRoute.leaf⟩
+    | internal m children =>
+      exact False.elim hvn
+  | succ depth' ih =>
+    intro n hvn hic k x hx
+    cases n with
+    | leaf l =>
+      cases hic with
+      | leafC _ hleaf hver =>
+        exact ⟨l, hleaf, hver, rfl, OrbitRoute.leaf⟩
+    | internal m children =>
+      cases hic with
+      | internalC _ _ hm halls hall =>
+        have hx_mod : accelerated_orbit x k % m < m :=
+          Nat.mod_lt (accelerated_orbit x k) hm
+        have hlookup : (children.lookup (accelerated_orbit x k % m)).isSome :=
+          halls.2 (accelerated_orbit x k % m) hx_mod
+        obtain ⟨child, hchild_lookup⟩ := Option.isSome_iff_exists.mp hlookup
+        obtain ⟨before, after, hchildren, _⟩ :=
+          List.lookup_eq_some_iff.mp hchild_lookup
+        have hpair_mem : (accelerated_orbit x k % m, child) ∈ children := by
+          rw [hchildren]; simp
+        obtain ⟨_, _, hvn_rest⟩ := hvn
+        have hchild_vn : ValidNode depth' child :=
+          hvn_rest (accelerated_orbit x k % m, child) hpair_mem
+        have hchild_ic : IsCompleteAux t child :=
+          hall (accelerated_orbit x k % m, child) hpair_mem
+        have hresult := ih child hchild_vn hchild_ic (k + 1) x hx
+        obtain ⟨l, hl, hv', hdesc_child, hroute_child⟩ := hresult
+        refine ⟨l, hl, hv', ?_, ?_⟩
+        · simpa [descendFromOrbit, hchild_lookup] using hdesc_child
+        · exact OrbitRoute.internal hpair_mem hroute_child
 
 -- Depth-0/1/2 regression examples (per Codex 4922430978).
 example : descendFrom 0 (.leaf { leafId := "L0", leafProperty := "P0" }) 5 = some { leafId := "L0", leafProperty := "P0" } := rfl
