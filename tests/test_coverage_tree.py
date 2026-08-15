@@ -823,9 +823,7 @@ def test_descend_orbit_agrees_with_independent_trace_oracle():
     leaves = []
     for j in range(4):
         for k in range(3):
-            leaves.append(
-                CoverageLeaf(leaf_id=f"L{j}{k}", leaf_property=f"3:{k}-{k}")
-            )
+            leaves.append(CoverageLeaf(leaf_id=f"L{j}{k}", leaf_property=f"3:{k}-{k}"))
     children_level2: dict = {}
     for j in range(4):
         leaf_block = [l for l in leaves if l.leaf_id.startswith(f"L{j}")]
@@ -844,4 +842,3 @@ def test_descend_orbit_agrees_with_independent_trace_oracle():
         expected = trace_oracle(tree, x)
         actual = descend_orbit(tree, x, 0)
         assert actual == expected, f"x={x}: expected {expected}, got {actual}"
-
