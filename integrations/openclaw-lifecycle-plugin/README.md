@@ -28,9 +28,13 @@ openclaw plugins enable collatz-lifecycle
 
 Set the following in the OpenClaw configuration. `repoPath` is the canonical
 Git checkout and `stateDir` is a writable persistent directory outside it.
-They are manifest-required. OpenClaw records an installation with missing
-required configuration as disabled, allowing an operator to configure these
-paths before enabling the plugin.
+They are intentionally optional at manifest-validation time. OpenClaw
+`2026.7.1-2` validates configuration during `plugins install` and aborts before
+it can record the documented disabled installation when these fields are
+required. The controller validates both values at runtime; in the default
+`observe` mode an incomplete configuration is reported without blocking chat.
+Configure both paths immediately after installation and before considering
+`enforce` mode.
 
 ```json
 {
