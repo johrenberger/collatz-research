@@ -11,8 +11,8 @@ Scenarios mirror the 07c-3 inherited BDD table, adapted to master's
 3-arg `descendOrbit t x k` (entry point: `k = 0`).
 
 **Trust role of `native_decide`.**
-`native_decide` (scenarios 2, 5, 6; the `hv` and `hc` witnesses in
-scenario 6) uses VM-backed evaluation to close goals of the form
+`native_decide` (scenarios 2, 5's `hstep`, scenario 6's `hv`/`hc`)
+uses VM-backed evaluation to close goals of the form
 `closed_Nat_computation = expected_value`. This is appropriate as
 executable-test evidence for closed `Nat` computations. It does NOT
 contribute to the kernel proof basis for `descend_orbit_complete` —
@@ -20,16 +20,16 @@ the theorem's proof uses only `induction` + `cases` + standard Mathlib
 lemmas (no `native_decide`, no VM evaluation). The executable spec is
 regression evidence, not a proof artifact.
 
-The reviewer's preferred proof shape for scenario 5 was
-`have hstep := by native_decide; simp [descendOrbit, descendFromOrbit, hstep]`
-(native_decide only on the closed `accelerated_orbit 5 1 = 1`, then
-`simp` symbolically to reduce the route). In practice `simp` did not
-fully reduce the goal — the `depthTwoTree.maxDepth` / `depthTwoTree.root`
-projections blocked the recursion under the default simp set, and
-adding `depthTwoTree` to the simp set still left the outer
-`descendFromOrbit` match cases un-driven. Falling back to
-`native_decide` on the full concrete expression matches the P2
-reviewer's note ("fine for closed regression checks").
+Scenario 5's proof shape: `native_decide` on the closed
+`accelerated_orbit 5 1 = 1` (per the reviewer's preferred split), then
+`show` exposes the literal `descendFromOrbit` goal (no projections),
+then `simp` symbolically reduces the route without needing `Decidable`
+synthesis on the full `descendOrbit depthTwoTree 5 0 = some D1`
+expression. Earlier attempts at this commit series that used `simp`
+without `show` (6e18c63) or `by native_decide` on the full expression
+(8ae8ac0) both failed at Decidable synthesis — the `show` step exposes
+the recursion argument directly so `simp` doesn't need to reduce
+projections.
 -/
 
 import CollatzResearch.CoverageTree
@@ -96,8 +96,23 @@ example :
 -- never raw `x % m₁`. For x = 5: 5 % 4 = 1 -> child with modulus 3;
 -- accelerated_orbit 5 1 = 1; 1 % 3 = 1 -> leaf D1.
 -- Raw `x % 3 = 5 % 3 = 2` would pick D2, which is WRONG.
+-- Proof shape: `native_decide` on the closed `accelerated_orbit 5 1 = 1`
+-- only (per the reviewer's preferred split); `show` exposes the literal
+-- `descendFromOrbit` goal so `simp` can drive the recursion
+-- symbolically without needing `Decidable` synthesis on the full
+-- `descendOrbit depthTwoTree 5 0 = some D1` expression.
 example : descendOrbit depthTwoTree 5 0 = some { leafId := "D1", leafProperty := "3:1-1" } := by
-  native_decide
+  have hstep : accelerated_orbit 5 1 = 1 := by native_decide
+  show descendFromOrbit 2 (CoverageNode.internal 4
+    [(0, CoverageNode.leaf { leafId := "L0", leafProperty := "4:0-0" }),
+     (1, CoverageNode.internal 3
+      [(0, CoverageNode.leaf { leafId := "D0", leafProperty := "3:0-0" }),
+       (1, CoverageNode.leaf { leafId := "D1", leafProperty := "3:1-1" }),
+       (2, CoverageNode.leaf { leafId := "D2", leafProperty := "3:2-2" })]),
+     (2, CoverageNode.leaf { leafId := "L2", leafProperty := "4:2-2" }),
+     (3, CoverageNode.leaf { leafId := "L3", leafProperty := "4:3-3" })]) 5 0
+    = some { leafId := "D1", leafProperty := "3:1-1" }
+  · simp [descendFromOrbit, hstep]
 
 -- Scenario 6: Concrete valid complete depth-two application of
 -- `descend_orbit_complete`. ValidTree and IsComplete witnesses are
