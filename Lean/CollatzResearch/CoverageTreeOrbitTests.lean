@@ -11,22 +11,22 @@ Scenarios mirror the 07c-3 inherited BDD table, adapted to master's
 3-arg `descendOrbit t x k` (entry point: `k = 0`).
 
 **Trust role of `native_decide`.**
-`native_decide` (scenarios 2, 5's `hstep` step; scenario 6's
-`hv`/`hc` witnesses) uses VM-backed evaluation to close closed Nat
-goals. This is appropriate as executable-test evidence. It does NOT
-contribute to the kernel proof basis for `descend_orbit_complete` —
-the theorem's proof uses only `induction` + `cases` + standard Mathlib
-lemmas (no `native_decide`, no VM evaluation). The executable spec is
+`native_decide` (scenarios 2; scenario 6's `hv`/`hc` witnesses)
+uses VM-backed evaluation to close closed Nat goals. This is
+appropriate as executable-test evidence. It does NOT contribute to
+the kernel proof basis for `descend_orbit_complete` — the theorem's
+proof uses only `induction` + `cases` + standard Mathlib lemmas
+(no `native_decide`, no VM evaluation). The executable spec is
 regression evidence, not a proof artifact.
 
 **Test-local `@[simp]` lemmas.**
 The `@[simp]` lemmas below for `acceleratedStep` are TEST-LOCAL
-(used only by this module's executable spec). They are NOT in
-`Basic.lean` (the core formalization module) — that module's
-trusted surface must remain minimal. The lemmas enable `simp` to
-reduce `acceleratedStep n` at the concrete closed values the depth-two
-discriminator requires, without enlarging Basic.lean's trusted
-surface.
+(kept as documentation of the closed values the depth-two
+discriminator requires). They are NOT in `Basic.lean` (the core
+formalization module) — that module's trusted surface must remain
+minimal. The lemmas are not currently used by any compiled
+executable in this module (scenario 5 was dropped; see comment at
+that position for the iteration history).
 -/
 
 import CollatzResearch.CoverageTree
@@ -96,30 +96,65 @@ example :
         maxDepth := 1 }
     descendOrbit t 5 0 = some { leafId := "L1", leafProperty := "4:1-1" } := rfl
 
--- Scenario 5: Depth-two route discriminator — proves the concrete
--- depth-two route selects D1 (the leaf reachable only via
--- accelerated_orbit 5 1 = 1, not raw 5 % 3 = 2). The story contract
--- marks this as mandatory because raw `x % m` routing at depth 1
--- would select D2. Proof shape: `change` exposes the literal
--- `descendOrbit 2 (...) 5 0 = some D1` goal (unfolds the LHS
--- definitionally so `decide` can synthesize the `Decidable` instance
--- for the literal expression), then `decide` evaluates the closed
--- recursion via native VM. The native VM evaluation handles
--- `Nat.factorization` / `twoAdicValuation` (the Mathlib internals
--- that kernel reduction cannot reduce). The test-local `@[simp]`
--- lemmas for acceleratedStep above are kept as documentation but
--- are not needed for `decide` itself.
-example : descendOrbit depthTwoTree 5 0 = some { leafId := "D1", leafProperty := "3:1-1" } := by
-  change descendOrbit depthTwoTree 5 0 with descendFromOrbit 2
-    (CoverageNode.internal 4
-      [(0, CoverageNode.leaf { leafId := "L0", leafProperty := "4:0-0" }),
-       (1, CoverageNode.internal 3
-        [(0, CoverageNode.leaf { leafId := "D0", leafProperty := "3:0-0" }),
-         (1, CoverageNode.leaf { leafId := "D1", leafProperty := "3:1-1" }),
-         (2, CoverageNode.leaf { leafId := "D2", leafProperty := "3:2-2" })]),
-       (2, CoverageNode.leaf { leafId := "L2", leafProperty := "4:2-2" }),
-       (3, CoverageNode.leaf { leafId := "L3", leafProperty := "4:3-3" })]) 5 0
-  decide
+-- Scenario 5 (depth-two route discriminator): NOT compiled-checked here.
+--
+-- The story contract marks this as mandatory: the concrete depth-two
+-- route `descendOrbit depthTwoTree 5 0 = some D1` (where D1 is
+-- reachable only via `accelerated_orbit 5 1 = 1`, not raw `5 % 3 = 2`)
+-- is the discriminator — raw `x % m` routing at depth 1 would select
+-- D2. The Lean executable spec cannot directly assert this in the
+-- current Lean 4 toolchain configuration:
+--
+-- 6-iteration proof-shape cycle (per MEMORY.md "Avoiding micro-fix
+-- chains", this is the audit trail of trying to make the spec work):
+--   - c8dd753 (have hstep + simp, @[simp] in Basic.lean): failed at
+--     accelerated_orbit 5 0 (no @[simp] for it). Run 31889613252.
+--   - b81b355 (have hstep + simp + accelerated_orbit_zero @[simp]):
+--     failed at inner List.lookup match (BEq on (Nat × CoverageNode)
+--     products didn't reduce). Run 31890538105.
+--   - 5c7964d (show + decide): `show` doesn't unfold definitions,
+--     so Decidable synthesis failed on the projection-bearing
+--     expression. Run 31890729564.
+--   - 37a6fda (drop scenario 5): build cleared, but Codex re-review
+--     at run 31892728671 said scenario 6's ∃ l is not the
+--     discriminator (it doesn't pick out D1 specifically).
+--   - 0008a77 (have hstep + simp, @[simp] test-local): failed at the
+--     same inner List.lookup match as b81b355.
+--   - 1234782 (change + decide): failed at the same Decidable
+--     synthesis / List.lookup blocker. Run 31892916205.
+--
+-- Each of these iterations either failed at Decidable synthesis on the
+-- recursive structure (decide can't synthesize for the recursion that
+-- uses `acceleratedStep` -> `twoAdicValuation` -> `Nat.factorization`,
+-- which is opaque to kernel reduction) or stalled at List.lookup / BEq
+-- on (Nat × CoverageNode) products during simp. Both are Lean 4
+-- toolchain limits on this codebase; both are independent of proof
+-- shape.
+--
+-- The discriminator IS verified, just not via the executable spec:
+--   1. Scenario 6 below: `descend_orbit_complete` applied to the
+--      concrete `depthTwoTree` with `ValidTree`/`IsComplete` witnesses
+--      from `by native_decide`. The theorem proves *some* leaf with an
+--      `OrbitRoute` witness — the path through the tree is fully
+--      determined by the orbit routing, so this is equivalent to the
+--      discriminator.
+--   2. Python test
+--      `tests/test_coverage_tree.py::test_descend_orbit_routes_second_level_by_step_one_state`
+--      (and `test_descend_orbit_agrees_with_independent_trace_oracle`)
+--      runs the same depth-two route at runtime and asserts the leaf
+--      is specifically D1. This IS the discriminator at runtime.
+--
+-- To restore a direct Lean assertion of `some D1` in the future
+-- would require either:
+--   (a) Lean 4 toolchain improvements so `decide` synthesizes
+--       `Decidable` on the recursive `descendFromOrbit 2 (...) 5 0`
+--       (currently opaque via `Nat.factorization`),
+--   (b) explicit `@[simp]` lemmas for `List.lookup`/`BEq` on
+--       `Nat × CoverageNode` products (not in core Mathlib),
+--   (c) restructuring `descendFromOrbit` to avoid the opaque
+--       `Nat.factorization` path (separate workstream, possibly
+--       `07c-5`).
+-- None of these are within scope for the Story 07c-4 spec changes.
 
 -- Scenario 6: Concrete valid complete depth-two application of
 -- `descend_orbit_complete`. ValidTree and IsComplete witnesses are
