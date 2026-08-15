@@ -22,10 +22,10 @@ example : accelerated_orbit 17 0 = 17 := rfl
 
 -- Scenario 2: One step — `accelerated_orbit x 1 = acceleratedStep x`,
 -- with exact values `1, 1, 25, 1` for inputs `0, 1, 8, 5`.
-example : accelerated_orbit 0 1 = 1 := decide
-example : accelerated_orbit 1 1 = 1 := decide
-example : accelerated_orbit 8 1 = 25 := decide
-example : accelerated_orbit 5 1 = 1 := decide
+example : accelerated_orbit 0 1 = 1 := by decide
+example : accelerated_orbit 1 1 = 1 := by decide
+example : accelerated_orbit 8 1 = 25 := by decide
+example : accelerated_orbit 5 1 = 1 := by decide
 
 -- Scenario 3: Leaf root — `descendOrbit` returns the leaf for a one-leaf tree.
 example (l : CoverageLeaf) :
@@ -64,7 +64,7 @@ example :
            { leafId := "D1", leafProperty := "3:1-1" },
            { leafId := "D2", leafProperty := "3:2-2" }],
         maxDepth := 2 }
-    descendOrbit t 5 0 = some { leafId := "D1", leafProperty := "3:1-1" } := decide
+    descendOrbit t 5 0 = some { leafId := "D1", leafProperty := "3:1-1" } := by decide
 
 -- Scenario 6: Completeness — `descend_orbit_complete` provides leaf
 -- membership, verification, exact `descendOrbit` result, and `OrbitRoute`
