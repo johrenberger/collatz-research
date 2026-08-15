@@ -589,7 +589,16 @@ def descend_orbit(tree: CoverageTree, x: int, k: int) -> CoverageLeaf | None:
     `k = 0` and trees where each leaf's `period` equals its parent's
     modulus, `descend_orbit(tree, x, 0)` agrees with
     `descend(tree, x)`.
+
+    Validates `x >= 0` and `k >= 0` at the entry point to mirror
+    Lean's `Nat` domain; `accelerated_orbit` enforces this on internal
+    reach but the leaf-root path bypassed it (caught by
+    `test_descend_orbit_rejects_negative_input`, Story 07c-4).
     """
+    if x < 0:
+        raise ValueError(f"x must be non-negative (mirrors Lean Nat), got {x}")
+    if k < 0:
+        raise ValueError(f"k must be non-negative (mirrors Lean Nat), got {k}")
     return _descend_from_orbit(tree.max_depth, tree.root, x, k)
 
 

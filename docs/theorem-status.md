@@ -35,6 +35,7 @@
 | `DescentWitness.Valid.start_pos_odd` | Checked | `CollatzResearch.Certificate` | A valid local-descent witness has a positive, odd start (matching Python's `accelerated_step`) |
 | `acceleratedStep_odd_of_odd` | Pending | `CollatzResearch.Certificate` | `acceleratedStep` preserves oddness on the odd domain (admitted `sorry`; pending Mathlib `Nat.factorization_div` / `Nat.factorization_pow` chain — same Mathlib blocker as `Dynamics.lean::acceleratedStep_positive_of_odd`, tracked as Story 02c/03c workstream) |
 | `DescentWitness.trajectory_odd` | Checked | `CollatzResearch.Certificate` | Oddness is preserved along the accelerated trajectory (induction on `steps`, uses `acceleratedStep_odd_of_odd`) |
+| `descend_orbit_complete` | Checked | `CollatzResearch.CoverageTree` | Structural orbit-aware routing completeness: for valid + complete `t` and `0 < x`, `descendOrbit t x 0` returns a leaf in `t.leaves`, verified, with `OrbitRoute t x 0 t.root l` witness. Each internal edge is selected by `accelerated_orbit x i % m`. Explicitly NOT `SatOrbit`, local descent, or global convergence. |
 | Global convergence | Not started | — | No claim |
 | Nontrivial cycle exclusion | Not started | — | No claim |
 
