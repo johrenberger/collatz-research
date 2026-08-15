@@ -117,6 +117,11 @@ def accelerated_orbit : Nat → Nat → Nat
   | n, Nat.zero => n
   | n, k + 1 => acceleratedStep (accelerated_orbit n k)
 
+/-- `@[simp]` lemma so `simp` can unfold `accelerated_orbit n 0` to `n`
+    (the base case). Needed by executable-spec reductions where the
+    recursive computation must fully close at concrete inputs. -/
+@[simp] theorem accelerated_orbit_zero (n : Nat) : accelerated_orbit n 0 = n := rfl
+
 /-- `ReachesOne n` iff applying `acceleratedStep` repeatedly to `n`
     eventually reaches 1. (Story 07c / round-5, 07c-2.) -/
 def ReachesOne (n : Nat) : Prop := ∃ k, accelerated_orbit n k = 1
