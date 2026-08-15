@@ -14,7 +14,7 @@ def test_given_a_native_plugin_when_packaged_then_manifest_and_runtime_entry_agr
 
     assert manifest["id"] == "collatz-lifecycle"
     assert package["openclaw"]["extensions"] == ["./index.js"]
-    assert manifest["configSchema"]["required"] == ["projectRoot"]
+    assert manifest["configSchema"]["required"] == ["repoPath", "stateDir"]
 
 
 def test_given_an_openclaw_turn_when_the_controller_loads_then_all_receipt_hooks_exist() -> None:
@@ -32,3 +32,13 @@ def test_given_a_typed_hook_when_it_needs_plugin_settings_then_it_reads_event_co
 
     assert "event?.context?.pluginConfig" in source
     assert "const config = context.pluginConfig;" not in source
+
+
+def test_canonical_checkout_requires_external_state_and_observation_mode() -> None:
+    manifest = json.loads((PLUGIN / "openclaw.plugin.json").read_text(encoding="utf-8"))
+
+    properties = manifest["configSchema"]["properties"]
+    assert properties["enforcementMode"]["default"] == "observe"
+    assert properties["receiptToolNames"]["default"] == []
+    assert "repoPath" in properties
+    assert "stateDir" in properties

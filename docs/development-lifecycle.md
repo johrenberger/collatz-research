@@ -22,24 +22,25 @@ context or a short SHA alone.
 
 ## Workspace and commands
 
-The agent project is outside the Git checkout:
+The canonical deployment has one Git checkout and an external mutable state
+directory. Do not put lifecycle state in the checkout, where it can pollute Git
+status or disappear when the checkout is replaced:
 
 ```text
-projects/collatz-research/
-├── state/
-├── worktrees/
-└── repo/
-    └── scripts/
-        ├── agent_lifecycle.py
-        ├── ci_status.py
-        └── packet_patch.sh
+REPO_PATH/                         # canonical Git checkout
+├── scripts/agent_lifecycle.py
+└── integrations/openclaw-lifecycle-plugin/
+
+STATE_DIR/                         # persistent, writable, outside Git
+└── turn-ledger.json
 ```
 
-All lifecycle commands take the outer `PROJECT_ROOT` explicitly. A packet
-starts with a full Git SHA and a clean-worktree check:
+All new lifecycle commands take `REPO_PATH` and `STATE_DIR` explicitly. A
+packet starts with a full Git SHA and a clean-worktree check:
 
 ```bash
-python repo/scripts/agent_lifecycle.py --project-root "$PROJECT_ROOT" begin \
+python "$REPO_PATH/scripts/agent_lifecycle.py" \
+  --repo-path "$REPO_PATH" --state-dir "$STATE_DIR" begin \
   --packet-id 07c-4-orbit-routing --turn-id "$RUNTIME_TURN_ID" \
   --payload-json '{"objective":"implement routing theorem"}' \
   --max-model-attempts 3 --max-tool-calls 20 --max-seconds 900
@@ -50,7 +51,8 @@ continue from the returned operation receipts; it must not repeat a send or
 edit. Before a mutation, create an intent:
 
 ```bash
-python repo/scripts/agent_lifecycle.py --project-root "$PROJECT_ROOT" \
+python "$REPO_PATH/scripts/agent_lifecycle.py" \
+  --repo-path "$REPO_PATH" --state-dir "$STATE_DIR" \
   begin-operation --turn-id "$RUNTIME_TURN_ID" --step-id post-review \
   --operation-kind github-comment --target pull/23 \
   --input-json '{"body_digest":"..."}'
@@ -82,13 +84,16 @@ OpenAI-completions compatibility adapter or inherit `thinking: false`.
 
 ## OpenClaw runtime enforcement
 
-Install `integrations/openclaw-lifecycle-plugin` into the OpenClaw host. It is
+Install `integrations/openclaw-lifecycle-plugin` from the canonical checkout
+into the OpenClaw host. It is
 the controller wrapper for every admitted agent turn: `before_agent_run`
 creates/reuses the durable turn and consumes a model attempt before submission;
 `before_tool_call` consumes the tool budget and writes an operation intent;
 `after_tool_call` stores the result; and `agent_end` records the terminal
-outcome. A blocked hook fails closed, so a missing ledger, exhausted budget, or
-duplicate external operation never becomes a prompt-only instruction.
+outcome. It defaults to **observe** mode: controller failures are logged but do
+not interrupt chat. Switch to **enforce** only after the host smoke test and a
+read-only tool test pass; then a missing ledger, exhausted budget, or duplicate
+external operation fails closed.
 
 The plugin requires `hooks.allowConversationAccess: true` because it uses
 `before_agent_run` and `agent_end`, but it does **not** inject conversation
@@ -104,12 +109,11 @@ Budgets are controller inputs, not hidden model limits. Every packet declares:
 - maximum model attempts;
 - maximum tool calls;
 - maximum elapsed time;
-- maximum source-repair attempts; and
 - an escalation target.
 
-The lifecycle script persists model/tool consumption. The controller enforces
-elapsed time and source-repair budgets, then writes `budget_blocked` with the
-current evidence. A budget event never marks work passed.
+The lifecycle script persists model/tool consumption and enforces elapsed time
+when a controller action occurs. It writes `budget_blocked` with the current
+evidence. A budget event never marks work passed.
 
 ## Safe Git recovery
 

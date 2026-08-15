@@ -1,7 +1,7 @@
 # Collatz OpenClaw lifecycle plugin
 
-This is a native OpenClaw plugin for the outer agent workspace used by this
-repository. It is the runtime controller for `repo/scripts/agent_lifecycle.py`:
+This is a native OpenClaw plugin for the canonical repository checkout. It is
+the runtime controller for `scripts/agent_lifecycle.py`:
 
 - `before_agent_run` opens or resumes a durable turn and consumes one model
   attempt before MiniMax receives the prompt;
@@ -20,12 +20,12 @@ review.
 The plugin is intentionally source-loadable for the project workspace:
 
 ```bash
-openclaw plugins install ./repo/integrations/openclaw-lifecycle-plugin --link
+openclaw plugins install ./integrations/openclaw-lifecycle-plugin --link
 openclaw plugins enable collatz-lifecycle
 ```
 
-Set the following in the OpenClaw configuration. `projectRoot` is the directory
-that contains `repo/` and `state/`, not the Git checkout itself.
+Set the following in the OpenClaw configuration. `repoPath` is the canonical
+Git checkout and `stateDir` is a writable persistent directory outside it.
 
 ```json
 {
@@ -35,12 +35,15 @@ that contains `repo/` and `state/`, not the Git checkout itself.
         "enabled": true,
         "hooks": { "allowConversationAccess": true },
         "config": {
-          "projectRoot": "/absolute/path/projects/collatz-research",
+          "repoPath": "/absolute/path/projects/collatz-research",
+          "stateDir": "/absolute/path/openclaw-state/collatz-research",
           "pythonCommand": "python3",
           "packetPrefix": "collatz",
           "maxModelAttempts": 3,
           "maxToolCalls": 20,
-          "maxSeconds": 900
+          "maxSeconds": 900,
+          "enforcementMode": "observe",
+          "receiptToolNames": []
         }
       }
     }
@@ -48,7 +51,12 @@ that contains `repo/` and `state/`, not the Git checkout itself.
 }
 ```
 
-On Windows, use an absolute Windows `projectRoot` and set `pythonCommand` to
+Start in `observe` mode. It preserves chat availability while logging controller
+failures. Switch to `enforce` only after the host smoke tests below pass.
+Add only known mutation-capable tool names to `receiptToolNames`; ordinary
+read-only tool calls deliberately receive budgets but no external-effect receipt.
+
+On Windows, use an absolute Windows `repoPath` and set `pythonCommand` to
 the interpreter executable OpenClaw can invoke (for example `py` only when its
 argument handling is known to work; an explicit `python.exe` is safer).
 

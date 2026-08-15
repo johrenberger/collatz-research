@@ -37,15 +37,18 @@ function identifiers(event, context, config) {
 }
 
 function lifecycle(config, args) {
-  const projectRoot = config.projectRoot;
-  const script = join(projectRoot, "repo", "scripts", "agent_lifecycle.py");
-  if (!projectRoot || !existsSync(script)) {
-    throw new Error("collatz-lifecycle: projectRoot must contain repo/scripts/agent_lifecycle.py");
+  const repoPath = config.repoPath;
+  const stateDir = config.stateDir;
+  const script = join(repoPath ?? "", "scripts", "agent_lifecycle.py");
+  if (!repoPath || !stateDir || !existsSync(script)) {
+    throw new Error("collatz-lifecycle: repoPath, stateDir, and scripts/agent_lifecycle.py are required");
   }
   const result = spawnSync(valueOr(config.pythonCommand, "python3"), [
     script,
-    "--project-root",
-    projectRoot,
+    "--repo-path",
+    repoPath,
+    "--state-dir",
+    stateDir,
     ...args,
   ], { encoding: "utf8", timeout: 10_000 });
   if (result.error) throw result.error;
@@ -57,14 +60,23 @@ function block(reason) {
   return { block: true, blockReason: `collatz-lifecycle: ${reason}` };
 }
 
+function enforce(config) {
+  return config?.enforcementMode === "enforce";
+}
+
+function report(scope, error) {
+  console.warn(`[collatz-lifecycle] ${scope}: ${error instanceof Error ? error.message : String(error)}`);
+}
+
 export default definePluginEntry({
   id: "collatz-lifecycle",
   name: "Collatz lifecycle controller",
   description: "Enforces durable receipts and bounded agent execution.",
   register(api) {
     api.on("before_agent_run", async (event, context) => {
+      let config;
       try {
-        const config = pluginConfig(event, context);
+        config = pluginConfig(event, context);
         const { packet, run } = identifiers(event, context, config);
         const payload = JSON.stringify({
           source: "openclaw",
@@ -87,17 +99,21 @@ export default definePluginEntry({
         turnIds.set(run, { packet, run });
         return { outcome: "pass" };
       } catch (error) {
+        report("before_agent_run", error);
+        if (!enforce(config)) return { outcome: "pass" };
         return { outcome: "block", reason: "lifecycle-error", message: "Lifecycle controller unavailable; run blocked." };
       }
     }, { priority: 100, timeoutMs: 10_000 });
 
     api.on("before_tool_call", async (event, context) => {
+      let config;
       try {
-        const config = pluginConfig(event, context);
+        config = pluginConfig(event, context);
         const { run } = identifiers(event, context, config);
         const budget = lifecycle(config, ["consume", "--turn-id", run, "--kind", "tool"]);
         if (budget.decision === "blocked") return block("tool budget is exhausted");
         const target = String(event.toolName ?? "unknown-tool");
+        if (!new Set(config.receiptToolNames ?? []).has(target)) return undefined;
         const intent = lifecycle(config, [
           "begin-operation", "--turn-id", run, "--step-id", String(event.toolCallId ?? target),
           "--operation-kind", "openclaw-tool", "--target", target,
@@ -107,6 +123,8 @@ export default definePluginEntry({
         operationKeys.set(String(event.toolCallId ?? `${run}:${target}`), { run, key: intent.operation_key });
         return undefined;
       } catch (error) {
+        report("before_tool_call", error);
+        if (!enforce(config)) return undefined;
         return block("ledger unavailable or turn was not admitted");
       }
     }, { priority: 100, timeoutMs: 10_000 });

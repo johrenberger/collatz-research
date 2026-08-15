@@ -39,6 +39,24 @@ def _run(project: Path, *args: str, expect: int = 0) -> dict[str, object]:
     return json.loads(result.stdout if expect == 0 else result.stderr)
 
 
+def _run_direct(repo: Path, state: Path, *args: str, expect: int = 0) -> dict[str, object]:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-path",
+            str(repo),
+            "--state-dir",
+            str(state),
+            *args,
+        ],
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == expect, result.stderr
+    return json.loads(result.stdout if expect == 0 else result.stderr)
+
+
 def test_duplicate_turn_is_a_noop_and_identity_mismatch_is_rejected(project: Path) -> None:
     args = (
         "begin",
@@ -103,6 +121,69 @@ def test_operation_intent_prevents_duplicate_mutation_and_resume_preserves_recei
     assert first["operation_key"] in resumed["pending_operation_keys"]
 
 
+def test_direct_checkout_uses_external_state_and_preserves_operation_receipts_across_turns(
+    project: Path,
+) -> None:
+    repo = project / "repo"
+    state = project / "external-state"
+    _run_direct(
+        repo,
+        state,
+        "begin",
+        "--packet-id",
+        "packet-1",
+        "--turn-id",
+        "turn-1",
+        "--payload-json",
+        "{}",
+    )
+    first = _run_direct(
+        repo,
+        state,
+        "begin-operation",
+        "--turn-id",
+        "turn-1",
+        "--step-id",
+        "post-review",
+        "--operation-kind",
+        "github-comment",
+        "--target",
+        "pull/23",
+        "--input-json",
+        '{"body":"review"}',
+    )
+    _run_direct(
+        repo,
+        state,
+        "begin",
+        "--packet-id",
+        "packet-1",
+        "--turn-id",
+        "turn-2",
+        "--payload-json",
+        "{}",
+    )
+    duplicate = _run_direct(
+        repo,
+        state,
+        "begin-operation",
+        "--turn-id",
+        "turn-2",
+        "--step-id",
+        "replayed-review",
+        "--operation-kind",
+        "github-comment",
+        "--target",
+        "pull/23",
+        "--input-json",
+        '{"body":"review"}',
+    )
+    assert duplicate["decision"] == "duplicate"
+    assert duplicate["operation_key"] == first["operation_key"]
+    assert (state / "turn-ledger.json").exists()
+    assert not (repo / "state").exists()
+
+
 def test_explicit_budget_blocks_before_an_unbounded_tool_loop(project: Path) -> None:
     _run(
         project,
@@ -121,6 +202,29 @@ def test_explicit_budget_blocks_before_an_unbounded_tool_loop(project: Path) -> 
     )
     assert (
         _run(project, "consume", "--turn-id", "turn-1", "--kind", "tool")["decision"] == "blocked"
+    )
+
+
+def test_elapsed_budget_blocks_a_later_controller_action(project: Path) -> None:
+    _run(
+        project,
+        "begin",
+        "--packet-id",
+        "packet-1",
+        "--turn-id",
+        "turn-1",
+        "--payload-json",
+        "{}",
+        "--max-seconds",
+        "1",
+    )
+    ledger_path = project / "state" / "turn-ledger.json"
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    ledger["turns"]["turn-1"]["created_at"] = "2000-01-01T00:00:00+00:00"
+    ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
+
+    assert (
+        _run(project, "consume", "--turn-id", "turn-1", "--kind", "model")["decision"] == "blocked"
     )
 
 
@@ -143,3 +247,36 @@ def test_finished_turn_cannot_create_a_new_external_operation(project: Path) -> 
         expect=2,
     )
     assert "cannot create" in blocked["error"]
+
+
+def test_operation_receipt_cannot_be_finished_by_a_different_turn(project: Path) -> None:
+    _run(project, "begin", "--packet-id", "packet-1", "--turn-id", "turn-1", "--payload-json", "{}")
+    first = _run(
+        project,
+        "begin-operation",
+        "--turn-id",
+        "turn-1",
+        "--step-id",
+        "post-review",
+        "--operation-kind",
+        "github-comment",
+        "--target",
+        "pull/23",
+        "--input-json",
+        "{}",
+    )
+    _run(project, "begin", "--packet-id", "packet-1", "--turn-id", "turn-2", "--payload-json", "{}")
+    rejected = _run(
+        project,
+        "finish-operation",
+        "--turn-id",
+        "turn-2",
+        "--operation-key",
+        str(first["operation_key"]),
+        "--status",
+        "succeeded",
+        "--result-json",
+        "{}",
+        expect=2,
+    )
+    assert "does not belong" in rejected["error"]
