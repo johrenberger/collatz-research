@@ -34,6 +34,15 @@ def test_given_a_typed_hook_when_it_needs_plugin_settings_then_it_reads_event_co
     assert "const config = context.pluginConfig;" not in source
 
 
+def test_given_a_terminal_hook_when_lifecycle_observation_fails_then_it_reports_and_cleans_up() -> (
+    None
+):
+    source = (PLUGIN / "index.js").read_text(encoding="utf-8")
+
+    assert 'report("after_tool_call", error);' in source
+    assert 'report("agent_end", error);' in source
+
+
 def test_canonical_checkout_requires_external_state_and_observation_mode() -> None:
     manifest = json.loads((PLUGIN / "openclaw.plugin.json").read_text(encoding="utf-8"))
 

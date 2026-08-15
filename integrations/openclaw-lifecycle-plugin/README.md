@@ -21,11 +21,16 @@ The plugin is intentionally source-loadable for the project workspace:
 
 ```bash
 openclaw plugins install ./integrations/openclaw-lifecycle-plugin --link
+openclaw config set plugins.entries.collatz-lifecycle.config.repoPath "/absolute/path/projects/collatz-research"
+openclaw config set plugins.entries.collatz-lifecycle.config.stateDir "/absolute/path/openclaw-state/collatz-research"
 openclaw plugins enable collatz-lifecycle
 ```
 
 Set the following in the OpenClaw configuration. `repoPath` is the canonical
 Git checkout and `stateDir` is a writable persistent directory outside it.
+They are manifest-required. OpenClaw records an installation with missing
+required configuration as disabled, allowing an operator to configure these
+paths before enabling the plugin.
 
 ```json
 {

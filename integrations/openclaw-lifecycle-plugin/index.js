@@ -142,6 +142,10 @@ export default definePluginEntry({
           "--status", event.isError ? "failed" : "succeeded",
           "--result-json", JSON.stringify({ is_error: Boolean(event.isError) }),
         ]);
+      } catch (error) {
+        // A terminal hook observes an operation that has already happened; it
+        // cannot enforce admission, so never propagate controller failures.
+        report("after_tool_call", error);
       } finally {
         if (receiptKey) operationKeys.delete(receiptKey);
       }
@@ -158,6 +162,10 @@ export default definePluginEntry({
           "--status", event.isError ? "transport_blocked" : "passed",
           "--evidence-json", JSON.stringify({ source: "openclaw-agent-end", is_error: Boolean(event.isError) }),
         ]);
+      } catch (error) {
+        // The run is already terminal. Record the controller failure without
+        // converting lifecycle observation into a runtime error.
+        report("agent_end", error);
       } finally {
         if (run) turnIds.delete(run);
       }
