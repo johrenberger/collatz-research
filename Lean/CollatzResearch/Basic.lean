@@ -1,5 +1,4 @@
 import Mathlib.Data.Nat.Factorization.Basic
-import Mathlib.Tactic.Omega
 
 /-!
 # Basic accelerated Collatz definitions
@@ -40,26 +39,28 @@ this version.
 theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
     Odd (acceleratedStep n) := by
   -- acceleratedStep n = (3n+1) / 2^ν₂(3n+1) where ν₂ m = m.factorization 2
-  -- For odd n: 3n+1 is even, so ν₂(3n+1) ≥ 1
-  -- The quotient by 2^ν₂(3n+1) has no factor of 2 by definition
-  -- Step 1: 3n+1 is even (construct the witness via `omega` on the equality)
-  have h_even : 2 ∣ (3 * n + 1) := by
-    obtain ⟨k, hk⟩ := h
-    rw [hk]
-    use 3 * k + 2
-    omega
-  -- Step 2: factorization 2 is positive (2 ∣ (3n+1) ↔ factorization 2 ≥ 1)
-  have h_fact : 0 < (3 * n + 1).factorization 2 :=
-    Nat.factorization_pos_iff_dvd.mpr h_even
-  -- Step 3: ((3n+1) / 2^ν₂(3n+1)).factorization 2 = 0
-  -- Uses Nat.factorization_div (a/b).factorization p = a.factorization p - b.factorization p
-  -- when b | a, plus Nat.factorization_pow (p^k).factorization p = k.
-  have h_dvd : 2 ^ (3 * n + 1).factorization 2 ∣ (3 * n + 1) :=
-    Nat.factorization_le_iff_dvd.mpr le_rfl
-  have h_quot : ((3 * n + 1) / 2 ^ (3 * n + 1).factorization 2).factorization 2 = 0 := by
-    rw [Nat.factorization_div _ _ h_dvd, Nat.factorization_pow]; ring
-  -- Step 4: factorization 2 = 0 ↔ ¬ 2 ∣ n ↔ Odd n
-  rw [Nat.factorization_eq_zero_iff] at h_quot
-  rw [Nat.odd_iff]; exact h_quot
+  -- By Mathlib notation: ordCompl[2] m = m / ordProj[2] m, where
+  --   ordProj[2] m = 2^(m.factorization 2) (the 2-power part of m)
+  --   ordCompl[2] m = the odd part of m
+  -- So acceleratedStep n = ordCompl[2] (3n+1) (the odd part of 3n+1).
+  --
+  -- The key Mathlib fact is Nat.not_dvd_ordCompl:
+  --   ¬ p ∣ ordCompl[p] m  when  p is prime and  m ≠ 0.
+  -- For p = 2 (Nat.prime_two), this gives  ¬ 2 ∣ ordCompl[2] (3n+1).
+  -- The conversion ¬ 2 ∣ x ↔ Odd x is Nat.odd_iff (the standard equivalence).
+  --
+  -- Step 1: 3n+1 is nonzero (trivially, since 3n+1 ≥ 1 for all n)
+  have h_nonzero : 3 * n + 1 ≠ 0 := by omega
+  -- Step 2: Apply Nat.not_dvd_ordCompl with p := 2
+  have h_not_dvd : ¬ 2 ∣ Nat.ordCompl[2] (3 * n + 1) :=
+    Nat.not_dvd_ordCompl Nat.prime_two h_nonzero
+  -- Step 3: acceleratedStep n = Nat.ordCompl[2] (3n+1) by definition
+  have h_eq : acceleratedStep n = Nat.ordCompl[2] (3 * n + 1) := by
+    unfold acceleratedStep twoAdicValuation Nat.ordProj Nat.ordCompl
+    rfl
+  rw [h_eq] at h_not_dvd
+  -- Step 4: Convert ¬ 2 ∣ acceleratedStep n to Odd acceleratedStep n
+  rw [Nat.odd_iff]
+  exact h_not_dvd
 
 end CollatzResearch
