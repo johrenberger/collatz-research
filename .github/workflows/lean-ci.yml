@@ -35,8 +35,8 @@ jobs:
       - name: Build and validate Lean
         uses: leanprover/lean-action@v1
         with:
-          use-github-cache: true
-          use-mathlib-cache: true
+          use-github-cache: false
+          use-mathlib-cache: false
 
       - name: Build CoverageTree target
         run: lake build CollatzResearch.CoverageTree
