@@ -849,6 +849,7 @@ def test_descend_orbit_agrees_with_independent_trace_oracle():
 # These tests cover the boundary cases the formal proofs will close.
 # Test-first commitment per MEMORY.md "BDD Discipline (Lean vs Python) — Justin, 2026-08-15".
 
+
 def test_accelerated_orbit_n_3_lemma_1_boundary():
     """n=3 is the Lemma 1 boundary case (Codex re-review #1 P1, 2026-08-16T17:32:09Z):
     ν₂(3n+1) = ν₂(10) = 1 exactly. The bound `1 ≤ k` is TIGHT — cannot strengthen to `k ≥ 2`.
@@ -911,7 +912,7 @@ def test_reaches_one_within_n_27():
     `reaches_one_within(n, bound)` checks whether a witness appears within
     `bound + 1` iterations.
     """
-    assert reaches_one_within(27, 41) is True   # exact boundary
+    assert reaches_one_within(27, 41) is True  # exact boundary
     assert reaches_one_within(27, 40) is False  # one short
 
 

@@ -41,22 +41,22 @@ theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
   -- acceleratedStep n = (3n+1) / 2^ν₂(3n+1) where ν₂ m = m.factorization 2
   -- For odd n: 3n+1 is even, so ν₂(3n+1) ≥ 1
   -- The quotient by 2^ν₂(3n+1) has no factor of 2 by definition
-  -- Step 1: 3n+1 is even
-  have h_even : (3 * n + 1) % 2 = 0 := by
+  -- Step 1: 3n+1 is even (construct the witness via `ring`)
+  have h_even : 2 ∣ (3 * n + 1) := by
     obtain ⟨k, hk⟩ := h
-    rw [hk]; ring_nf; simp
+    rw [hk]; exact ⟨3 * k + 2, by ring⟩
   -- Step 2: factorization 2 is positive (2 ∣ (3n+1) ↔ factorization 2 ≥ 1)
   have h_fact : 0 < (3 * n + 1).factorization 2 :=
-    Nat.factorization_pos_iff_dvd.mpr (by
-      rw [Nat.dvd_iff_mod_eq_zero]; exact h_even)
-  -- Step 3: ((3n+1) / 2^ν₂(3n+1)).factorization 2 = 0 (no factor of 2 remains)
+    Nat.factorization_pos_iff_dvd.mpr h_even
+  -- Step 3: ((3n+1) / 2^ν₂(3n+1)).factorization 2 = 0
+  -- Uses Nat.factorization_div (a/b).factorization p = a.factorization p - b.factorization p
+  -- when b | a, plus Nat.factorization_pow (p^k).factorization p = k.
+  have h_dvd : 2 ^ (3 * n + 1).factorization 2 ∣ (3 * n + 1) :=
+    Nat.factorization_le_iff_dvd.mpr le_rfl
   have h_quot : ((3 * n + 1) / 2 ^ (3 * n + 1).factorization 2).factorization 2 = 0 := by
-    rw [Nat.factorization_div _ _ (Nat.factorization_le_iff_dvd.mpr le_rfl),
-        Nat.factorization_pow]
-    ring
-  -- Step 4: factorization 2 = 0 ↔ ¬ 2 ∣ (n) ↔ Odd n
+    rw [Nat.factorization_div _ _ h_dvd, Nat.factorization_pow]; ring
+  -- Step 4: factorization 2 = 0 ↔ ¬ 2 ∣ n ↔ Odd n
   rw [Nat.factorization_eq_zero_iff] at h_quot
-  rw [Nat.odd_iff]
-  exact h_quot
+  rw [Nat.odd_iff]; exact h_quot
 
 end CollatzResearch
