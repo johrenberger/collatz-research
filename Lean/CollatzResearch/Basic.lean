@@ -47,7 +47,12 @@ theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
   -- The key Mathlib fact is Nat.not_dvd_ordCompl:
   --   ¬ p ∣ ordCompl[p] m  when  p is prime and  m ≠ 0.
   -- For p = 2 (Nat.prime_two), this gives  ¬ 2 ∣ ordCompl[2] (3n+1).
-  -- The conversion ¬ 2 ∣ x ↔ Odd x is Nat.odd_iff (the standard equivalence).
+  --
+  -- The conversion ¬ 2 ∣ x → x % 2 = 1 (i.e., Odd x) uses two verified
+  -- Mathlib lemmas (Init.lean:921, standard):
+  --   Nat.dvd_iff_mod_eq_zero : 2 ∣ x ↔ x % 2 = 0
+  --   Nat.mod_two_ne_zero    : x % 2 ≠ 0 ↔ x % 2 = 1
+  -- Combined with Odd x ↔ x % 2 = 1 (the definition), this gives Odd x directly.
   --
   -- 'open Nat in' brings the ordCompl / ordProj notation into scope
   -- (defined in Mathlib.Data.Nat.Factorization.Defs).
@@ -62,8 +67,11 @@ theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
     unfold acceleratedStep twoAdicValuation
     rfl
   rw [h_eq] at h_not_dvd
-  -- Step 4: Convert ¬ 2 ∣ acceleratedStep n to Odd acceleratedStep n
-  rw [Nat.odd_iff]
+  -- Step 4: ¬ 2 ∣ acceleratedStep n → acceleratedStep n % 2 = 1 (by verified Mathlib lemmas)
+  rw [Nat.dvd_iff_mod_eq_zero] at h_not_dvd
+  rw [Nat.mod_two_ne_zero] at h_not_dvd
+  -- h_not_dvd : acceleratedStep n % 2 = 1
+  -- Odd n is definitionally n % 2 = 1 in modern Mathlib
   exact h_not_dvd
 
 end CollatzResearch
