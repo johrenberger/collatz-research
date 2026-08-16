@@ -49,14 +49,17 @@ theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
   -- For p = 2 (Nat.prime_two), this gives  ¬ 2 ∣ ordCompl[2] (3n+1).
   -- The conversion ¬ 2 ∣ x ↔ Odd x is Nat.odd_iff (the standard equivalence).
   --
+  -- 'open Nat in' brings the ordCompl / ordProj notation into scope
+  -- (defined in Mathlib.Data.Nat.Factorization.Defs).
+  open Nat in
   -- Step 1: 3n+1 is nonzero (trivially, since 3n+1 ≥ 1 for all n)
   have h_nonzero : 3 * n + 1 ≠ 0 := by omega
   -- Step 2: Apply Nat.not_dvd_ordCompl with p := 2
-  have h_not_dvd : ¬ 2 ∣ Nat.ordCompl[2] (3 * n + 1) :=
+  have h_not_dvd : ¬ 2 ∣ ordCompl[2] (3 * n + 1) :=
     Nat.not_dvd_ordCompl Nat.prime_two h_nonzero
-  -- Step 3: acceleratedStep n = Nat.ordCompl[2] (3n+1) by definition
-  have h_eq : acceleratedStep n = Nat.ordCompl[2] (3 * n + 1) := by
-    unfold acceleratedStep twoAdicValuation Nat.ordProj Nat.ordCompl
+  -- Step 3: acceleratedStep n = ordCompl[2] (3n+1) by definition
+  have h_eq : acceleratedStep n = ordCompl[2] (3 * n + 1) := by
+    unfold acceleratedStep twoAdicValuation
     rfl
   rw [h_eq] at h_not_dvd
   -- Step 4: Convert ¬ 2 ∣ acceleratedStep n to Odd acceleratedStep n
