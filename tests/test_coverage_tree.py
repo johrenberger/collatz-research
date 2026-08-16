@@ -842,3 +842,88 @@ def test_descend_orbit_agrees_with_independent_trace_oracle():
         expected = trace_oracle(tree, x)
         actual = descend_orbit(tree, x, 0)
         assert actual == expected, f"x={x}: expected {expected}, got {actual}"
+
+
+# ---- 02c/03c boundary-case regression tests (Story 02c/03c proof-bearing PR) ----
+# Per the spec at docs/story-02c-03c-dynamics-equivalence-proofs.md (PR #30, merged 2026-08-16).
+# These tests cover the boundary cases the formal proofs will close.
+# Test-first commitment per MEMORY.md "BDD Discipline (Lean vs Python) — Justin, 2026-08-15".
+
+def test_accelerated_orbit_n_3_lemma_1_boundary():
+    """n=3 is the Lemma 1 boundary case (Codex re-review #1 P1, 2026-08-16T17:32:09Z):
+    ν₂(3n+1) = ν₂(10) = 1 exactly. The bound `1 ≤ k` is TIGHT — cannot strengthen to `k ≥ 2`.
+
+    accelerated_orbit(3, 1) = (3*3+1)/2^1 = 10/2 = 5 (NOT 1).
+    accelerated_orbit(3, 2) = acceleratedStep(5) = 16/16 = 1.
+    """
+    assert accelerated_orbit(3, 0) == 3
+    assert accelerated_orbit(3, 1) == 5  # confirms ν₂(10) = 1 (tight bound; Lemma 1)
+    assert accelerated_orbit(3, 2) == 1
+    assert accelerated_orbit(3, 3) == 1  # 1 is a fixed point
+
+
+def test_accelerated_orbit_n_5_lemma_2_factorization():
+    """n=5 is the Lemma 2 factorization decomposition case:
+    3*5+1 = 16 = 2^4, so ν₂(3n+1) = 4 and T(5) = 16/16 = 1.
+    The standard-trajectory equivalence says C²(5) = T(5) = 1 (single accelerated step).
+    """
+    assert accelerated_orbit(5, 0) == 5
+    assert accelerated_orbit(5, 1) == 1  # single accelerated step reaches 1
+
+
+def test_accelerated_orbit_n_1_is_fixed_point():
+    """n=1 is the trajectory fixed point — accelerated_orbit(1, k) = 1 for all k.
+    This is the trajectory-lifting base case (`trajectory 1 0 = 1`) that the
+    `acceleratedTrajectory_reaches_one_implies_standard` proof handles at m=0.
+    """
+    for k in range(10):
+        assert accelerated_orbit(1, k) == 1
+
+
+def test_accelerated_orbit_n_27_known_trajectory():
+    """n=27 is the Collatz-famous value that takes 112 accelerated steps to reach 1.
+    First 10 trajectory values verified against hand computation:
+
+    accelerated_orbit(27, 0) = 27
+    accelerated_orbit(27, 1) = T(27) = 82/2    = 41   (3*27+1=82,  ν₂=1)
+    accelerated_orbit(27, 2) = T(41) = 124/4   = 31   (3*41+1=124, ν₂=2)
+    accelerated_orbit(27, 3) = T(31) = 94/2    = 47   (3*31+1=94,  ν₂=1)
+    accelerated_orbit(27, 4) = T(47) = 142/2   = 71   (3*47+1=142, ν₂=1)
+    accelerated_orbit(27, 5) = T(71) = 214/2   = 107  (3*71+1=214, ν₂=1)
+    accelerated_orbit(27, 6) = T(107) = 322/2  = 161  (3*107+1=322, ν₂=1)
+    accelerated_orbit(27, 7) = T(161) = 484/4  = 121  (3*161+1=484, ν₂=2)
+    accelerated_orbit(27, 8) = T(121) = 364/4  = 91   (3*121+1=364, ν₂=2)
+    accelerated_orbit(27, 9) = T(91) = 274/2   = 137  (3*91+1=274,  ν₂=1)
+    """
+    expected = [27, 41, 31, 47, 71, 107, 161, 121, 91, 137]
+    for k, exp in enumerate(expected):
+        assert accelerated_orbit(27, k) == exp, f"k={k}: expected {exp}"
+
+
+def test_reaches_one_within_n_27():
+    """n=27 reaches 1 after 41 accelerated steps (Collatz-famous).
+
+    Note: the standard Collatz trajectory of n=27 has 111 steps (including the
+    final 4→2→1), but the accelerated trajectory collapses `1 + ν₂(3n+1)`
+    standard steps into one accelerated step. Total: 41 accelerated steps
+    (verified via Python iteration).
+
+    `reaches_one_within(n, bound)` checks whether a witness appears within
+    `bound + 1` iterations.
+    """
+    assert reaches_one_within(27, 41) is True   # exact boundary
+    assert reaches_one_within(27, 40) is False  # one short
+
+
+def test_accelerated_orbit_n_31_known_trajectory():
+    """n=31 trajectory verification (107 steps to reach 1).
+
+    accelerated_orbit(31, 0) = 31
+    accelerated_orbit(31, 1) = T(31) = 94/2   = 47   (3*31+1=94,  ν₂=1)
+    accelerated_orbit(31, 2) = T(47) = 142/2  = 71   (3*47+1=142, ν₂=1)
+    accelerated_orbit(31, 3) = T(71) = 214/2  = 107  (3*71+1=214, ν₂=1)
+    accelerated_orbit(31, 4) = T(107) = 322/2 = 161  (3*107+1=322, ν₂=1)
+    """
+    expected = [31, 47, 71, 107, 161]
+    for k, exp in enumerate(expected):
+        assert accelerated_orbit(31, k) == exp, f"k={k}: expected {exp}"
