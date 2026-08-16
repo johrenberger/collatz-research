@@ -1,4 +1,5 @@
 import Mathlib.Data.Nat.Factorization.Basic
+import Mathlib.Tactic.Omega
 
 /-!
 # Basic accelerated Collatz definitions
@@ -41,10 +42,12 @@ theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
   -- acceleratedStep n = (3n+1) / 2^ν₂(3n+1) where ν₂ m = m.factorization 2
   -- For odd n: 3n+1 is even, so ν₂(3n+1) ≥ 1
   -- The quotient by 2^ν₂(3n+1) has no factor of 2 by definition
-  -- Step 1: 3n+1 is even (construct the witness via `ring`)
+  -- Step 1: 3n+1 is even (construct the witness via `omega` on the equality)
   have h_even : 2 ∣ (3 * n + 1) := by
     obtain ⟨k, hk⟩ := h
-    rw [hk]; exact ⟨3 * k + 2, by ring⟩
+    rw [hk]
+    use 3 * k + 2
+    omega
   -- Step 2: factorization 2 is positive (2 ∣ (3n+1) ↔ factorization 2 ≥ 1)
   have h_fact : 0 < (3 * n + 1).factorization 2 :=
     Nat.factorization_pos_iff_dvd.mpr h_even
