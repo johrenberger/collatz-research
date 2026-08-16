@@ -2,21 +2,24 @@
 
 ## Claim level
 
-**Preparatory / implementation plan.** This PR documents the implementation plan for closing the outstanding `sorry` items in `Dynamics.lean` and `Equivalence.lean` from Story 02b/03b. The plan itself is preparatory: the actual formalization — closing the admissions, achieving a green Lean CI build, and proving all claim prerequisites — is the work of the proof-bearing PR that follows. **This PR must not be merged at `formally established`; that claim is reserved for the proof-bearing PR.**
+**Preparatory / implementation plan.** This PR documents the implementation plan for closing the outstanding `sorry` items in `Dynamics.lean`, `Equivalence.lean`, and `Certificate.lean` from Story 02b/03b. The plan itself is preparatory: the actual formalization — closing the admissions, achieving a green Lean CI build, and proving all claim prerequisites — is the work of the proof-bearing PR that follows. **This PR must not be merged at `formally established`; that claim is reserved for the proof-bearing PR.**
 
-Reclassified from `formally established` per Codex review (PR #30, 2026-08-16T16:34:55Z), P0: the spec adds no Lean proofs and leaves all four target theorems as `sorry`; reserving "formally established" for the proof-bearing PR.
+Reclassified from `formally established` per Codex review (PR #30, 2026-08-16T16:34:55Z), P0: the spec adds no Lean proofs and leaves all target theorems as `sorry`; reserving "formally established" for the proof-bearing PR.
 
 ## Objective
 
 Complete the formal proofs for:
 
+**Target admissions to close in Dynamics.lean + Equivalence.lean** (4 sorries):
+
 1. `standardStep_positive` (Dynamics.lean) — standard step preserves positivity on positive domain
 2. `acceleratedStep_positive_of_odd` (Dynamics.lean) — accelerated step preserves positivity on odd domain
 3. `acceleratedStep_equiv_standardStep` (Equivalence.lean) — one accelerated step on odd domain = `1 + ν₂(3n+1)` standard steps
 4. `acceleratedTrajectory_reaches_one_implies_standard` (Equivalence.lean) — accelerated trajectory reaching 1 lifts to a finite standard trajectory reaching 1
-5. (To be added by proof-bearing PR) — one-step oddness preservation (distinct core lemma in `Equivalence.lean`; prerequisite for #3 and #4)
 
-These are the **five** preconditions for promoting Story 07c-2 (Collatz/Syracuse dynamics connection) from `preparatory` to `formally established`.
+**Plus: relocate and close the existing `Certificate.lean::acceleratedStep_odd_of_odd`** (per Codex re-review P1, 2026-08-16T17:58:50Z). Move the canonical declaration to `Basic.lean` (low-level, imports only Mathlib); both `Certificate.lean` and `Equivalence.lean` consume it.
+
+These are the **four target admissions plus one relocated admission** for promoting Story 07c-2 (Collatz/Syracuse dynamics connection) from `preparatory` to `formally established`. The relocation **closes** an existing admission rather than adding a parallel one.
 
 ## Why no Mathlib PR is needed
 
@@ -29,41 +32,49 @@ The blockers originally attributed to "Mathlib `omega` extension" are resolvable
 
 **No upstream Mathlib contribution is required.** The 04b workstream (`Int.mul_div_cancel_left_of_dvd` + divisibility-combination lemma) for the Affine.lean sorries is also tracked separately and is not in this scope.
 
-## Prerequisite: oddness invariant (Codex re-review P1, 2026-08-16T17:32:09Z)
+## Module ownership of the oddness theorem (Codex re-review P1, 2026-08-16T17:58:50Z)
 
-`acceleratedStep_equiv_standardStep` (sorry #3) requires `Odd (trajectory n k)` (one-step oddness preservation across the orbit). The existing `Certificate.lean::acceleratedStep_odd_of_odd` is a `sorry`; importing it from `Equivalence.lean` would create a cycle.
+The current import structure is:
 
-**Architecture** (per Codex re-review P1, 2026-08-16T17:32:09Z): to avoid a duplicate declaration with `Certificate.lean::acceleratedStep_odd_of_odd` (same fully-qualified name `CollatzResearch.acceleratedStep_odd_of_odd` in two modules = compile error), the proof-bearing PR will introduce a **distinctly named core oddness lemma** in `Equivalence.lean`. Two architectural options, both avoiding duplicate declarations:
+- `Basic.lean` imports `Mathlib.Data.Nat.Factorization.Basic`
+- `Dynamics.lean` imports `CollatzResearch.Basic`
+- `Equivalence.lean` imports `CollatzResearch.Basic` + `CollatzResearch.Dynamics`
+- `Certificate.lean` imports `CollatzResearch.Basic` + `CollatzResearch.Importer`
 
-- **Option A (recommended)**: define the core lemma in `Equivalence.lean` under a sub-namespace (e.g., `CollatzResearch.EquivalenceCore.acceleratedStep_odd_of_odd`) or with a uniquely named helper (e.g., `oddness_step_preserved`). Full qualification differs from `Certificate.lean::acceleratedStep_odd_of_odd`. Certificate migration to consume the Equivalence lemma is deferred to a **separate follow-on workstream** (out of scope for 02c/03c).
-- **Option B**: move the canonical declaration from `Certificate.lean` to `Equivalence.lean`; Certificate imports the Equivalence module. More invasive but cleaner long-term.
+**`Certificate.lean` does not import `Equivalence.lean`, and vice versa.** There is no import cycle. My prior re-review architecture (distinct core lemma in `Equivalence.lean`) was based on a false premise.
 
-Either option gives a fully-qualified distinct identifier; no duplicate declaration. The proof-bearing PR selects one and adds the new declaration atomically with its implementation. **This preparatory doc specifies the requirement; the proof-bearing PR will add the declaration.**
+**Correct architecture** (per Codex re-review P1): the canonical oddness theorem belongs **below** both `Certificate.lean` and `Equivalence.lean` — i.e., in `Basic.lean` (or a dedicated low-level parity module importing only `Basic`/Mathlib). Both `Certificate.lean` and `Equivalence.lean` then consume it.
 
 **Resolution** (to be implemented by proof-bearing PR):
 
+1. Add `acceleratedStep_odd_of_odd` to `Basic.lean` (proved via factorization decomposition).
+2. Drop the existing `Certificate.lean::acceleratedStep_odd_of_odd` sorry declaration; rewrite `Certificate.lean::trajectory_odd` to use `Basic.lean::acceleratedStep_odd_of_odd` (already in scope via existing import).
+3. Equivalence.lean uses `Basic.lean::acceleratedStep_odd_of_odd` directly via existing import.
+4. `Certificate.lean` migration is **in scope** for the proof-bearing PR (not deferred to a follow-on workstream as previously planned).
+
+This **closes** the existing Certificate admission rather than adding a parallel one.
+
 ```lean
--- In Equivalence.lean (under namespace EquivalenceCore, or with renamed helper)
+-- In Basic.lean (NEW)
 theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) : Odd (acceleratedStep n) := by
   -- 3n+1 is even; (3n+1)/2^k is odd since k = ν₂(3n+1) is the full 2-adic valuation
   have hn_pos : 0 < n := h.pos
   have h_even : 1 ≤ (3 * n + 1).factorization 2 := by
-    -- Lemma 1: odd n → ν₂(3n+1) ≥ 1 (corrected from 2 ≤ per Codex re-review P1)
+    -- Lemma 1: odd n → ν₂(3n+1) ≥ 1
     exact ...  -- case analysis on n mod 2 + factorization_pos_iff_dvd
   -- ... (factorization decomposition proves oddness of the result)
-```
 
-Plus a trajectory-oddness induction lemma (corollary, no separate admission):
-
-```lean
+-- In Certificate.lean (UPDATED, drops local sorry)
+-- trajectory_odd now uses Basic.lean::acceleratedStep_odd_of_odd
 theorem trajectory_odd (n : Nat) (h_odd : Odd n) : ∀ k : Nat, Odd (trajectory n k) := by
   intro k
   induction k with
   | zero => exact h_odd
-  | succ k' ih => exact EquivalenceCore.acceleratedStep_odd_of_odd (trajectory n k') ih
-```
+  | succ k' ih => exact acceleratedStep_odd_of_odd (trajectory n k') ih
 
-This adds a **5th sorry to close** (added by the proof-bearing PR) at the new distinct name in `Equivalence.lean`. The trajectory-level oddness is a corollary (no separate admission).
+-- In Equivalence.lean (UPDATED)
+-- Uses Basic.lean::acceleratedStep_odd_of_odd (imported transitively)
+```
 
 ## Per-sorry resolution
 
@@ -112,7 +123,7 @@ theorem standardStep_positive (n : Nat) (h : Positive n) : Positive (standardSte
 
 **Lemma 1 (odd n → ν₂(3n+1) ≥ 1)**: For odd `n`, `3n+1` is even. Write `3n+1 = 2^k * m` with `m` odd; `k ≥ 1` (i.e., `1 ≤ k`). Proof: `n` odd → `3n+1` is even → 2-adic valuation ≥ 1. In Mathlib: `Odd n → (3*n+1) % 2 = 0` (case analysis on `n` mod 2), then `Nat.factorization_pos_iff_dvd` chains to show `1 ≤ (3*n+1).factorization 2`.
 
-**Boundary case**: `n = 3` is the smallest odd `n` where `3n+1 = 10` and `ν₂(10) = 1` exactly. The bound `k ≥ 1` is **tight** here (cannot strengthen to `k ≥ 2`).
+**Boundary case**: `n = 3` is the smallest odd `n` where `3n+1 = 10` and `ν₂(10) = 1` exactly. The bound `k ≥ 1` is **tight** here (cannot strengthen to to `k ≥ 2`).
 
 **Lemma 2 (factorization decomposition)**: `(3*n+1).factorization 2 = k` implies `3*n+1 = 2^k * m` with `m` odd. This is `Nat.factorization_mul` + `Prime.factorization` rewriting.
 
@@ -132,30 +143,68 @@ theorem standardStep_positive (n : Nat) (h : Positive n) : Positive (standardSte
 
 **Statement**: `acceleratedTrajectory_reaches_one_implies_standard (n m : Nat) (h_odd : Odd n) (h : trajectory n m = 1) : ∃ m', standardTrajectory n m' = 1`
 
-**Proof approach**: Induction on `m`. **Depends on sorry #3** (`acceleratedStep_equiv_standardStep`) **and sorry #5** (core oddness lemma + `trajectory_odd`).
+**Proof approach** (per Codex re-review P1, 2026-08-16T17:58:50Z): strong induction on `m`, with hypothesis rewritten as `trajectory (acceleratedStep n) k = 1` and final composition via `standardTrajectory_compose`.
 
-- **Base case** `m = 0`: `trajectory n 0 = n = 1` forces `n = 1`; `standardTrajectory 1 0 = 1`.
-- **Inductive case** `m = k + 1`: by `trajectory_odd` (sorry #5), `trajectory n k` is odd. Apply `acceleratedStep_equiv_standardStep` (sorry #3) to `trajectory n k` to get `standardTrajectory (trajectory n k) (1 + ν₂(3*(trajectory n k) + 1)) = acceleratedStep (trajectory n k) = 1`. Take `m' = (1 + ν₂(3*(trajectory n k) + 1)) + (1 + ν₂(3n + 1) + ... + 1 + ν₂(...))` — the sum of `1 + ν₂(3 n_i + 1)` over `i = 0 .. k-1` plus the final segment.
+**New auxiliary lemma** `standardTrajectory_compose` (Equivalence.lean):
+```lean
+theorem standardTrajectory_compose (n a b : Nat) :
+    standardTrajectory (standardTrajectory n a) b = standardTrajectory n (a + b) := by
+  induction a with
+  | zero => simp [standardTrajectory_zero]
+  | succ a' ih => simp [standardTrajectory_succ, ih, Nat.add_succ]
+```
 
-**Risk**: medium. Depends on #3 and #5 being closed; the sum construction for `m'` requires `standardTrajectory` induction.
+**Main proof** (sketch):
+```lean
+theorem acceleratedTrajectory_reaches_one_implies_standard (n m : Nat)
+    (h_odd : Odd n) (h : trajectory n m = 1) :
+    ∃ m', standardTrajectory n m' = 1 := by
+  induction m using Nat.strong_rec_on with
+  | _ m ih =>
+    cases m with
+    | zero =>
+      -- trajectory n 0 = n = 1
+      exact ⟨0, by rfl⟩
+    | succ k =>
+      -- h : trajectory n (k+1) = 1
+      -- trajectory n (k+1) = acceleratedStep (trajectory n k)
+      -- so h : acceleratedStep (trajectory n k) = 1
+      have h_acc : acceleratedStep (trajectory n k) = 1 := h
+      -- trajectory_odd (Certificate.lean, now using Basic.lean's theorem) gives
+      -- Odd (trajectory n k); alternatively, use acceleratedStep_odd_of_odd directly
+      have h_odd_t : Odd (trajectory n k) := trajectory_odd h_odd k
+      -- Apply IH to (trajectory n k, k) with the rewritten goal
+      have h_ih := ih k (Nat.lt_succ_self k) (trajectory n k) h_odd_t h_acc
+      obtain ⟨r, hr⟩ := h_ih  -- standardTrajectory (trajectory n k) r = 1
+      -- acceleratedStep_equiv_standardStep at n
+      have h_eq := acceleratedStep_equiv_standardStep n h_odd
+      -- standardTrajectory n (1 + ν₂(3n+1)) = acceleratedStep n
+      -- Compose: standardTrajectory n ((1 + ν₂(3n+1)) + r) = 1
+      have h_comp : standardTrajectory n ((1 + (3 * n + 1).factorization 2) + r) = 1 := by
+        rw [← standardTrajectory_compose n (1 + (3 * n + 1).factorization 2) r]
+        rw [h_eq]
+        exact hr
+      exact ⟨(1 + (3 * n + 1).factorization 2) + r, h_comp⟩
+```
+
+**Risk**: medium. Depends on #3 being closed; the `standardTrajectory_compose` lemma is new.
 
 **Validation**: GitHub Lean CI is the sole Lean validation gate.
 
-### 5. Core oddness preservation lemma (Equivalence.lean) — added by proof-bearing PR
+### 5. `Certificate.lean::acceleratedStep_odd_of_odd` — relocated to Basic.lean, existing admission closed
 
-**Statement**: `∀ n : Nat, Odd n → Odd (acceleratedStep n)`
+**Original**: `Certificate.lean` line 90: `theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) : Odd (acceleratedStep n) := by sorry`
 
-**Location** (per Codex re-review P1, 2026-08-16T17:32:09Z): the lemma will be defined in `Equivalence.lean` under a **fully-qualified distinct** name to avoid duplicate-declaration with `Certificate.lean::acceleratedStep_odd_of_odd` (e.g., `CollatzResearch.EquivalenceCore.acceleratedStep_odd_of_odd` via sub-namespace, or a uniquely-named helper such as `oddness_step_preserved`). The proof-bearing PR chooses the name and atomically adds: declaration in `Equivalence.lean`, theorem-status row in `docs/theorem-status.md`, and (if Option B) `Certificate.lean` migration.
+**Relocation** (per Codex re-review P1, 2026-08-16T17:58:50Z): the canonical declaration moves to `Basic.lean` (low-level, imports only Mathlib). The proof-bearing PR:
 
-**Proof approach** (same regardless of name):
-- `acceleratedStep n = (3n+1) / 2^k` where `k = (3*n+1).factorization 2`
-- For odd `n`: `3n+1` is even, so `k ≥ 1` (Lemma 1)
-- `(3n+1) / 2^k` is odd because `k` is the **full** 2-adic valuation (no factor of 2 remains)
-- Uses Mathlib `Nat.factorization_div` + `Nat.factorization_pow` to show oddness of the quotient
+1. Adds the proved declaration to `Basic.lean`.
+2. Removes the sorry declaration from `Certificate.lean`.
+3. Updates `Certificate.lean::trajectory_odd` to use `Basic.lean::acceleratedStep_odd_of_odd` (already in scope).
+4. Updates `theorem-status.md` to record `Checked` (or appropriate status post-proof).
 
-**Mathlib lemmas used**: `Nat.factorization_div`, `Nat.factorization_pow`, `Prime.factorization`, `Nat.factorization_pos_iff_dvd`.
+This **closes** an existing admission, not adds a new one.
 
-**Risk**: **medium** (per Codex re-review P2, 2026-08-16T17:32:09Z). The factorization chain is well-established in Mathlib in principle but is the **same** factorization chain currently admitted in `Certificate.lean`. Risk remains medium until the exact Mathlib chain passes GitHub Lean CI; revisits to medium/high as needed.
+**Risk**: medium (same factorization chain as sorry #2 and #3; revisits to medium/high until Mathlib CI passes).
 
 **Validation**: GitHub Lean CI is the sole Lean validation gate.
 
@@ -164,10 +213,9 @@ theorem standardStep_positive (n : Nat) (h : Positive n) : Positive (standardSte
 Per the PR #17 framing that established the `preparatory` claim, promotion to `formally established` requires:
 
 - **Restore `ReachesOne x` conclusion** in `coverage_tree_soundness` (currently absent per the current `CoverageTree.lean` header comment, which explicitly says: *"this theorem intentionally does not conclude `ReachesOne x`; that would require a proof connecting tree descent to the Collatz trajectory."*)
-- **Prove** via the 5 closed lemmas from 02c/03c:
+- **Prove** via the closed lemmas from 02c/03c:
   - `acceleratedStep_equiv_standardStep` for the per-step standard equivalence
-  - `acceleratedTrajectory_reaches_one_implies_standard` for the trajectory-level lift
-  - Core oddness lemma (distinct name TBD, sorry #5) for the oddness invariant
+  - `acceleratedTrajectory_reaches_one_implies_standard` for the trajectory-level lift (using `standardTrajectory_compose` + the Basic.lean oddness theorem)
 - **No new `sorry`/`admit`/`axiom`** in the extension
 - **Claim level**: `formally established`
 - **Python BDD**: extend `tests/test_coverage_tree.py` with a `test_coverage_tree_soundness_implies_ReachesOne` runtime check (UNTRUSTED RUNTIME EVIDENCE per existing discipline — not a Lean-side substitution)
@@ -180,22 +228,24 @@ This work is deferred to a separate PR after 02c/03c lands. It is NOT in this st
 2. ✅ Draft this spec doc (executed 2026-08-16)
 3. ✅ Spec PR opened (PR #30) + initial Codex review received (request changes, 2026-08-16T16:34:55Z)
 4. ✅ Spec updated to address initial P0/P1/P2 (commit `6911c8c`, 2026-08-16)
-5. ✅ Codex re-review received (request changes, 2026-08-16T17:32:09Z) — 4 new P1/P2 issues
-6. ✅ Spec updated to address re-review P1/P2 (in progress, 2026-08-16)
-7. ⏳ Push spec update to PR #30 + re-request Codex review
-8. ⏳ Close `standardStep_positive` (smallest, lowest risk)
-9. ⏳ Close `acceleratedStep_positive_of_odd`
-10. ⏳ Add core oddness lemma (sorry #5, distinct name TBD) to `Equivalence.lean`
-11. ⏳ Close `acceleratedStep_equiv_standardStep`
-12. ⏳ Close `acceleratedTrajectory_reaches_one_implies_standard`
-13. ⏳ Push branch + GitHub Lean CI validates the proof work (sole Lean validation gate)
-14. ⏳ Commit sequence (one commit per sorry, signed-off)
-15. ⏳ Open proof-bearing PR (one PR for all 5 sorries; supersedes PR #30)
-16. ⏳ Codex review + CI green
-17. ⏳ Merge to `agent/bootstrap-research-monorepo`
-18. ⏳ Certificate migration follow-on workstream (per Codex re-review P1 architecture decision)
-19. ⏳ 07c-2 promotion PR (separate; depends on merged 02c/03c + Certificate follow-on)
-20. ⏳ M4 closes
+5. ✅ Codex re-review received (request changes, 2026-08-16T17:32:09Z) — 4 P1/P2 issues
+6. ✅ Spec updated to address re-review P1/P2 (commit `657c260`, 2026-08-16)
+7. ✅ Second re-review received (request changes, 2026-08-16T17:58:50Z) — 2 P1 + 1 P2 architectural issues
+8. ✅ Spec updated to address second re-review (in progress, 2026-08-16)
+9. ⏳ Push spec update to PR #30 + re-request Codex review
+10. ⏳ Close `Certificate.lean::acceleratedStep_odd_of_odd` (relocated to Basic.lean) — this admission is closed, not duplicated
+11. ⏳ Close `standardStep_positive` (smallest, lowest risk)
+12. ⏳ Close `acceleratedStep_positive_of_odd`
+13. ⏳ Close `acceleratedStep_equiv_standardStep`
+14. ⏳ Add `standardTrajectory_compose` lemma in Equivalence.lean
+15. ⏳ Close `acceleratedTrajectory_reaches_one_implies_standard`
+16. ⏳ Push branch + GitHub Lean CI validates the proof work (sole Lean validation gate)
+17. ⏳ Commit sequence (one commit per sorry, signed-off)
+18. ⏳ Open proof-bearing PR (one PR for all 4 target admissions + 1 relocation; supersedes PR #30)
+19. ⏳ Codex review + CI green
+20. ⏳ Merge to `agent/bootstrap-research-monorepo`
+21. ⏳ 07c-2 promotion PR (separate; depends on merged 02c/03c)
+22. ⏳ M4 closes
 
 ## Non-goals
 
@@ -206,7 +256,7 @@ This work is deferred to a separate PR after 02c/03c lands. It is NOT in this st
 - **No change to `CoverageTree.lean`** (07c-2 promotion is a separate PR)
 - **No `coverage_tree_soundness_orbit` work** (separate workstream; `sorry` remains)
 - **No `Affine.lean` work** (Story 04b)
-- **No `Certificate.lean::acceleratedStep_odd_of_odd` migration in this PR** (deferred to follow-on workstream per Codex re-review P1 architectural decision; the existing `Certificate.lean` `sorry` remains open)
+- **No new parallel oddness lemma** (the existing `Certificate.lean::acceleratedStep_odd_of_odd` is **closed** by relocation to `Basic.lean`, not duplicated)
 
 ## Lean / Python split (per `MEMORY.md` "BDD Discipline — Justin, 2026-08-15")
 
@@ -214,36 +264,46 @@ This work is deferred to a separate PR after 02c/03c lands. It is NOT in this st
 - **Lean validation**: **GitHub Lean CI is the sole Lean validation gate.** No local `lake` commands of any kind (no `lake build`, no `lake env lean`, no `.olean` inspection). All Lean verification happens in CI. Per-stop rule: stop after 2 patch failures on the same logical edit; read Mathlib source before the next patch.
 - **Out of scope**: local fast feedback via `lake env lean`. Removed per Codex review P1 (2026-08-16): the project decision is now explicit — GitHub Lean CI only.
 
-## Open gates (from Codex review + re-review)
+## Open gates (from Codex review + re-reviews)
 
 ### Initial review (2026-08-16T16:34:55Z)
 - ✅ Accurate preparatory claim level (P0 resolved)
-- ✅ Explicit oddness-closure dependency for the trajectory theorem (P1 — sorry #5 specified)
+- ✅ Explicit oddness-closure dependency for the trajectory theorem (P1 — sorry #5 specified initially)
 - ✅ GitHub-CI-only Lean validation (P1 — local Lake commands removed)
 - ✅ Concrete factorization proof decomposition (P2 — Lemma 1 + Lemma 2 + induction predicate)
 
-### Re-review (2026-08-16T17:32:09Z)
-- ✅ Module-ownership conflict (P1 — distinct core lemma name; Certificate migration deferred)
+### Re-review #1 (2026-08-16T17:32:09Z)
+- ✅ Module-ownership conflict (P1 — originally distinct core lemma in Equivalence)
 - ✅ Lemma 1 valuation bound (P1 — `1 ≤ k` not `2 ≤ k`; `n = 3` boundary case noted)
-- ✅ Sorry #5 future tense (P1 — preparatory doc uses future tense; proof-bearing PR adds declaration + status row atomically)
+- ✅ Sorry #5 future tense (P1 — preparatory doc used future tense)
 - ✅ Stray markup (P2 — `</content></invoke>` removed)
 - ✅ Risk classification (P2 — oddness preservation reclassified medium, was low)
 
-## Codex review corrections (both reviews)
+### Re-review #2 (2026-08-16T17:58:50Z)
+- ✅ Oddness module ownership (P1 — relocated to Basic.lean; Certificate admission closed, not duplicated)
+- ✅ Trajectory-composition proof (P1 — new `standardTrajectory_compose` lemma; hypothesis rewritten as `trajectory (acceleratedStep n) k = 1`)
+- ✅ "Five sorries" framing (P2 — now 4 target admissions + 1 relocated admission)
 
-### Initial review (2026-08-16T16:34:55Z)
+## Codex review corrections (all rounds)
+
+### Initial review (2026-08-16T16:34:55Z) — addressed at `6911c8c`
 - **P0**: reclassified `formally established` → `preparatory / implementation plan`
 - **P1**: added oddness invariant prerequisite (sorry #5 in Equivalence.lean)
 - **P1**: removed local Lean validation references; "GitHub Lean CI only" is the sole gate
 - **P2**: specified factorization proof decomposition (Lemma 1, Lemma 2, induction predicate)
 
-### Re-review (2026-08-16T17:32:09Z)
-- **P1 (module ownership)**: distinct core lemma name in Equivalence.lean (sub-namespace `EquivalenceCore` or uniquely-named helper); `Certificate.lean::acceleratedStep_odd_of_odd` migration deferred to follow-on workstream
+### Re-review #1 (2026-08-16T17:32:09Z) — addressed at `657c260`
+- **P1 (module ownership)**: distinct core lemma name in Equivalence.lean (sub-namespace `EquivalenceCore` or uniquely-named helper)
 - **P1 (Lemma 1 bound)**: corrected `2 ≤ k` to `1 ≤ k`; boundary case `n = 3` (`ν₂(10) = 1`) noted
 - **P1 (future tense)**: sorry #5 described in future tense; proof-bearing PR adds declaration + theorem-status row atomically
 - **P2 (stray markup)**: stray `</content></invoke>` removed
-- **P2 (risk)**: oddness preservation risk reclassified medium (was low); revisits to medium/high until Mathlib CI passes
+- **P2 (risk)**: oddness preservation risk reclassified medium (was low)
+
+### Re-review #2 (2026-08-16T17:58:50Z) — addressing now
+- **P1 (module ownership)**: canonical oddness theorem relocated to `Basic.lean` (imports only Mathlib); both `Certificate.lean` and `Equivalence.lean` consume it. **No import cycle exists** between Certificate.lean and Equivalence.lean. The existing `Certificate.lean::acceleratedStep_odd_of_odd` admission is **closed** by this relocation, not duplicated.
+- **P1 (trajectory composition)**: new `standardTrajectory_compose` lemma in Equivalence.lean; hypothesis rewritten as `trajectory (acceleratedStep n) k = 1`; IH applied to `acceleratedStep n`; final witness is `m' = (1 + ν₂(3n+1)) + r`.
+- **P2 (admission framing)**: 4 target admissions + 1 relocated admission (not "5 current admissions").
 
 ## Status
 
-**Started 2026-08-16.** Per-sorry resolution proven feasible without Mathlib PR (see "Why no Mathlib PR is needed"). Spec doc updated to address Codex reviews (initial P0/P1/P2 + re-review P1/P2 on 2026-08-16T17:32:09Z). Awaiting re-review.
+**Started 2026-08-16.** Per-sorry resolution proven feasible without Mathlib PR (see "Why no Mathlib PR is needed"). Spec doc updated to address all three Codex reviews (initial P0/P1/P2 + re-review #1 P1/P2 + re-review #2 P1/P2). Architecture corrected: oddness theorem relocated to Basic.lean (closes existing Certificate admission). Awaiting re-review.
