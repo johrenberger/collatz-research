@@ -68,11 +68,12 @@ theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
     rfl
   rw [← h_eq] at h_not_dvd
   -- Step 4: ¬ 2 ∣ acceleratedStep n → acceleratedStep n is odd.
-  -- Direct construction avoids the ¬(... = 0) vs (... ≠ 0) syntactic
-  -- mismatch that surfaces under v4.33.0's stricter Ne normalization.
+  -- Under v4.33.0: Nat.mod_two_ne_zero is `x % 2 ≠ 0 ↔ x % 2 = 1`
+  -- (no longer `↔ Odd x`), and Odd x ↔ x % 2 = 1 is now the explicit
+  -- lemma Nat.Odd_iff (NOT definitional). Apply both .mpr directions
+  -- to bridge: (¬ 2 ∣ n) → (n % 2 ≠ 0) → (n % 2 = 1) → Odd n.
   have hmod : acceleratedStep n % 2 ≠ 0 :=
     fun h => h_not_dvd (Nat.dvd_of_mod_eq_zero h)
-  rw [Nat.mod_two_ne_zero] at hmod
-  exact hmod
+  exact (Nat.Odd_iff.mpr (Nat.mod_two_ne_zero.mp hmod))
 
 end CollatzResearch
