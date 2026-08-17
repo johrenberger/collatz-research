@@ -66,7 +66,7 @@ theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
   have h_eq : acceleratedStep n = ordCompl[2] (3 * n + 1) := by
     unfold acceleratedStep twoAdicValuation
     rfl
-  rw [h_eq] at h_not_dvd
+  rw [← h_eq] at h_not_dvd
   -- Step 4: ¬ 2 ∣ acceleratedStep n → acceleratedStep n % 2 = 1 (by verified Mathlib lemmas)
   rw [Nat.dvd_iff_mod_eq_zero] at h_not_dvd
   rw [Nat.mod_two_ne_zero] at h_not_dvd
