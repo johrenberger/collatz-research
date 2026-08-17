@@ -67,11 +67,12 @@ theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
     unfold acceleratedStep twoAdicValuation
     rfl
   rw [← h_eq] at h_not_dvd
-  -- Step 4: ¬ 2 ∣ acceleratedStep n → acceleratedStep n % 2 = 1 (by verified Mathlib lemmas)
-  rw [Nat.dvd_iff_mod_eq_zero] at h_not_dvd
-  rw [Nat.mod_two_ne_zero] at h_not_dvd
-  -- h_not_dvd : acceleratedStep n % 2 = 1
-  -- Odd n is definitionally n % 2 = 1 in modern Mathlib
-  exact h_not_dvd
+  -- Step 4: ¬ 2 ∣ acceleratedStep n → acceleratedStep n is odd.
+  -- Direct construction avoids the ¬(... = 0) vs (... ≠ 0) syntactic
+  -- mismatch that surfaces under v4.33.0's stricter Ne normalization.
+  have hmod : acceleratedStep n % 2 ≠ 0 :=
+    fun h => h_not_dvd (Nat.dvd_of_mod_eq_zero h)
+  rw [Nat.mod_two_ne_zero] at hmod
+  exact hmod
 
 end CollatzResearch
