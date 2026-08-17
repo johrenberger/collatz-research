@@ -26,7 +26,7 @@ LAKE_MANIFEST = REPO_ROOT / "lake-manifest.json"
 
 EXPECTED_PYTHON_MIN = (3, 12)
 EXPECTED_PYTHON_MAX_EXCLUSIVE = (3, 13)
-EXPECTED_LEAN_TAG = "leanprover/lean4:v4.19.0"
+EXPECTED_LEAN_TAG = "leanprover/lean4:v4.33.0"
 
 
 def _read(path: Path) -> str:

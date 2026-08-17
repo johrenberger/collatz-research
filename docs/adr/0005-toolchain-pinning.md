@@ -20,6 +20,16 @@ The pre-Story-01 state had:
 - `lean-toolchain` pinned to `leanprover/lean4:v4.19.0` with `lake-manifest.json`
   locking transitive revisions — the Lean side was already correct.
 
+  *Updated 2026-08-17:* bumped to `leanprover/lean4:v4.33.0` via PR #32
+  (Story 08, merge commit `98831ae`). The bump itself was driven by the
+  spec doc `docs/story-08-toolchain-bump.md` which records the
+  rationale, the iterative commit sequence, and the Phase 2 source
+  adaptations. `lake-manifest.json` revs were updated to match Mathlib
+  v4.33.0's own manifest; toolchain-keyed `.olean` caches were
+  invalidated for the cold build. The pin-decision discipline
+  ("toolchain updates require their own story") is preserved: this ADR
+  is the post-hoc update, and Story 08 + PR #32 are the bump-record.
+
 ## Decision
 
 - **Python interpreter:** pin to `3.12.x`. `pyproject.toml` declares
@@ -34,9 +44,10 @@ The pre-Story-01 state had:
 - **`uv.lock`** is committed and verified with `uv sync --frozen`.
   Lockfile-driven bootstrap reproduces the same environment on every
   supported workstation.
-- **Lean toolchain:** `leanprover/lean4:v4.19.0` via `lean-toolchain`,
+- **Lean toolchain:** `leanprover/lean4:v4.33.0` via `lean-toolchain`,
   with transitive revisions locked in `lake-manifest.json`. `lake build`
-  uses the locked manifest without an implicit `lake update`.
+  uses the locked manifest without an implicit `lake update`. (Was
+  `v4.19.0`; bumped 2026-08-17 via PR #32 — see Story 08 spec doc.)
 - **Toolchain version policy:** toolchain updates require their own
   story (or an explicit ADR-driven change to this decision). They are
   never incidental.
