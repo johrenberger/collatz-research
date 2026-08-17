@@ -30,6 +30,7 @@ that position for the iteration history).
 -/
 
 import CollatzResearch.CoverageTree
+import Mathlib.Tactic.NormNum
 
 namespace CollatzResearch
 
