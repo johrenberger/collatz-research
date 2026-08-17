@@ -74,6 +74,6 @@ theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
   -- to bridge: (¬ 2 ∣ n) → (n % 2 ≠ 0) → (n % 2 = 1) → Odd n.
   have hmod : acceleratedStep n % 2 ≠ 0 :=
     fun h => h_not_dvd (Nat.dvd_of_mod_eq_zero h)
-  exact (Nat.Odd_iff.mpr (Nat.mod_two_ne_zero.mp hmod))
+  exact (Nat.odd_iff.mpr (Nat.mod_two_ne_zero.mp hmod))
 
 end CollatzResearch
