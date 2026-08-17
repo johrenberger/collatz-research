@@ -160,9 +160,9 @@ def verified (t : CoverageTree) (l : CoverageLeaf) : Prop :=
     `Option (Nat × Nat × Nat)`. Strict format; returns `none` on any
     deviation. (Story 07c / round-5, 07c-1.) -/
 def leanInterval (l : CoverageLeaf) : Option (Nat × Nat × Nat) :=
-  match l.leafProperty.split (· = ':') with
+  match (l.leafProperty.split (· = ':')).toList.map (·.toString) with
   | [periodStr, rangeStr] =>
-    match rangeStr.split (· = '-') with
+    match (rangeStr.split (· = '-')).toList.map (·.toString) with
     | [loStr, hiStr] =>
       match periodStr.toNat?, loStr.toNat?, hiStr.toNat? with
       | some period, some lo, some hi => some (period, lo, hi)
