@@ -26,4 +26,54 @@ def trajectory (n : Nat) : Nat → Nat
     trajectory n (steps + 1) = acceleratedStep (trajectory n steps) := by
   rfl
 
+/-- `acceleratedStep` preserves oddness on the odd domain.
+
+For odd `n`, `3n+1` is even, so `ν₂(3n+1) ≥ 1`. The quotient
+`(3n+1)/2^ν₂(3n+1)` is the maximal odd divisor of `3n+1`, hence odd.
+
+This is the relocated declaration from `Certificate.lean` per the Story 02c/03c
+spec (PR #30); both `Certificate.lean::DescentWitness.trajectory_odd` and
+`Equivalence.lean::acceleratedTrajectory_reaches_one_implies_standard` consume
+this version.
+-/
+theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
+    Odd (acceleratedStep n) := by
+  -- acceleratedStep n = (3n+1) / 2^ν₂(3n+1) where ν₂ m = m.factorization 2
+  -- By Mathlib notation: ordCompl[2] m = m / ordProj[2] m, where
+  --   ordProj[2] m = 2^(m.factorization 2) (the 2-power part of m)
+  --   ordCompl[2] m = the odd part of m
+  -- So acceleratedStep n = ordCompl[2] (3n+1) (the odd part of 3n+1).
+  --
+  -- The key Mathlib fact is Nat.not_dvd_ordCompl:
+  --   ¬ p ∣ ordCompl[p] m  when  p is prime and  m ≠ 0.
+  -- For p = 2 (Nat.prime_two), this gives  ¬ 2 ∣ ordCompl[2] (3n+1).
+  --
+  -- The conversion ¬ 2 ∣ x → x % 2 = 1 (i.e., Odd x) uses two verified
+  -- Mathlib lemmas (Init.lean:921, standard):
+  --   Nat.dvd_iff_mod_eq_zero : 2 ∣ x ↔ x % 2 = 0
+  --   Nat.mod_two_ne_zero    : x % 2 ≠ 0 ↔ x % 2 = 1
+  -- Combined with Odd x ↔ x % 2 = 1 (the definition), this gives Odd x directly.
+  --
+  -- 'open Nat in' brings the ordCompl / ordProj notation into scope
+  -- (defined in Mathlib.Data.Nat.Factorization.Defs).
+  open Nat in
+  -- Step 1: 3n+1 is nonzero (trivially, since 3n+1 ≥ 1 for all n)
+  have h_nonzero : 3 * n + 1 ≠ 0 := by omega
+  -- Step 2: Apply Nat.not_dvd_ordCompl with p := 2
+  have h_not_dvd : ¬ 2 ∣ ordCompl[2] (3 * n + 1) :=
+    Nat.not_dvd_ordCompl Nat.prime_two h_nonzero
+  -- Step 3: acceleratedStep n = ordCompl[2] (3n+1) by definition
+  have h_eq : acceleratedStep n = ordCompl[2] (3 * n + 1) := by
+    unfold acceleratedStep twoAdicValuation
+    rfl
+  rw [← h_eq] at h_not_dvd
+  -- Step 4: ¬ 2 ∣ acceleratedStep n → acceleratedStep n is odd.
+  -- Under v4.33.0: Nat.mod_two_ne_zero is `x % 2 ≠ 0 ↔ x % 2 = 1`
+  -- (no longer `↔ Odd x`), and Odd x ↔ x % 2 = 1 is now the explicit
+  -- lemma Nat.Odd_iff (NOT definitional). Apply both .mpr directions
+  -- to bridge: (¬ 2 ∣ n) → (n % 2 ≠ 0) → (n % 2 = 1) → Odd n.
+  have hmod : acceleratedStep n % 2 ≠ 0 :=
+    fun h => h_not_dvd (Nat.dvd_of_mod_eq_zero h)
+  exact (Nat.odd_iff.mpr (Nat.mod_two_ne_zero.mp hmod))
+
 end CollatzResearch

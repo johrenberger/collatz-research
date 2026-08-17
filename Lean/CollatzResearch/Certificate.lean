@@ -77,21 +77,11 @@ theorem DescentWitness.Valid.start_pos_odd (w : DescentWitness) (h : w.Valid) :
     0 < w.start ∧ Odd w.start :=
   ⟨h.1, h.2.1⟩
 
-/-- `acceleratedStep` preserves oddness on the odd domain.
+/-- Oddness is preserved along the trajectory (induction on `steps`).
 
-For odd `n`, `3n+1` is even, so `v2(3n+1) ≥ 1`. The quotient
-`(3n+1)/2^v2(3n+1)` is the maximal odd divisor of `3n+1`, hence odd.
-
-Admitted via `sorry`: the factorization chain through `Nat.factorization_div`
-and `Nat.factorization_pow` is the same Mathlib work blocking
-`Dynamics.lean::acceleratedStep_positive_of_odd`. Tracked as part of the
-Story 02c/03c Mathlib workstream.
--/
-theorem acceleratedStep_odd_of_odd (n : Nat) (h : Odd n) :
-    Odd (acceleratedStep n) := by
-  sorry
-
-/-- Oddness is preserved along the trajectory (induction on `steps`). -/
+The one-step lemma `acceleratedStep_odd_of_odd` is now in `Basic.lean`
+(relocated per Story 02c/03c spec, PR #30, merged 2026-08-16) so both
+`Certificate.lean` and `Equivalence.lean` can consume it. -/
 theorem DescentWitness.trajectory_odd (start k : Nat) (h : Odd start) :
     Odd (trajectory start k) := by
   induction k with
