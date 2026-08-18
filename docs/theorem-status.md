@@ -4,7 +4,7 @@
 | --- | --- | --- | --- |
 | `trajectory_zero` | Checked | `CollatzResearch.Basic` | Definitional base case |
 | `trajectory_succ` | Checked | `CollatzResearch.Basic` | One-step unfolding |
-| `standardStep_positive` | Pending | `CollatzResearch.Dynamics` | Standard step preserves positivity on positive domain (definition only; proof TODO) |
+| `standardStep_positive` | Checked | `CollatzResearch.Dynamics` | Standard step preserves positivity on positive domain (closed in PR #37; parity case split with `decide` + `omega`; uses `Nat.div_pos` dividend-bound then divisor-positivity per Mathlib v4.33.0) |
 | `acceleratedStep_positive_of_odd` | Pending | `CollatzResearch.Dynamics` | Accelerated step preserves positivity on odd domain (definition only; proof TODO) |
 | `standardTrajectory_zero` | Checked | `CollatzResearch.Equivalence` | Definitional base case |
 | `standardTrajectory_succ` | Checked | `CollatzResearch.Equivalence` | One-step unfolding |

@@ -74,10 +74,29 @@ applies directly).
 -/
 theorem standardStep_positive (n : Nat) (h : Positive n) :
     Positive (standardStep n) := by
-  -- TODO: see file-header blocker notes. Needs `omega` to see
-  -- `n % 2 = 0 ∧ n > 0 → n ≥ 2` (or equivalent step-by-step
-  -- reasoning). `n = 0` and `n = 1` cases need contradiction proofs.
-  sorry
+  unfold Positive standardStep
+  split_ifs with h_even
+  · -- even branch: n is positive even, hence n ≥ 2, so n / 2 ≥ 1 > 0
+    -- Prove n ≠ 1 explicitly: 1 is odd, so `1 % 2 ≠ 0`.
+    have hn1 : n ≠ 1 := by
+      intro hn1
+      subst hn1
+      -- h_even : 1 % 2 = 0; reduce 1 % 2 = 1 via decide (no Mathlib import).
+      have h1 : (1 : Nat) % 2 = 1 := by decide
+      rw [h1] at h_even
+      -- h_even : 1 = 0, which is False. omega closes the goal.
+      omega
+    -- Make positivity explicit so omega can use it (omega doesn't unfold `Positive`).
+    change 0 < n at h
+    -- Pure linear arithmetic on h, hn1. Clear h_even first: the `n % 2 = 0`
+    -- constraint in scope confuses omega on the %-irrelevant goal `2 ≤ n`.
+    have hlt : 2 ≤ n := by
+      clear h_even
+      omega
+    -- Nat.div_pos in Mathlib v4.33.0: dividend-bound first, divisor-positivity second.
+    exact Nat.div_pos hlt (by omega)
+  · -- odd branch: 3 * n + 1 > 0 trivially (n : Nat).
+    omega
 
 /-- The accelerated Collatz step `T(n)` preserves positivity on the odd
 domain.
