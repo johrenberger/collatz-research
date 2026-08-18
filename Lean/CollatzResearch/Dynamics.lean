@@ -119,14 +119,16 @@ theorem acceleratedStep_positive_of_odd (n : Nat) (h_odd : Odd n) :
   · -- 2^((3*n+1).factorization 2) ≤ 3*n+1
     -- The 2-power factor of 3*n+1 divides 3*n+1 by definition of factorization;
     -- since 3*n+1 > 0, the divisor is bounded by the dividend.
+    -- Nat.factorization_le_iff_dvd signature in v4.33.0 likely has explicit `k`
+    -- between `hn` and `hp`: `(hn : n ≠ 0) → (k : ℕ) → (hp : p.Prime) → ...`.
     have h_ne : 3 * n + 1 ≠ 0 := by omega
     have h_le : (3 * n + 1).factorization 2 ≤ (3 * n + 1).factorization 2 :=
       Nat.le_refl _
     have h_dvd : 2 ^ ((3 * n + 1).factorization 2) ∣ 3 * n + 1 :=
-      (Nat.factorization_le_iff_dvd_pow h_ne Nat.prime_two).mpr h_le
+      Nat.factorization_le_iff_dvd h_ne ((3 * n + 1).factorization 2) Nat.prime_two h_le
     exact Nat.le_of_dvd h_ne h_dvd
   · -- 0 < 2^((3*n+1).factorization 2): any power of 2 is positive.
-    -- Nat.pow_pos signature in v4.33.0: (a n : Nat) → 0 < a → 0 < a^n.
-    exact Nat.pow_pos 2 ((3 * n + 1).factorization 2) Nat.zero_lt_two
+    -- Nat.pow_pos in v4.33.0: first arg is `0 < a` proof (Prop), then `n : Nat`.
+    exact Nat.pow_pos Nat.zero_lt_two ((3 * n + 1).factorization 2)
 
 end CollatzResearch
