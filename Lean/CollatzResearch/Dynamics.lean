@@ -74,10 +74,22 @@ applies directly).
 -/
 theorem standardStep_positive (n : Nat) (h : Positive n) :
     Positive (standardStep n) := by
-  -- TODO: see file-header blocker notes. Needs `omega` to see
-  -- `n % 2 = 0 ∧ n > 0 → n ≥ 2` (or equivalent step-by-step
-  -- reasoning). `n = 0` and `n = 1` cases need contradiction proofs.
-  sorry
+  unfold Positive standardStep
+  split_ifs with h_even
+  · -- even branch: n is positive even, hence n ≥ 2, so n / 2 ≥ 1 > 0
+    -- First derive `n ≠ 1` directly (since 1 is odd, contradicts h_even).
+    have hn1 : n ≠ 1 := by
+      intro hn1
+      subst hn1
+      -- h_even : 1 % 2 = 0, which is contradictory.
+      omega
+    -- Now omega handles pure linear arithmetic: 1 ≤ n ∧ n ≠ 1 → 2 ≤ n.
+    have hlt : 2 ≤ n := by omega
+    have hpos : 0 < 2 := by norm_num
+    -- Nat.div_pos : (0 < b) → (b ≤ a) → 0 < a / b
+    exact Nat.div_pos hpos hlt
+  · -- odd branch: 3 * n + 1 > 0 trivially (Nat arithmetic).
+    omega
 
 /-- The accelerated Collatz step `T(n)` preserves positivity on the odd
 domain.
