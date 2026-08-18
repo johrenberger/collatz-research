@@ -110,25 +110,24 @@ Story 03's one-step equivalence theorem.
 -/
 theorem acceleratedStep_positive_of_odd (n : Nat) (h_odd : Odd n) :
     Positive (acceleratedStep n) := by
-  unfold Positive acceleratedStep twoAdicValuation
-  -- Goal: 0 < (3*n+1) / 2^((3*n+1).factorization 2)
+  -- Pivot from Nat.div_pos + factorization lemma chain to ordCompl-based approach.
+  -- The v4.33.0 Mathlib factorization_* API diverged too far from PR #30 spec
+  -- (8 CI failures on the Nat.div_pos route). The ordCompl approach used in
+  -- Basic.lean's `acceleratedStep_odd_of_odd` (v4.33.0-validated) is simpler.
   --
-  -- Use Nat.div_pos (Mathlib v4.33.0 signature: dividend-bound first,
-  -- divisor-positivity second — per Codex P1 on PR #37).
-  apply Nat.div_pos
-  · -- 2^((3*n+1).factorization 2) ≤ 3*n+1
-    -- The 2-power factor of 3*n+1 divides 3*n+1 by definition of factorization;
-    -- since 3*n+1 > 0, the divisor is bounded by the dividend.
-    -- Nat.factorization_le_iff_dvd signature in v4.33.0 likely has explicit `k`
-    -- between `hn` and `hp`: `(hn : n ≠ 0) → (k : ℕ) → (hp : p.Prime) → ...`.
-    have h_ne : 3 * n + 1 ≠ 0 := by omega
-    have h_le : (3 * n + 1).factorization 2 ≤ (3 * n + 1).factorization 2 :=
-      Nat.le_refl _
-    have h_dvd : 2 ^ ((3 * n + 1).factorization 2) ∣ 3 * n + 1 :=
-      Nat.factorization_le_iff_dvd h_ne ((3 * n + 1).factorization 2) Nat.prime_two h_le
-    exact Nat.le_of_dvd h_ne h_dvd
-  · -- 0 < 2^((3*n+1).factorization 2): any power of 2 is positive.
-    -- Nat.pow_pos in v4.33.0: first arg is `0 < a` proof (Prop), then `n : Nat`.
-    exact Nat.pow_pos Nat.zero_lt_two ((3 * n + 1).factorization 2)
+  -- Strategy: acceleratedStep n = ordCompl[2] (3*n+1) (the 2-free part).
+  -- Since ordCompl[2] (3*n+1) divides 3*n+1 and 3*n+1 > 0,
+  -- ordCompl[2] (3*n+1) ≥ 1, hence > 0.
+  open Nat in
+  have h_nonzero : 3 * n + 1 ≠ 0 := by omega
+  have h_eq : acceleratedStep n = ordCompl[2] (3 * n + 1) := by
+    unfold acceleratedStep twoAdicValuation
+    rfl
+  rw [h_eq]
+  -- ordCompl[2] (3*n+1) divides 3*n+1 (since 3*n+1 = 2^k * ordCompl[2] (3*n+1))
+  have h_dvd : ordCompl[2] (3 * n + 1) ∣ 3 * n + 1 := Nat.ordCompl_dvd
+  -- 1 ≤ ordCompl[2] (3*n+1) (any divisor of nonzero is ≥ 1).
+  -- Convert `1 ≤ x` to `0 < x` via Nat.one_le_iff_ne_zero / Nat.pos_iff_ne_zero.
+  exact (Nat.one_le_iff_ne_zero.mp (Nat.one_le_of_dvd h_nonzero h_dvd) : 0 < ordCompl[2] (3 * n + 1))
 
 end CollatzResearch
