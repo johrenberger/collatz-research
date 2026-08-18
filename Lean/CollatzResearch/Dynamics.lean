@@ -121,7 +121,7 @@ theorem acceleratedStep_positive_of_odd (n : Nat) (h_odd : Odd n) :
     -- since 3*n+1 > 0, the divisor is bounded by the dividend.
     have h_ne : 3 * n + 1 ≠ 0 := by omega
     have h_dvd : 2 ^ ((3 * n + 1).factorization 2) ∣ 3 * n + 1 :=
-      (Nat.factorization_le_iff_dvd h_ne).mpr le_rfl
+      (Nat.factorization_le_iff_dvd h_ne Nat.prime_two).mpr le_rfl
     exact Nat.le_of_dvd h_ne h_dvd
   · -- 0 < 2^((3*n+1).factorization 2): any power of 2 is positive.
     omega
