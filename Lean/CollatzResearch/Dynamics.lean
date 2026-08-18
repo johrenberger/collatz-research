@@ -110,8 +110,20 @@ Story 03's one-step equivalence theorem.
 -/
 theorem acceleratedStep_positive_of_odd (n : Nat) (h_odd : Odd n) :
     Positive (acceleratedStep n) := by
-  -- TODO: see file-header blocker notes. Needs `omega` to see
-  -- `Odd n → n ≥ 1 → 3n+1 ≠ 0` for `factorization_le_iff_dvd.hn`.
-  sorry
+  unfold Positive acceleratedStep twoAdicValuation
+  -- Goal: 0 < (3*n+1) / 2^((3*n+1).factorization 2)
+  --
+  -- Use Nat.div_pos (Mathlib v4.33.0 signature: dividend-bound first,
+  -- divisor-positivity second — per Codex P1 on PR #37).
+  apply Nat.div_pos
+  · -- 2^((3*n+1).factorization 2) ≤ 3*n+1
+    -- The 2-power factor of 3*n+1 divides 3*n+1 by definition of factorization;
+    -- since 3*n+1 > 0, the divisor is bounded by the dividend.
+    have h_ne : 3 * n + 1 ≠ 0 := by omega
+    have h_dvd : 2 ^ ((3 * n + 1).factorization 2) ∣ 3 * n + 1 :=
+      Nat.pow_factorization_dvd h_ne
+    exact Nat.le_of_dvd h_ne h_dvd
+  · -- 0 < 2^((3*n+1).factorization 2): any power of 2 is positive.
+    omega
 
 end CollatzResearch
