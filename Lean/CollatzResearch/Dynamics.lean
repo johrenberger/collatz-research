@@ -110,8 +110,31 @@ Story 03's one-step equivalence theorem.
 -/
 theorem acceleratedStep_positive_of_odd (n : Nat) (h_odd : Odd n) :
     Positive (acceleratedStep n) := by
-  -- TODO: see file-header blocker notes. Needs `omega` to see
-  -- `Odd n → n ≥ 1 → 3n+1 ≠ 0` for `factorization_le_iff_dvd.hn`.
-  sorry
+  -- Pivot from Nat.div_pos + factorization lemma chain to ordCompl-based approach.
+  -- The v4.33.0 Mathlib factorization_* API diverged too far from PR #30 spec
+  -- (8 CI failures on the Nat.div_pos route). The ordCompl approach used in
+  -- Basic.lean's `acceleratedStep_odd_of_odd` (v4.33.0-validated) is simpler.
+  --
+  -- Strategy: acceleratedStep n = ordCompl[2] (3*n+1) (the 2-free part).
+  -- Since ordCompl[2] (3*n+1) divides 3*n+1 and 3*n+1 > 0,
+  -- ordCompl[2] (3*n+1) ≥ 1, hence > 0.
+  open Nat in
+  have h_nonzero : 3 * n + 1 ≠ 0 := by omega
+  have h_eq : acceleratedStep n = ordCompl[2] (3 * n + 1) := by
+    unfold acceleratedStep twoAdicValuation
+    rfl
+  rw [h_eq]
+  -- ordCompl[2] (3*n+1) divides 3*n+1 (since 3*n+1 = 2^k * ordCompl[2] (3*n+1))
+  -- Codex P1: Nat.ordCompl_dvd has TWO explicit args `(n p : ℕ)`; must instantiate.
+  have h_dvd : ordCompl[2] (3 * n + 1) ∣ 3 * n + 1 :=
+    Nat.ordCompl_dvd (3 * n + 1) 2
+  -- ordCompl[2] (3*n+1) > 0 because it divides 3*n+1 (nonzero):
+  -- assume it's 0, then 0 ∣ 3*n+1, but 3*n+1 ≠ 0 — contradiction.
+  have h_ne_m : ordCompl[2] (3 * n + 1) ≠ 0 := by
+    intro h
+    rw [h] at h_dvd
+    exact h_nonzero (Nat.zero_dvd.mp h_dvd)
+  -- Convert `x ≠ 0` to `0 < x` via Nat.pos_iff_ne_zero.
+  exact Nat.pos_iff_ne_zero.mpr h_ne_m
 
 end CollatzResearch
