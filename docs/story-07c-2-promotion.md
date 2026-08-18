@@ -1,36 +1,41 @@
 # Story 07c-2 — `coverage_tree_soundness_full` promotion (preparatory → formally established)
 
-Status: **spec draft, awaiting Codex review at spec stage.** Companion-theorem approach per Justin's recommendation 2026-08-18T00:16 GMT+2.
+Status: **v2 spec, re-scoped per Codex P0 review on PR #34 (2026-08-18T00:22Z).** Conditional `LeafReachesOne` form replaces unconditional `coverage_tree_soundness_full`.
 
 ## Context
 
-M4 Finite coverage requires closing the `coverage_tree_soundness` ↔ Collatz trajectory gap. The current `coverage_tree_soundness` (CoverageTree.lean:281) proves tree descent succeeds:
+M4 Finite coverage requires closing the `coverage_tree_soundness` � Collatz trajectory gap. The current `coverage_tree_soundness` (CoverageTree.lean:281) proves tree descent succeeds:
 
 ```lean
 theorem coverage_tree_soundness (t : CoverageTree)
     (hv : ValidTree t) (hic : IsComplete t) (x : Nat) (hx : x > 0) :
-    � l, l ∈ t.leaves ∧ verified t l ∧ descend t x = some l
+    ∃ l, l ∈ t.leaves ∧ verified t l ∧ descend t x = some l
 ```
 
 Its docstring explicitly defers `ReachesOne x`: *"this theorem intentionally does not conclude `ReachesOne x`; that would require a proof connecting tree descent to the Collatz trajectory."*
 
-PR #31 (merged 2026-08-17T22:11:12Z at `08319d5`) closed the 5 Dynamics/Equivalence/Certificate admissions in 02c/03c, landing in master:
+### Project state at master `cd1272b` (post PR #35 audit)
 
-1. `Basic.lean::acceleratedStep_odd_of_odd` (relocated from Certificate.lean)
-2. `Dynamics.lean::standardStep_positive`
-3. `Dynamics.lean::acceleratedStep_positive_of_odd`
-4. `Dynamics.lean::acceleratedStep_equiv_standardStep`
-5. `Equivalence.lean::acceleratedTrajectory_reaches_one_implies_standard`
+- **1 admission closed** by PR #31 (merged 2026-08-17T22:11:12Z): `Basic.lean::acceleratedStep_odd_of_odd` (relocated from Certificate.lean, proved). See `docs/theorem-status.md`.
+- **4 Dynamics/Equivalence sorries still pending** (NOT closed by PR #31):
+  - `Dynamics.lean::standardStep_positive` (line 80)
+  - `Dynamics.lean::acceleratedStep_positive_of_odd` (line 96)
+  - `Equivalence.lean::acceleratedStep_equiv_standardStep` (line 60)
+  - `Equivalence.lean::acceleratedTrajectory_reaches_one_implies_standard` (line 92)
+- **Certificate.lean parser-related sorries** (lines 198, 199, 202) — over-budget (allows 1, has 3); pre-existing, out of scope for 02c/03c.
+- **Affine.lean sorries** (lines 115, 174, 185, 195) — Story 04b workstream, separate.
+- **`coverage_tree_soundness_orbit` sorry** (line 344) — orbit-aware routing workstream, separate.
 
-These 5 lemmas establish the bridge between `acceleratedStep` (odd-only) and `standardStep` (Collatz map), and show that `accelerated_orbit` reaching 1 implies `standardTrajectory` reaching 1. **They do NOT directly prove `ReachesOne x` for arbitrary `x`** — they establish properties that are *prerequisites* to that proof.
+The 1 closed admission establishes one prerequisite: `Odd (acceleratedStep n)` when `Odd n`. The 4 pending Dynamics/Equivalence sorries are themselves prerequisites for the 07c-2 promotion (per the Codex P0 review).
 
-## Claim
+## Claim (v2 — re-scoped per Codex P0 #1)
 
 **Claim level target:** formally established.
 
-Add a new companion theorem in `CoverageTree.lean`:
+### v1 error (P0): unconditional form was rejected
 
 ```lean
+-- v1 (REJECTED by Codex P0): unsound overclaim
 theorem coverage_tree_soundness_full (t : CoverageTree)
     (hv : ValidTree t) (hic : IsComplete t) (x : Nat) (hx : x > 0) :
     ∃ l, l ∈ t.leaves ∧ verified t l ∧
@@ -38,117 +43,138 @@ theorem coverage_tree_soundness_full (t : CoverageTree)
          ReachesOne x
 ```
 
-No new `sorry` / `admit` / `axiom`. The existing `coverage_tree_soundness` is left **untouched** (preserves the formally established result + Codex-reviewed docstring that explicitly defers `ReachesOne`).
+Codex P0 review rejected v1 because under only `ValidTree ∧ IsComplete`, the conclusion yields `ReachesOne x` for every `x > 0` for any valid complete tree (e.g., a one-leaf tree) — that **IS** the Collatz theorem, not a tree-soundness bridge. A tree-soundness bridge cannot entail the global convergence claim without additional leaf-level semantics.
 
-`coverage_tree_soundness_orbit` (CoverageTree.lean:344, currently `sorry`) is **OUT OF SCOPE** — separate workstream per MEMORY.md.
+### v2 (this revision): conditional semantic-leaf form
 
-## Proof strategy (DRAFT — needs Codex review)
-
-The key gap: `descend t x` uses `x % m` for residue lookup, while `accelerated_orbit x k` uses `acceleratedStep` for iteration. These are different operations. Bridging them requires one of:
-
-### Option A — Tree-modulus bridge
-Show that the tree's moduli are chosen so that `x % m` at level `k` equals `accelerated_orbit x k % m` for some specific `k`. This requires the tree to encode the Collatz map's residue structure at each level.
-
-**Lemma needed (new):** `tree_residue_alignment : ∀ (t : CoverageTree), ValidTree t → IsComplete t → ∀ x (i : Nat) (child : CoverageNode), (i, child) ∈ tree.children → ∃ k, accelerated_orbit x k % m = i`
-
-This is essentially the orbit-alignment condition that `coverage_tree_soundness_orbit` already requires (via `OrbitAlignedTree`). So Option A is closely related to closing `coverage_tree_soundness_orbit`'s sorry — but that sorry is out of scope.
-
-### Option B — Use `coverage_tree_soundness_orbit` as a stepping stone
-Prove `coverage_tree_soundness_full` by:
-1. Apply `coverage_tree_soundness` to get `descend t x = some l`
-2. Show `descendOrbit t x 0 = descend t x` (descent functions coincide for `k=0`)
-3. Conclude `ReachesOne x` from `SatOrbit t x l`
-
-This requires closing part of `coverage_tree_soundness_orbit`'s sorry (specifically the `SatOrbit` witness construction), which is out of scope.
-
-### Option C — Direct `ReachesOne x` witness
-Prove `ReachesOne x` independently using only the 5 closed lemmas + tree structure:
+Two new definitions + one companion theorem, all conditional on leaf-level semantics:
 
 ```lean
--- After coverage_tree_soundness gives us descend t x = some l and verified t l:
-have hReaches : ReachesOne x := by
-  -- The leaf's leafProperty gives us an interval [lo, hi] modulo the leaf's period
-  -- combined with ValidTree ∧ IsComplete, this means the tree correctly encodes
-  -- the Collatz trajectory reaching 1 within the leaf's interval.
-  ...
+-- v2: conditional semantic-leaf predicate
+def LeafReachesOne (t : CoverageTree) (l : CoverageLeaf) : Prop :=
+  ∀ x, descend t x = some l → ReachesOne x
+
+-- v2: companion theorem with explicit leaf-semantic hypothesis
+theorem coverage_tree_soundness_full (t : CoverageTree)
+    (hv : ValidTree t) (hic : IsComplete t)
+    (hLeaf : ∀ l ∈ t.leaves, verified t l → LeafReachesOne t l)
+    (x : Nat) (hx : x > 0) :
+    ∃ l, l ∈ t.leaves ∧ verified t l ∧ descend t x = some l ∧ LeafReachesOne t l
 ```
 
-This is the cleanest if doable, but requires proving the Collatz theorem essentially — which is the whole project. Not feasible without additional infrastructure.
+The conditional `hLeaf` is the semantic hypothesis: every verified leaf must carry a certificate that "any `x` landing here reaches 1". The proof of `coverage_tree_soundness_full` is then:
 
-### Preliminary assessment
-Option C is infeasible without additional lemmas (essentially requires the Collatz theorem). Option B requires closing `coverage_tree_soundness_orbit` (out of scope). Option A is the most direct but introduces a new lemma that overlaps with `OrbitAlignedTree`.
+1. Apply `coverage_tree_soundness` to get `descend t x = some l` with `verified t l`.
+2. Extract `LeafReachesOne t l` from `hLeaf l hl hver`.
+3. Conclude.
 
-**Open question for Codex review:** Which of these options (or which variant) is the intended proof strategy for 07c-2? The 5 closed lemmas provide prerequisites, but the actual bridge from `descend` to `ReachesOne x` requires additional structure that isn't in the closed lemmas.
+This is correct: the tree routes (`coverage_tree_soundness`) and the leaf carries the semantic certificate (`LeafReachesOne`). No false claim about the global Collatz theorem.
 
-## Lemma inventory (5 closed, from PR #31)
+No new `sorry` / `admit` / `axiom`. The existing `coverage_tree_soundness` is left **untouched**. `coverage_tree_soundness_orbit` (line 344, `sorry`) is **OUT OF SCOPE** — orbit-aware routing workstream.
 
-All available in master as of `08319d5`:
+## The actual work: structured leaf-certificate semantics (Q3)
 
-| # | Location | Statement (informal) | Used by Option |
+The conditional form makes the semantic gap explicit. The work shifts from "prove `ReachesOne x`" (impossible without the Collatz theorem) to **defining and proving the leaf semantics**.
+
+### Required: a structured certificate type
+
+`leafProperty : String` carries no semantic content — it's an opaque `String` that could be anything. To prove `LeafReachesOne t l`, the leaf needs a **structured certificate** that proves "x reaches 1 within this leaf's interval" for any `x` that lands at this leaf.
+
+A candidate (to be designed in a separate spec story):
+
+```lean
+-- Sketch: structured certificate that proves "x → 1 within this interval"
+inductive LeafCertificate where
+  | interval (period lo hi : Nat) (h : ∀ x, lo ≤ x % period ∧ x % period ≤ hi → ReachesOne x)
+  | -- ... other certificate shapes ...
+```
+
+The semantics: a leaf certificate carries a proof that any `x` in its declared residue interval reaches 1.
+
+### Why this matters
+
+The current `leafProperty : String` is an opaque token. To prove `LeafReachesOne`, we need either:
+
+1. **Structured certificates** (preferred): replace `leafProperty` with a certificate type that carries the semantic content + the proof.
+2. **Proof-carrying strings**: parse the string into a structured form and re-prove the semantics from the parsed form. Harder, error-prone.
+3. **External oracle**: assume the leaf semantics from an external source (Python's `tree.py`, etc.). Requires formal integration.
+
+### Open question for Codex review (Q3 design)
+
+This is the actual new story: **define the structured leaf-certificate type, prove the parsing/proof-construction logic, integrate with `coverage_tree_soundness_full`**.
+
+The 5 closed lemmas from PR #31 are still relevant prerequisites (especially `acceleratedStep_odd_of_odd`, `acceleratedStep_equiv_standardStep`, `acceleratedTrajectory_reaches_one_implies_standard`) — they'll be used in the certificate construction. But the bridge is at the certificate level, not at the unconditional tree level.
+
+## Lemma inventory (1 closed, 4 pending — corrected per audit)
+
+Per `docs/theorem-status.md` (corrected post-PR #35 audit) and `docs/lean-sorry-budget.json`:
+
+| # | Location | Status | Statement (informal) |
 |---|---|---|---|
-| 1 | `Basic.lean` | `Odd (acceleratedStep n)` when `Odd n` | A, B |
-| 2 | `Dynamics.lean` | `standardStep n > 0` for all `n` | A, B |
-| 3 | `Dynamics.lean` | `acceleratedStep n > 0` when `Odd n` | A, B |
-| 4 | `Dynamics.lean` | `acceleratedStep n` equiv. `standardStep n` (under odd condition) | A, B |
-| 5 | `Equivalence.lean` | `accelerated_orbit` reaches 1 → `standardTrajectory` reaches 1 | A, B |
+| 1 | `Basic.lean::acceleratedStep_odd_of_odd` | ✅ Checked | `Odd (acceleratedStep n)` when `Odd n` |
+| 2 | `Dynamics.lean::standardStep_positive` | ❌ Pending | `standardStep n > 0` for all `n` |
+| 3 | `Dynamics.lean::acceleratedStep_positive_of_odd` | ❌ Pending | `acceleratedStep n > 0` when `Odd n` |
+| 4 | `Dynamics.lean::acceleratedStep_equiv_standardStep` | ❌ Pending | `acceleratedStep n` ≡ `standardStep n` (under odd condition) |
+| 5 | `Equivalence.lean::acceleratedTrajectory_reaches_one_implies_standard` | ❌ Pending | `accelerated_orbit` reaches 1 → `standardTrajectory` reaches 1 |
 
-None of these directly prove `ReachesOne x` — they establish prerequisites. The actual "x reaches 1" claim requires the Collatz theorem, which is the project's open problem.
-
-## Implementation outline (tentative)
-
-1. **Spec-doc-stage Codex review** (THIS DOC) — validate proof strategy before implementation.
-2. On Codex approval: implement `coverage_tree_soundness_full` on branch `story-07c-2-promotion` (already created from master `08319d5`).
-3. Push to PR.
-4. CI validates the Lean build (sole Lean gate per project BDD discipline — no local `lake`).
-5. Codex review of the actual code (Phase B).
-6. Merge on CI green + Codex sign-off.
-
-Per-file discipline: `CoverageTree.lean` only.
+The 4 pending lemmas are prerequisites for the structured certificate construction in Q3. They can be closed as part of 02c/03c (separate workstream) OR as part of the Q3 story itself.
 
 ## Out of scope (explicit)
 
-- `coverage_tree_soundness_orbit` sorry at CoverageTree.lean:344 — separate workstream.
+- `coverage_tree_soundness_orbit` sorry at CoverageTree.lean:344 — orbit-aware routing workstream (separate).
+- Certificate.lean parser-related sorries (lines 198/199/202) — pre-existing over-budget condition, separate audit pass.
+- Affine.lean sorries — Story 04b workstream.
 - New `sorry` / `admit` / `axiom` — forbidden by 07c-2 promotion criteria.
 - `coverage_tree_soundness` modification — preserved untouched.
-- The actual Collatz theorem (accelerated_orbit reaches 1 for all `x > 0`) — this is M4's deeper goal; 07c-2 is the tree-soundness bridge only.
+- The unconditional Collatz theorem — out of scope; 07c-2 is the tree-soundness bridge only.
+
+## Implementation outline
+
+1. **Spec-doc-stage Codex review** (THIS DOC, v2) — validate the conditional form + Q3 design direction.
+2. On Codex approval: define structured `LeafCertificate` type + parsing/proof logic.
+3. Prove `LeafReachesOne` from the certificate.
+4. Implement `coverage_tree_soundness_full` using `coverage_tree_soundness` + `hLeaf` hypothesis.
+5. Push to PR.
+6. CI validates the Lean build (sole Lean gate per project BDD discipline).
+7. Codex review of the actual code.
+8. Merge on CI green + Codex sign-off.
+
+Per-file discipline: `CoverageTree.lean` + (new file for the certificate type) + `tests/` for executable specs.
 
 ## Risks
 
-- **R1 (HIGH):** The proof strategy (A/B/C above) may not work without additional infrastructure (orbit alignment, Collatz theorem fragment, etc.). Spec-stage Codex review is meant to catch this.
-- **R2 (MEDIUM):** New lemmas needed beyond the 5 closed ones — these would require their own spec/Codex review cycle, extending the timeline.
-- **R3 (LOW):** v4.33.0 Mathlib API drift could affect new lemmas (we just debugged 4 such issues on PR #31). Mitigation: CI is the validation gate; iterate on failure.
+- **R1 (HIGH):** The structured certificate design is the central new work. Spec-stage Codex review is meant to validate the design before implementation.
+- **R2 (MEDIUM):** The 4 pending Dynamics/Equivalence lemmas need closure as part of the certificate work. This is a substantial formal-verification effort.
+- **R3 (LOW):** v4.33.0 Mathlib API drift could affect new code. Mitigation: CI is the validation gate; iterate on failure.
 
-## Codex review handoff template
+## Codex review handoff template (v2)
 
 ```
-## Story 07c-2 — coverage_tree_soundness_full promotion
+## Story 07c-2 — coverage_tree_soundness_full promotion (v2 re-scope)
 
-**Claim:** Add companion theorem `coverage_tree_soundness_full`
-strengthening `coverage_tree_soundness` to also conclude `ReachesOne x`,
-using only the 5 closed lemmas from PR #31. No new sorry/admit/axiom.
+**Claim:** Add companion theorem `coverage_tree_soundness_full` with
+conditional semantic-leaf hypothesis:
+  LeafReachesOne t l := ∀ x, descend t x = some l → ReachesOne x
+  coverage_tree_soundness_full uses hLeaf : ∀ l ∈ t.leaves,
+    verified t l → LeafReachesOne t l as explicit hypothesis.
+Uses 1 closed lemma from PR #31 (acceleratedStep_odd_of_odd) plus
+the 4 pending Dynamics/Equivalence lemmas (closed as part of
+this workstream or prerequisite PR). No new sorry/admit/axiom.
 
-**Files:** CoverageTree.lean (companion theorem only);
+**Files:** CoverageTree.lean (companion theorem only),
+            new certificate module (TBD name) for LeafCertificate,
             docs/story-07c-2-promotion.md (this doc).
-**Base:** master at 08319d5 (PR #31 merged 2026-08-17T22:11:12Z).
+**Base:** master at cd1272b (post-PR #35 audit).
 
-**Specific review questions:**
-1. Which of Options A/B/C is the intended proof strategy? Or is there
-   a different strategy we haven't enumerated?
-2. Does the spec correctly identify the 5 closed lemmas as
-   prerequisites (not direct proofs) for ReachesOne x?
-3. Are there additional lemmas that should be closed in a prerequisite
-   PR (e.g., orbit alignment) before this promotion?
+**Specific review questions (v2):**
+1. Is the conditional `LeafReachesOne` form sound? (v1 unconditional
+   was rejected as a category error — does v2 fix it?)
+2. Is the structured leaf-certificate design (Q3) the right
+   approach? Or is there a better alternative?
+3. Should the 4 pending Dynamics/Equivalence lemmas be closed as
+   part of 07c-2, or as a prerequisite PR?
 4. Is the out-of-scope boundary for coverage_tree_soundness_orbit
-   correct (separate workstream)?
-
-**Evidence the reviewer will need:**
-- CoverageTree.lean: full file (especially lines 270-360)
-- PR #31 commits: ba12572, b237d44, 7516f32, 06a2388 (the 4 fixups
-  that bridged v4.33.0 API drift)
-- The 5 closed lemmas: Basic.lean::acceleratedStep_odd_of_odd,
-  Dynamics.lean::{standardStep_positive, acceleratedStep_positive_of_odd,
-  acceleratedStep_equiv_standardStep},
-  Equivalence.lean::acceleratedTrajectory_reaches_one_implies_standard
+   correct?
 
 **Lean validation gate:** GitHub Lean CI on the PR. No local lake.
 **Per-stop rule:** standard pause at 2nd failure on same logical edit.
@@ -156,7 +182,5 @@ using only the 5 closed lemmas from PR #31. No new sorry/admit/axiom.
 
 ## Implementation log
 
-(populated as commits land on `story-07c-2-promotion`)
-
-- _no commits yet_ — awaiting Codex spec-stage approval.
-
+- `d95caff` — spec v1 draft (companion-theorem approach) — REJECTED by Codex P0 review
+- (this commit) — spec v2 re-scope (conditional `LeafReachesOne` + Q3 design)
