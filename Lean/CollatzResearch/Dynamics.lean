@@ -84,11 +84,14 @@ theorem standardStep_positive (n : Nat) (h : Positive n) :
       -- h_even : 1 % 2 = 0; reduce 1 % 2 = 1 via decide (no Mathlib import).
       have h1 : (1 : Nat) % 2 = 1 := by decide
       rw [h1] at h_even
-      -- h_even : 1 = 0, which is False.
-      exact h_even.symm.elim0
-    -- Pure linear arithmetic: 1 ≤ n ∧ n ≠ 1 → 2 ≤ n.
-    have hlt : 2 ≤ n := by omega
-    -- 0 < 2 by omega (literal inequality, no Mathlib import needed).
+      -- h_even : 1 = 0, which is False. omega closes the goal.
+      omega
+    -- Pure linear arithmetic on h, hn1. Clear h_even first: the `n % 2 = 0`
+    -- constraint in scope confuses omega on the %-irrelevant goal `2 ≤ n`.
+    have hlt : 2 ≤ n := by
+      clear h_even
+      omega
+    -- 0 < 2 by omega (literal inequality).
     exact Nat.div_pos (by omega) hlt
   · -- odd branch: 3 * n + 1 > 0 trivially (n : Nat).
     omega
