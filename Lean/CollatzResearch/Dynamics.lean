@@ -125,7 +125,9 @@ theorem acceleratedStep_positive_of_odd (n : Nat) (h_odd : Odd n) :
     rfl
   rw [h_eq]
   -- ordCompl[2] (3*n+1) divides 3*n+1 (since 3*n+1 = 2^k * ordCompl[2] (3*n+1))
-  have h_dvd : ordCompl[2] (3 * n + 1) ∣ 3 * n + 1 := Nat.ordCompl_dvd
+  -- Codex P1: Nat.ordCompl_dvd has TWO explicit args `(n p : ℕ)`; must instantiate.
+  have h_dvd : ordCompl[2] (3 * n + 1) ∣ 3 * n + 1 :=
+    Nat.ordCompl_dvd (3 * n + 1) 2
   -- ordCompl[2] (3*n+1) > 0 because it divides 3*n+1 (nonzero):
   -- assume it's 0, then 0 ∣ 3*n+1, but 3*n+1 ≠ 0 — contradiction.
   have h_ne_m : ordCompl[2] (3 * n + 1) ≠ 0 := by
