@@ -77,18 +77,20 @@ theorem standardStep_positive (n : Nat) (h : Positive n) :
   unfold Positive standardStep
   split_ifs with h_even
   · -- even branch: n is positive even, hence n ≥ 2, so n / 2 ≥ 1 > 0
-    -- First derive `n ≠ 1` directly (since 1 is odd, contradicts h_even).
+    -- Prove n ≠ 1 explicitly: 1 is odd, so `1 % 2 ≠ 0`.
     have hn1 : n ≠ 1 := by
       intro hn1
       subst hn1
-      -- h_even : 1 % 2 = 0, which is contradictory.
-      omega
-    -- Now omega handles pure linear arithmetic: 1 ≤ n ∧ n ≠ 1 → 2 ≤ n.
+      -- h_even : 1 % 2 = 0; reduce 1 % 2 = 1 via decide (no Mathlib import).
+      have h1 : (1 : Nat) % 2 = 1 := by decide
+      rw [h1] at h_even
+      -- h_even : 1 = 0, which is False.
+      exact h_even.symm.elim0
+    -- Pure linear arithmetic: 1 ≤ n ∧ n ≠ 1 → 2 ≤ n.
     have hlt : 2 ≤ n := by omega
-    have hpos : 0 < 2 := by norm_num
-    -- Nat.div_pos : (0 < b) → (b ≤ a) → 0 < a / b
-    exact Nat.div_pos hpos hlt
-  · -- odd branch: 3 * n + 1 > 0 trivially (Nat arithmetic).
+    -- 0 < 2 by omega (literal inequality, no Mathlib import needed).
+    exact Nat.div_pos (by omega) hlt
+  · -- odd branch: 3 * n + 1 > 0 trivially (n : Nat).
     omega
 
 /-- The accelerated Collatz step `T(n)` preserves positivity on the odd
