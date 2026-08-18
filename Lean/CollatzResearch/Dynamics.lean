@@ -126,8 +126,13 @@ theorem acceleratedStep_positive_of_odd (n : Nat) (h_odd : Odd n) :
   rw [h_eq]
   -- ordCompl[2] (3*n+1) divides 3*n+1 (since 3*n+1 = 2^k * ordCompl[2] (3*n+1))
   have h_dvd : ordCompl[2] (3 * n + 1) ∣ 3 * n + 1 := Nat.ordCompl_dvd
-  -- 1 ≤ ordCompl[2] (3*n+1) (any divisor of nonzero is ≥ 1).
-  -- Convert `1 ≤ x` to `0 < x` via Nat.one_le_iff_ne_zero / Nat.pos_iff_ne_zero.
-  exact (Nat.one_le_iff_ne_zero.mp (Nat.one_le_of_dvd h_nonzero h_dvd) : 0 < ordCompl[2] (3 * n + 1))
+  -- ordCompl[2] (3*n+1) > 0 because it divides 3*n+1 (nonzero):
+  -- assume it's 0, then 0 ∣ 3*n+1, but 3*n+1 ≠ 0 — contradiction.
+  have h_ne_m : ordCompl[2] (3 * n + 1) ≠ 0 := by
+    intro h
+    rw [h] at h_dvd
+    exact h_nonzero (Nat.zero_dvd.mp h_dvd)
+  -- Convert `x ≠ 0` to `0 < x` via Nat.pos_iff_ne_zero.
+  exact Nat.pos_iff_ne_zero.mpr h_ne_m
 
 end CollatzResearch
