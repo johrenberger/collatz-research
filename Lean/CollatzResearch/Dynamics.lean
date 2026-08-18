@@ -86,13 +86,15 @@ theorem standardStep_positive (n : Nat) (h : Positive n) :
       rw [h1] at h_even
       -- h_even : 1 = 0, which is False. omega closes the goal.
       omega
+    -- Make positivity explicit so omega can use it (omega doesn't unfold `Positive`).
+    change 0 < n at h
     -- Pure linear arithmetic on h, hn1. Clear h_even first: the `n % 2 = 0`
     -- constraint in scope confuses omega on the %-irrelevant goal `2 ≤ n`.
     have hlt : 2 ≤ n := by
       clear h_even
       omega
-    -- 0 < 2 by omega (literal inequality).
-    exact Nat.div_pos (by omega) hlt
+    -- Nat.div_pos in Mathlib v4.33.0: dividend-bound first, divisor-positivity second.
+    exact Nat.div_pos hlt (by omega)
   · -- odd branch: 3 * n + 1 > 0 trivially (n : Nat).
     omega
 
