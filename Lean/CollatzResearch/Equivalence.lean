@@ -82,7 +82,9 @@ theorem acceleratedStep_equiv_standardStep (n : Nat) (h : Odd n) :
   -- Step 4: combine. LHS = standardTrajectory (3n+1) ν₂(3n+1) = (3n+1) / 2^ν₂(3n+1)
   --                                = ordCompl[2] (3n+1) (by definition of ordCompl)
   --                                = acceleratedStep n        (by h_eq_acc)
-  exact (h_shift _).trans (h_eq_traj _ (le_refl _)).trans h_eq_acc.symm
+  exact (h_shift ((3 * n + 1).factorization 2)).trans
+    (h_eq_traj ((3 * n + 1).factorization 2) (le_refl _)).trans
+    h_eq_acc.symm
 
 -- (4th Dynamics/Equivalence soritem `acceleratedTrajectory_reaches_one_implies_standard`
 --  removed from the file for this PR to stay under the 2-sorry budget.
