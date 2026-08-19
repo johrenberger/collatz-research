@@ -5,6 +5,7 @@
 | `trajectory_zero` | Checked | `CollatzResearch.Basic` | Definitional base case |
 | `trajectory_succ` | Checked | `CollatzResearch.Basic` | One-step unfolding |
 | `standardStep_positive` | Checked | `CollatzResearch.Dynamics` | Standard step preserves positivity on positive domain (closed in PR #37; parity case split with `decide` + `omega`; uses `Nat.div_pos` dividend-bound then divisor-positivity per Mathlib v4.33.0) |
+| `standardStep_of_odd` | Pending | `CollatzResearch.Dynamics` | Parity dispatch: `standardStep n = 3 * n + 1` when `Odd n`; library-light; foundation for `acceleratedStep_equiv_standardStep` (proof TODO; submitted via branch `story-02c-03c-helpers-2`, awaiting CI) |
 | `acceleratedStep_positive_of_odd` | Checked | `CollatzResearch.Dynamics` | Accelerated step preserves positivity on odd domain (closed in PR #38; ordCompl-based proof per Codex P1 review; `acceleratedStep n = ordCompl[2] (3*n+1)` (the 2-free part) and `ordCompl[2] (3*n+1) > 0` from divisibility + `Nat.zero_dvd.mp` + `Nat.pos_iff_ne_zero.mpr`; explicit `Nat.ordCompl_dvd (3*n+1) 2` per Codex; retains odd-domain signature for API compat even though the proof establishes the stronger `∀ n, 0 < acceleratedStep n`) |
 | `standardTrajectory_zero` | Checked | `CollatzResearch.Equivalence` | Definitional base case |
 | `standardTrajectory_succ` | Checked | `CollatzResearch.Equivalence` | One-step unfolding |

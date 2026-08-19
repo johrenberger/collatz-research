@@ -98,6 +98,30 @@ theorem standardStep_positive (n : Nat) (h : Positive n) :
   · -- odd branch: 3 * n + 1 > 0 trivially (n : Nat).
     omega
 
+/-- Standard step on an odd input is `3 * n + 1`.
+
+Helper for `acceleratedStep_equiv_standardStep` and
+`acceleratedTrajectory_reaches_one_implies_standard`: the parity of `n`
+determines which branch of `standardStep` is taken; the odd branch is
+`3 * n + 1` directly.
+
+The first branch of `split_ifs` (`n % 2 = 0`) contradicts `Odd n`
+(which is `n % 2 = 1`); the second branch (`n % 2 ≠ 0`) is `rfl`
+by definition.
+
+This is the second of the two helper-lemma PRs in the Story 02c/03c
+decomposition (PR #30 spec; PR #39 Codex advice). Foundation for the
+`acceleratedStep_equiv_standardStep` proof at
+`basicModification` PR #43 (`story-02c-03c-equivalence-1`). -/
+theorem standardStep_of_odd (n : Nat) (h : Odd n) : standardStep n = 3 * n + 1 := by
+  unfold standardStep
+  split_ifs with h_even
+  · -- even branch: h_even : n % 2 = 0 contradicts h (Odd n ↔ n % 2 = 1)
+    have h1 : n % 2 = 1 := h
+    omega
+  · -- odd branch: by definition
+    rfl
+
 /-- The accelerated Collatz step `T(n)` preserves positivity on the odd
 domain.
 
