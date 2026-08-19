@@ -116,8 +116,8 @@ decomposition (PR #30 spec; PR #39 Codex advice). Foundation for the
 theorem standardStep_of_odd (n : Nat) (h : Odd n) : standardStep n = 3 * n + 1 := by
   unfold standardStep
   split_ifs with h_even
-  · -- even branch: h_even : n % 2 = 0 contradicts h (Odd n ↔ n % 2 = 1)
-    have h1 : n % 2 = 1 := h
+  · -- even branch: h_even : n % 2 = 0 contradicts h (converted via Odd_iff to n % 2 = 1)
+    have h1 : n % 2 = 1 := Odd_iff.mp h
     omega
   · -- odd branch: by definition
     rfl
