@@ -1,5 +1,6 @@
 import CollatzResearch.Basic
 import CollatzResearch.Dynamics
+import Mathlib.Tactic.Ring
 
 /-!
 # Standard ↔ Accelerated Collatz equivalence
@@ -59,6 +60,55 @@ theorem standardTrajectory_succ_shift (n k : Nat) :
   | zero => rfl
   | succ k ih =>
     rw [standardTrajectory_succ, ih, ← standardTrajectory_succ]
+
+/-- **Power division for `standardTrajectory`**: for `2^k ∣ x`, applying
+`standardStep` `k` times to `x` divides by `2` at each step, yielding
+`x / 2^k`.
+
+    2^k ∣ x → standardTrajectory x k = x / 2^k
+
+Foundation for `acceleratedStep_equiv_standardStep` (Equivalence
+admission #1). Pure library-light lemma; no `Odd` hypothesis.
+
+**Why not `@[simp]`.** The RHS `x / 2^k` is not a definitional
+unfolding target; marking this `@[simp]` would create a non-confluent
+simp rewrite system (LHS pattern `standardTrajectory x k` overlaps with
+the existing `@[simp] theorem standardTrajectory_succ`). Per
+`docs/lean-api-discipline.md`, prefer nearby-proven local patterns
+over adding overlapping simp lemmas. Call this lemma explicitly via
+`rw [standardTrajectory_pow_div]` when the power-division form is
+the target.
+
+**Proof.** Induction on `k`. Base `k = 0` is `rfl`. Step `k → k+1`:
+`standardTrajectory x (k+1) = standardStep (standardTrajectory x k)`
+`= standardStep (x / 2^k)` (by IH) `= (x / 2^k) / 2` (since
+`x / 2^k` is even when `2^(k+1) ∣ x`) `= x / 2^(k+1)`. -/
+lemma standardTrajectory_pow_div (x k : Nat) (h : 2^k ∣ x) :
+    standardTrajectory x k = x / 2^k := by
+  induction k using Nat.strong_rec_on with
+  | _ k' ih =>
+    rcases Nat.exists_eq_mul_left_of_dvd h with ⟨m, rfl⟩
+    show standardTrajectory (2^k' * m) k' = (2^k' * m) / 2^k'
+    cases k' with
+    | zero => rfl
+    | succ k'' =>
+      rw [standardTrajectory_succ]
+      have ih' := ih k'' (Nat.lt_succ_self k'') ⟨2 * m, by ring⟩
+      rw [ih']
+      have h1 : (2 * 2^k'' * m) / 2^k'' = 2 * m := by
+        rw [show 2 * 2^k'' * m = 2^k'' * (2 * m) by ring]
+        rw [Nat.mul_div_cancel_left _ (Nat.pow_pos k'' (by decide : 0 < 2))]
+      rw [h1]
+      have h2 : standardStep (2 * m) = m := by
+        rw [standardStep]
+        have h_even : (2 * m : Nat) % 2 = 0 := by omega
+        rw [if_pos h_even]
+        rw [Nat.mul_div_cancel_left _ (by decide : 0 < 2)]
+      rw [h2]
+      have h3 : (2 * 2^k'' * m) / 2^(k''+1) = m := by
+        rw [show 2 * 2^k'' * m = 2^(k''+1) * m by ring]
+        rw [Nat.mul_div_cancel_left _ (Nat.pow_pos (k''+1) (by decide : 0 < 2))]
+      rw [h3]
 
 /-- One accelerated step on the odd domain corresponds to
 `1 + ν₂(3n + 1)` standard steps.
