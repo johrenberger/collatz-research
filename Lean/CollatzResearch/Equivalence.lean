@@ -36,6 +36,30 @@ def standardTrajectory (n : Nat) : Nat → Nat
     standardTrajectory n (steps + 1) = standardStep (standardTrajectory n steps) := by
   rfl
 
+/-- **Shift lemma** for `standardTrajectory`: stepping `n` forward by one in
+the trajectory equals starting from `standardStep n` and taking `k` steps.
+
+    standardTrajectory n (k + 1) = standardTrajectory (standardStep n) k
+
+Foundation for the proof of `acceleratedTrajectory_reaches_one_implies_standard`:
+the induction hypothesis rewrites the inner `standardTrajectory n m` form to
+`standardTrajectory (standardStep n) (m - 1)` so the IH can apply to the
+one-step-reduced input.
+
+**Why not `@[simp]`.** This lemma's LHS pattern (`standardTrajectory n (_ + 1)`)
+overlaps with the existing `@[simp] theorem standardTrajectory_succ`. Marking
+both creates a non-confluent simp rewrite system (simp would have two choices
+for the same redex). Per `docs/lean-api-discipline.md`, this would violate
+the stop-guessing rule's "prefer nearby proven local patterns" discipline.
+Call this lemma explicitly via `rw [standardTrajectory_succ_shift]` when
+the shift form is the target. -/
+theorem standardTrajectory_succ_shift (n k : Nat) :
+    standardTrajectory n (k + 1) = standardTrajectory (standardStep n) k := by
+  induction k with
+  | zero => rfl
+  | succ k ih =>
+    rw [standardTrajectory_succ, ih, ← standardTrajectory_succ]
+
 /-- One accelerated step on the odd domain corresponds to
 `1 + ν₂(3n + 1)` standard steps.
 

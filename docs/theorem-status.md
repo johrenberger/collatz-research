@@ -8,6 +8,7 @@
 | `acceleratedStep_positive_of_odd` | Checked | `CollatzResearch.Dynamics` | Accelerated step preserves positivity on odd domain (closed in PR #38; ordCompl-based proof per Codex P1 review; `acceleratedStep n = ordCompl[2] (3*n+1)` (the 2-free part) and `ordCompl[2] (3*n+1) > 0` from divisibility + `Nat.zero_dvd.mp` + `Nat.pos_iff_ne_zero.mpr`; explicit `Nat.ordCompl_dvd (3*n+1) 2` per Codex; retains odd-domain signature for API compat even though the proof establishes the stronger `∀ n, 0 < acceleratedStep n`) |
 | `standardTrajectory_zero` | Checked | `CollatzResearch.Equivalence` | Definitional base case |
 | `standardTrajectory_succ` | Checked | `CollatzResearch.Equivalence` | One-step unfolding |
+| `standardTrajectory_succ_shift` | Pending | `CollatzResearch.Equivalence` | One-step shift: `standardTrajectory n (k + 1) = standardTrajectory (standardStep n) k`; library-independent; foundation for `acceleratedTrajectory_reaches_one_implies_standard` (proof TODO; submitted via branch `story-02c-03c-helpers-1`, awaiting CI) |
 | `acceleratedStep_equiv_standardStep` | Pending | `CollatzResearch.Equivalence` | One accelerated step on odd domain = 1 + ν₂(3n+1) standard steps (definition only; proof TODO) |
 | `acceleratedTrajectory_reaches_one_implies_standard` | Pending | `CollatzResearch.Equivalence` | Accelerated trajectory reaching 1 lifts to a finite standard trajectory reaching 1 (definition only; proof TODO) |
 | `AffineMap.comp_assoc` | Checked | `CollatzResearch.Affine` | Composition of affine maps is associative |
