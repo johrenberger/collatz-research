@@ -134,7 +134,6 @@ or requires an unrecorded bound from a certificate producer.
 
 **Use when:** a finite set/tree covers a root domain except for explicitly
 handled leaves.
-
 **Preferred approach:** make root-domain membership independent of the
 algorithm being proved; state leaf verification, routing completeness, and
 exception handling as distinct predicates; induct on bounded tree depth.
