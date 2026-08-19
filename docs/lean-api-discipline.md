@@ -17,13 +17,22 @@ resolved by trying more variants of the same shape:
 - A "close" guess can mask a deeper signature mismatch that only
   surfaces on the next lemma that uses similar shapes.
 
-**Rule (codified 2026-08-19 after PR #39 closed without merge):**
+**Rule (codified 2026-08-19 after PR #39 closed without merge; refined 2026-08-19 after PR #43 failure #2):**
 
-After **2 CI failures** with API-surface uncertainty on the same
-lemma, stop submitting CI runs and take exactly one of the four
-paths below. After **3 CI failures** on the same surface, the next
-attempt **must** begin with one of (1)–(4); CI-only iteration is no
-longer acceptable.
+After **1 CI failure** with API-surface uncertainty on the same lemma,
+the next attempt **must** begin with Exit Path #2 (reuse nearby-proven
+pattern) OR Exit Path #3 (read Mathlib source at pinned rev). After
+**2 CI failures**, the next attempt **must** begin with Exit Path #3
+OR Exit Path #4 (Codex review). CI-only iteration is no longer
+acceptable after either threshold.
+
+The original threshold (2 failures) was too lenient: failure #2 is
+always worse than failure #1 because it costs another CI run AND
+forecloses the option of ditching the surface entirely. PR #43
+demonstrated this — failure #1 was a definitional-unfold assumption;
+failure #2 was a guess at the conversion name. Exit Path #2 (in
+`Basic.lean::acceleratedStep_odd_of_odd`) would have produced the
+correct conversion on failure #1.
 
 ## The four exit paths
 
@@ -93,6 +102,35 @@ reading source or asking someone who has.
   Both arguments are **explicit**; implicit-argument guessing was the
   wrong call. PR #38 succeeded only after the rule above was
   implicitly applied.
+- **PR #43** (`standardStep_of_odd`, branch `story-02c-03c-helpers-2`):
+  two-failure pair on the same surface; the refinement above is
+  directly motivated by this case.
+  - Failure #1: `h has type Odd n but is expected to have type n % 2 = 1`
+    — assumption that `Odd n` reduces definitionally was wrong.
+  - Failure #2 (anti-pattern): `Unknown identifier 'Odd_iff.mp'`
+    — guessed the conversion name without Exit Path #2 first.
+  - Correct fix (found via Exit Path #2 from
+    `Basic.lean::acceleratedStep_odd_of_odd` PR #31): `Nat.odd_iff.mp h`
+    (NOT `Odd_iff.mp`).
+  - **Lesson**: Exit Path #2 must be attempted on failure #1, not
+    deferred until failure #2. The original "2 failures" threshold
+    was too lenient.
+
+## Verified Mathlib v4.33.0 patterns
+
+These conversions have been verified against Mathlib v4.33.0 by
+exit-path application. Use them directly; do not second-guess.
+
+| Need | Theorem | Direction |
+|---|---|---|
+| `Odd n → n % 2 = 1` | `Nat.odd_iff.mp` | mp |
+| `n % 2 = 1 → Odd n` | `Nat.odd_iff.mpr` | mpr |
+| `n % 2 ≠ 0 → n % 2 = 1` | `Nat.mod_two_ne_zero.mp` | mp |
+| `2 ∣ n → n % 2 = 0` | `Nat.dvd_iff_mod_eq_zero.mp` | mp |
+
+The earlier comment trail in `Basic.lean::acceleratedStep_odd_of_odd`
+explicitly notes the v4.33.0 change: `Odd` is no longer definitional
+in terms of `n % 2 = 1`; the conversion is via `Nat.odd_iff`.
 
 ## Adjacent rules (do not conflate)
 
@@ -120,6 +158,9 @@ actionable at 04:00 GMT+2.
 ## Provenance
 
 - Codified: 2026-08-19 after PR #39 closed without merge.
+- **Refined 2026-08-19 after PR #43 failure #2**: threshold tightened
+  from "2 failures" to "1 failure + Exit Path #2 is the next attempt's
+  basis". See the PR #43 counter-example.
 - Path A active packet (per Justin's 2026-08-16 selection): Story
   02c/03c helper-lemma PRs are the first adopters.
 - Companion doc: `LEAN_PATTERNS.md` (playbook, positive patterns).
