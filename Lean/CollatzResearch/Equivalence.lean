@@ -85,7 +85,7 @@ the target.
 `x / 2^k` is even when `2^(k+1) ∣ x`) `= x / 2^(k+1)`. -/
 lemma standardTrajectory_pow_div (x k : Nat) (h : 2^k ∣ x) :
     standardTrajectory x k = x / 2^k := by
-  induction k using Nat.strong_rec_on with
+  induction k using Nat.strongRecOn with
   | _ k' ih =>
     rcases Nat.exists_eq_mul_left_of_dvd h with ⟨m, rfl⟩
     show standardTrajectory (2^k' * m) k' = (2^k' * m) / 2^k'
