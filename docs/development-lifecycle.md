@@ -145,6 +145,20 @@ Do not merge an admitted proof or an excluded failing Lean test as a
 preparatory proof story. The red test commit is retained in PR history; the
 final target is green and explicitly invoked by CI.
 
+### Related discipline documents (added 2026-08-19)
+
+- **`docs/lean-api-discipline.md`** — the API-surface **stop-guessing** rule.
+  When CI failures come from guessing wrong lemmas / wrong signatures /
+  implicit-vs-explicit arguments, this rule applies. Threshold: stop after
+  **2 CI failures** on the same surface, take one of the four exit paths
+  (playbook / nearby-proven / read source / Codex review). After 3 CI
+  failures, the next attempt **must** begin with one of those paths.
+  Distinct from the proof-shape stop rule above — see the failure-mode
+  classification table in `lean-api-discipline.md` for how to tell them
+  apart.
+- **`LEAN_PATTERNS.md`** (repo root, PR #40) — vetted Lean patterns P01–P13
+  with worked examples. The *positive* companion to `lean-api-discipline.md`.
+
 ## CI status without `checks:read`
 
 Use Actions runs by commit SHA as a polling fallback:
