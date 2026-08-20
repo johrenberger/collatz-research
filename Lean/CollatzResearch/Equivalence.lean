@@ -79,7 +79,7 @@ over adding overlapping simp lemmas. Call this lemma explicitly via
 `rw [standardTrajectory_pow_div]` when the power-division form is
 the target.
 
-**Proof.** Induction on `k`. Base `k = 0` is `rfl`. Step `k → k+1`:
+**Proof.** Induction on `k`. Base `k = 0` is `simp [standardTrajectory]`. Step `k → k+1`:
 `standardTrajectory x (k+1) = standardStep (standardTrajectory x k)`
 `= standardStep (x / 2^k)` (by IH) `= (x / 2^k) / 2` (since
 `x / 2^k` is even when `2^(k+1) ∣ x`) `= x / 2^(k+1)`. -/

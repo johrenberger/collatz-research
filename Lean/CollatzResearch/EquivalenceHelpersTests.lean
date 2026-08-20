@@ -35,4 +35,10 @@ The closed witness is checked with the helper, not merely by trajectory reductio
 example : standardTrajectory 8 3 = 8 / 2 ^ 3 :=
   standardTrajectory_pow_div 8 3 (by decide)
 
+/-- Scenario: standardTrajectory_pow_div at x = 0, k = 0 (zero boundary).
+`2^0 = 1` divides all `Nat` (including `0`), so `standardTrajectory 0 0 = 0 / 1 = 0`.
+The closed witness is checked with the helper. -/
+example : standardTrajectory 0 0 = 0 / 2 ^ 0 :=
+  standardTrajectory_pow_div 0 0 (by decide)
+
 end CollatzResearch
