@@ -85,30 +85,28 @@ the target.
 `x / 2^k` is even when `2^(k+1) ∣ x`) `= x / 2^(k+1)`. -/
 lemma standardTrajectory_pow_div (x k : Nat) (h : 2^k ∣ x) :
     standardTrajectory x k = x / 2^k := by
-  induction k using Nat.strongRecOn with
-  | _ k' ih =>
+  induction k generalizing x with
+  | zero =>
+    simp [standardTrajectory]
+  | succ k ih =>
     rcases exists_eq_mul_left_of_dvd h with ⟨m, rfl⟩
-    rw [Nat.mul_comm m (2 ^ k')]
-    cases k' with
-    | zero => rfl
-    | succ k'' =>
-      rw [standardTrajectory_succ]
-      have ih' := ih k'' (Nat.lt_succ_self k'') ⟨2 * m, by ring⟩
-      rw [ih']
-      have h1 : (2 * 2^k'' * m) / 2^k'' = 2 * m := by
-        rw [show 2 * 2^k'' * m = 2^k'' * (2 * m) by ring]
-        rw [Nat.mul_div_cancel_left _ (Nat.pow_pos k'' (by decide : 0 < 2))]
-      rw [h1]
-      have h2 : standardStep (2 * m) = m := by
-        rw [standardStep]
-        have h_even : (2 * m : Nat) % 2 = 0 := by omega
-        rw [if_pos h_even]
-        rw [Nat.mul_div_cancel_left _ (by decide : 0 < 2)]
-      rw [h2]
-      have h3 : (2 * 2^k'' * m) / 2^(k''+1) = m := by
-        rw [show 2 * 2^k'' * m = 2^(k''+1) * m by ring]
-        rw [Nat.mul_div_cancel_left _ (Nat.pow_pos (k''+1) (by decide : 0 < 2))]
-      rw [h3]
+    rw [show m * 2 ^ (k + 1) = 2 ^ k * (2 * m) by ring]
+    rw [standardTrajectory_succ]
+    have ih' := ih (2 ^ k * (2 * m)) ⟨2 * m, rfl⟩
+    rw [ih']
+    have h1 : (2 ^ k * (2 * m)) / 2 ^ k = 2 * m := by
+      rw [Nat.mul_div_cancel_left _ (Nat.pow_pos k (by decide : 0 < 2))]
+    rw [h1]
+    have h2 : standardStep (2 * m) = m := by
+      rw [standardStep]
+      have h_even : (2 * m : Nat) % 2 = 0 := by omega
+      rw [if_pos h_even]
+      rw [Nat.mul_div_cancel_left _ (by decide : 0 < 2)]
+    rw [h2]
+    have h3 : (2 ^ k * (2 * m)) / 2 ^ (k + 1) = m := by
+      rw [show 2 ^ k * (2 * m) = 2 ^ (k + 1) * m by ring]
+      rw [Nat.mul_div_cancel_left _ (Nat.pow_pos (k + 1) (by decide : 0 < 2))]
+    rw [h3]
 
 /-- One accelerated step on the odd domain corresponds to
 `1 + ν₂(3n + 1)` standard steps.
