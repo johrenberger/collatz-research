@@ -147,6 +147,15 @@ The key observation is that each standard step `C` divides by 2 until
 the value is odd, and the count of standard steps required to reach
 the odd part is exactly `1 + ν₂(3n + 1)`.
 -/
+theorem acceleratedStep_equiv_standardStep (n : Nat) (h : Odd n) :
+    standardTrajectory n (1 + (3 * n + 1).factorization 2) = acceleratedStep n := by
+  rw [Nat.add_comm]
+  rw [standardTrajectory_succ_shift]
+  rw [standardStep_of_odd n h]
+  rw [standardTrajectory_pow_div (3*n+1) ((3*n+1).factorization 2)
+      ((Nat.Prime.pow_dvd_iff_le_factorization Nat.prime_two (by positivity)).mpr (le_refl _))]
+  rw [acceleratedStep, twoAdicValuation]
+
 /-- **Shift lemma for `trajectory`**: stepping `n` forward by one in
 the accelerated trajectory equals starting from `acceleratedStep n` and
 taking `k` steps.
@@ -201,15 +210,6 @@ theorem standardTrajectory_compose (n a b : Nat) :
   | zero => rfl
   | succ b ih =>
     rw [standardTrajectory_succ, ih, standardTrajectory_succ]
-
-theorem acceleratedStep_equiv_standardStep (n : Nat) (h : Odd n) :
-    standardTrajectory n (1 + (3 * n + 1).factorization 2) = acceleratedStep n := by
-  rw [Nat.add_comm]
-  rw [standardTrajectory_succ_shift]
-  rw [standardStep_of_odd n h]
-  rw [standardTrajectory_pow_div (3*n+1) ((3*n+1).factorization 2)
-      ((Nat.Prime.pow_dvd_iff_le_factorization Nat.prime_two (by positivity)).mpr (le_refl _))]
-  rw [acceleratedStep, twoAdicValuation]
 
 /-- An accelerated trajectory starting on the odd domain and reaching
 `1` corresponds to a (finite) standard trajectory reaching `1`.
