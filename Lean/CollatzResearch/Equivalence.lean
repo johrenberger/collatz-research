@@ -95,7 +95,7 @@ lemma standardTrajectory_pow_div (x k : Nat) (h : 2^k ∣ x) :
     have ih' := ih (2 ^ k * (2 * m)) ⟨2 * m, rfl⟩
     rw [ih']
     have h1 : (2 ^ k * (2 * m)) / 2 ^ k = 2 * m := by
-      rw [Nat.mul_div_cancel_left _ (Nat.pow_pos k (by decide : 0 < 2))]
+      rw [Nat.mul_div_cancel_left _ (Nat.pow_pos (by decide : 0 < 2))]
     rw [h1]
     have h2 : standardStep (2 * m) = m := by
       rw [standardStep]
@@ -105,7 +105,7 @@ lemma standardTrajectory_pow_div (x k : Nat) (h : 2^k ∣ x) :
     rw [h2]
     have h3 : (2 ^ k * (2 * m)) / 2 ^ (k + 1) = m := by
       rw [show 2 ^ k * (2 * m) = 2 ^ (k + 1) * m by ring]
-      rw [Nat.mul_div_cancel_left _ (Nat.pow_pos (k + 1) (by decide : 0 < 2))]
+      rw [Nat.mul_div_cancel_left _ (Nat.pow_pos (by decide : 0 < 2))]
     rw [h3]
 
 /-- One accelerated step on the odd domain corresponds to
