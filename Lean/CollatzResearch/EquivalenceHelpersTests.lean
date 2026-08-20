@@ -26,13 +26,13 @@ Both sides reduce to `2` via the standard Collatz trajectory
 example : standardTrajectory 5 (3 + 1) = standardTrajectory (standardStep 5) 3 := rfl
 
 /-- Scenario: standardTrajectory_pow_div at x = 6, k = 1.
-`2^1 = 2` divides `6`, so `standardTrajectory 6 1 = 6 / 2 = 3`.
-Closes by `rfl` (the `standardStep` even-branch reduces directly). -/
-example : standardTrajectory 6 1 = 3 := rfl
+The closed witness is checked with the helper, not merely by trajectory reduction. -/
+example : standardTrajectory 6 1 = 6 / 2 ^ 1 :=
+  standardTrajectory_pow_div 6 1 (by decide)
 
 /-- Scenario: standardTrajectory_pow_div at x = 8, k = 3.
-`2^3 = 8` divides `8`, so `standardTrajectory 8 3 = 8 / 8 = 1`.
-The 3 standard steps are `8 → 4 → 2 → 1`. -/
-example : standardTrajectory 8 3 = 1 := rfl
+The closed witness is checked with the helper, not merely by trajectory reduction. -/
+example : standardTrajectory 8 3 = 8 / 2 ^ 3 :=
+  standardTrajectory_pow_div 8 3 (by decide)
 
 end CollatzResearch
