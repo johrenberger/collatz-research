@@ -206,8 +206,8 @@ meaning between `Nat` and `Int`.
 implicit-argument inference failure.
 
 **Preferred approach:** read the pinned v4.33.0 Mathlib source first; copy the
-exact declaration shape; supply explicit arguments exposed by the CI error;
-make a minimal compiling helper before editing a larger theorem.
+exact declaration shape; record its path/URL and signature in the PR before a
+rerun; make a minimal compiling helper before editing a larger theorem.
 
 **Primitives:** GitHub source at the pinned revision, CI error signatures,
 repository imports, `#check` only where allowed by project validation policy.
@@ -247,4 +247,3 @@ or a proposed change weakens a statement/domain/trust boundary.
 - Keep examples schematic unless a copied snippet is known to compile against
   the pinned toolchain. Update or remove API-specific entries when the pinned
   version changes.
-
