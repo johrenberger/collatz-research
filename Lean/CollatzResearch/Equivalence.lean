@@ -1,6 +1,7 @@
 import CollatzResearch.Basic
 import CollatzResearch.Dynamics
 import Mathlib.Tactic.Ring
+import Mathlib.Tactic.Positivity
 
 /-!
 # Standard ↔ Accelerated Collatz equivalence
@@ -115,12 +116,32 @@ This is the formal bridge between the accelerated map `T`
 (`CollatzResearch.Basic.acceleratedStep`) and the standard map `C`
 (`CollatzResearch.Dynamics.standardStep`) on the odd domain.
 
-**Proof sketch.** By induction on `k = ν₂(3n + 1)`.
-- Base case `k = 1`: `3n + 1 = 2 * m` with `m` odd, so `C(n) = 3n + 1 = 2m`,
-  `C²(n) = m = T(n) = (3n + 1) / 2¹`.
-- Inductive case `k = m + 1`: `3n + 1 = 2^{m+1} * p` for odd `p`. By the
-  inductive hypothesis on `k' = m`, `C^{1+m}(n) = 2 * p`. Then
-  `C^{2+m}(n) = C(2 * p) = p = T(n)`.
+**Proof.** 4-`rw` composition of the three helper lemmas
+`standardTrajectory_succ_shift` (PR #42, one-step shift),
+`standardStep_of_odd` (PR #43, parity dispatch), and
+`standardTrajectory_pow_div` (PR #45, power-division). The proof is
+**not** by induction (the original PR #30 spec sketched an inductive
+proof; the three helpers enabled a direct compositional rewrite).
+
+Step-by-step:
+1. `rw [Nat.add_comm]` — reorder `1 + x` to `x + 1`. Lean 4 `rw` does
+   not reduce `1 + x` definitionally, so this rewrite is needed before
+   step 2 matches.
+2. `rw [standardTrajectory_succ_shift]` — unfold:
+   `standardTrajectory n (k + 1) = standardTrajectory (standardStep n) k`.
+3. `rw [standardStep_of_odd n h]` — on the odd domain (`Odd n`),
+   `standardStep n = 3 * n + 1`.
+4. `rw [standardTrajectory_pow_div (3*n+1) ((3*n+1).factorization 2)
+      ((Nat.Prime.pow_dvd_iff_le_factorization Nat.prime_two (by positivity)).mpr (le_refl _))]`
+   — apply power-division. The divisibility witness is constructed via
+   `Nat.Prime.pow_dvd_iff_le_factorization` (canonical Mathlib v4.33.0 name;
+   same lemma used by `Nat.Prime.pow_dvd_iff_dvd_ordProj` in
+   `Mathlib.Data.Nat.Factorization.Basic` line 168). The `.mpr` direction
+   takes `k ≤ n.factorization p` (here `le_refl _`) and produces `p^k ∣ n`.
+5. `rw [acceleratedStep, twoAdicValuation]` — unfold the accelerated
+   map (`acceleratedStep n = (3*n+1) / 2^twoAdicValuation (3*n+1)`) and
+   `twoAdicValuation (3*n+1) = (3*n+1).factorization 2`. The goal
+   closes by `rfl`.
 
 The key observation is that each standard step `C` divides by 2 until
 the value is odd, and the count of standard steps required to reach
@@ -128,8 +149,12 @@ the odd part is exactly `1 + ν₂(3n + 1)`.
 -/
 theorem acceleratedStep_equiv_standardStep (n : Nat) (h : Odd n) :
     standardTrajectory n (1 + (3 * n + 1).factorization 2) = acceleratedStep n := by
-  -- TODO: complete the proof by induction on (3n+1).factorization 2.
-  sorry
+  rw [Nat.add_comm]
+  rw [standardTrajectory_succ_shift]
+  rw [standardStep_of_odd n h]
+  rw [standardTrajectory_pow_div (3*n+1) ((3*n+1).factorization 2)
+      ((Nat.Prime.pow_dvd_iff_le_factorization Nat.prime_two (by positivity)).mpr (le_refl _))]
+  rw [acceleratedStep, twoAdicValuation]
 
 /-- An accelerated trajectory starting on the odd domain and reaching
 `1` corresponds to a (finite) standard trajectory reaching `1`.
