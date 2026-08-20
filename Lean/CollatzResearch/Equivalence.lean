@@ -209,6 +209,7 @@ theorem standardTrajectory_compose (n a b : Nat) :
   induction b with
   | zero => rfl
   | succ b ih =>
+    show standardTrajectory (standardTrajectory n a) (b + 1) = standardTrajectory n (a + b + 1)
     rw [standardTrajectory_succ, ih, standardTrajectory_succ]
 
 /-- An accelerated trajectory starting on the odd domain and reaching
@@ -248,20 +249,27 @@ re-review #3 P1 2026-08-16T18:04:30Z) reduces the witness to
 trajectory. -/
 theorem acceleratedTrajectory_reaches_one_implies_standard (n m : Nat)
     (h_odd : Odd n) (h : trajectory n m = 1) : ∃ m', standardTrajectory n m' = 1 := by
-  induction m with
-  | zero =>
-    -- h : trajectory n 0 = 1, so n = 1 (by trajectory_zero)
-    -- standardTrajectory n 0 = n (by standardTrajectory_zero), so standardTrajectory n 0 = 1
-    exact ⟨0, by rw [standardTrajectory_zero, ← trajectory_zero, h]⟩
-  | succ k ih =>
-    -- h : trajectory n (k + 1) = 1
-    rw [trajectory_succ_shift] at h
-    -- h : trajectory (acceleratedStep n) k = 1
-    have h_odd' : Odd (acceleratedStep n) := acceleratedStep_odd_of_odd n h_odd
-    obtain ⟨r, hr⟩ := ih h_odd' h
-    -- hr : standardTrajectory (acceleratedStep n) r = 1
-    -- Witness m' = (1 + ν₂(3n+1)) + r (forward step + inner IH witness)
-    exact ⟨(1 + (3*n+1).factorization 2) + r, by
-      rw [standardTrajectory_compose, acceleratedStep_equiv_standardStep n h_odd, hr]⟩
+  induction m using Nat.strongRecOn generalizing n with
+  | _ m ih =>
+    cases m with
+    | zero =>
+      -- h : trajectory n 0 = 1, so n = 1 (by trajectory_zero)
+      -- standardTrajectory n 0 = n (by standardTrajectory_zero), so standardTrajectory n 0 = 1
+      show standardTrajectory n 0 = 1
+      rw [standardTrajectory_zero, ← trajectory_zero]
+      exact h
+    | succ k =>
+      -- h : trajectory n (k + 1) = 1
+      rw [trajectory_succ_shift] at h
+      -- h : trajectory (acceleratedStep n) k = 1
+      -- ih : ∀ n : Nat, (∀ m' < succ k, P n) → P n
+      -- Strong induction recurses through the inner IH for m' < k, then
+      -- applies the outer IH at (acceleratedStep n, k).
+      have h_odd' : Odd (acceleratedStep n) := acceleratedStep_odd_of_odd n h_odd
+      obtain ⟨r, hr⟩ := ih (acceleratedStep n) (Nat.strong_induction_on _ ih) h_odd' h
+      -- hr : standardTrajectory (acceleratedStep n) r = 1
+      -- Witness m' = (1 + ν₂(3n+1)) + r (forward step + inner IH witness)
+      exact ⟨(1 + (3*n+1).factorization 2) + r, by
+        rw [standardTrajectory_compose, acceleratedStep_equiv_standardStep n h_odd, hr]⟩
 
 end CollatzResearch
