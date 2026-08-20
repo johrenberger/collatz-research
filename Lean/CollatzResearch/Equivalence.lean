@@ -132,12 +132,12 @@ Step-by-step:
 3. `rw [standardStep_of_odd n h]` — on the odd domain (`Odd n`),
    `standardStep n = 3 * n + 1`.
 4. `rw [standardTrajectory_pow_div (3*n+1) ((3*n+1).factorization 2)
-      ((Prime.pow_dvd_iff_le_factorization (Nat.prime_two) (by positivity)).mpr (le_refl _))]`
+      ((Nat.Prime.pow_dvd_iff_le_factorization Nat.prime_two (by positivity)).mpr (le_refl _))]`
    — apply power-division. The divisibility witness is constructed via
-   `Prime.pow_dvd_iff_le_factorization` (canonical Mathlib v4.33.0 name;
-   same lemma used by `Prime.pow_dvd_iff_dvd_ordProj` in
-   `Mathlib.Data.Nat.Factorization.Basic`). The `.mpr` direction takes
-   `k ≤ n.factorization p` (here `le_refl _`) and produces `p^k ∣ n`.
+   `Nat.Prime.pow_dvd_iff_le_factorization` (canonical Mathlib v4.33.0 name;
+   same lemma used by `Nat.Prime.pow_dvd_iff_dvd_ordProj` in
+   `Mathlib.Data.Nat.Factorization.Basic` line 168). The `.mpr` direction
+   takes `k ≤ n.factorization p` (here `le_refl _`) and produces `p^k ∣ n`.
 5. `rw [acceleratedStep, twoAdicValuation]` — unfold the accelerated
    map (`acceleratedStep n = (3*n+1) / 2^twoAdicValuation (3*n+1)`) and
    `twoAdicValuation (3*n+1) = (3*n+1).factorization 2`. The goal
@@ -153,7 +153,7 @@ theorem acceleratedStep_equiv_standardStep (n : Nat) (h : Odd n) :
   rw [standardTrajectory_succ_shift]
   rw [standardStep_of_odd n h]
   rw [standardTrajectory_pow_div (3*n+1) ((3*n+1).factorization 2)
-      ((Prime.pow_dvd_iff_le_factorization (Nat.prime_two) (by positivity)).mpr (le_refl _))]
+      ((Nat.Prime.pow_dvd_iff_le_factorization Nat.prime_two (by positivity)).mpr (le_refl _))]
   rw [acceleratedStep, twoAdicValuation]
 
 /-- An accelerated trajectory starting on the odd domain and reaching
