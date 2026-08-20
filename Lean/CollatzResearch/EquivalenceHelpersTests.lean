@@ -25,4 +25,20 @@ Both sides reduce to `2` via the standard Collatz trajectory
 `5 → 16 → 8 → 4 → 2` (4 standard steps); closed by `rfl`. -/
 example : standardTrajectory 5 (3 + 1) = standardTrajectory (standardStep 5) 3 := rfl
 
+/-- Scenario: standardTrajectory_pow_div at x = 6, k = 1.
+The closed witness is checked with the helper, not merely by trajectory reduction. -/
+example : standardTrajectory 6 1 = 6 / 2 ^ 1 :=
+  standardTrajectory_pow_div 6 1 (by decide)
+
+/-- Scenario: standardTrajectory_pow_div at x = 8, k = 3.
+The closed witness is checked with the helper, not merely by trajectory reduction. -/
+example : standardTrajectory 8 3 = 8 / 2 ^ 3 :=
+  standardTrajectory_pow_div 8 3 (by decide)
+
+/-- Scenario: standardTrajectory_pow_div at x = 0, k = 0 (zero boundary).
+`2^0 = 1` divides all `Nat` (including `0`), so `standardTrajectory 0 0 = 0 / 1 = 0`.
+The closed witness is checked with the helper. -/
+example : standardTrajectory 0 0 = 0 / 2 ^ 0 :=
+  standardTrajectory_pow_div 0 0 (by decide)
+
 end CollatzResearch
