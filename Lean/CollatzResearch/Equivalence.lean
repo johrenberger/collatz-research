@@ -88,7 +88,7 @@ lemma standardTrajectory_pow_div (x k : Nat) (h : 2^k ∣ x) :
   induction k using Nat.strongRecOn with
   | _ k' ih =>
     rcases exists_eq_mul_left_of_dvd h with ⟨m, rfl⟩
-    show standardTrajectory (2^k' * m) k' = (2^k' * m) / 2^k'
+    rw [Nat.mul_comm m (2 ^ k')]
     cases k' with
     | zero => rfl
     | succ k'' =>
