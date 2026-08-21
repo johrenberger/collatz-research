@@ -156,6 +156,62 @@ theorem acceleratedStep_equiv_standardStep (n : Nat) (h : Odd n) :
       ((Nat.Prime.pow_dvd_iff_le_factorization Nat.prime_two (by positivity)).mpr (le_refl _))]
   rw [acceleratedStep, twoAdicValuation]
 
+/-- **Shift lemma for `trajectory`**: stepping `n` forward by one in
+the accelerated trajectory equals starting from `acceleratedStep n` and
+taking `k` steps.
+
+    trajectory n (k + 1) = trajectory (acceleratedStep n) k
+
+Foundation for `acceleratedTrajectory_reaches_one_implies_standard`:
+the induction hypothesis rewrites the inner `trajectory n (k + 1)` form to
+`trajectory (acceleratedStep n) k` so the IH can apply to the
+one-step-reduced accelerated input (which is odd by
+`acceleratedStep_odd_of_odd`).
+
+**Why not `@[simp]`.** LHS pattern `trajectory n (k + 1)` overlaps with
+the existing `@[simp] theorem trajectory_succ` — adding both creates a
+non-confluent simp rewrite system. Per `docs/lean-api-discipline.md`,
+prefer nearby-proven local patterns over adding overlapping simp lemmas.
+Call this lemma explicitly via `rw [trajectory_succ_shift]`.
+
+**Proof.** Induction on `k`. Base `k = 0` is `rfl` (using `trajectory n 1 =
+acceleratedStep n` as `trajectory n (0 + 1)`). Step `k → k+1`: unfold via
+`trajectory_succ`, apply IH, refold via `trajectory_succ`. -/
+theorem trajectory_succ_shift (n k : Nat) :
+    trajectory n (k + 1) = trajectory (acceleratedStep n) k := by
+  induction k with
+  | zero => rfl
+  | succ k ih =>
+    rw [trajectory_succ, ih, trajectory_succ]
+
+/-- **Composition for `standardTrajectory`**: stepping
+`standardTrajectory n a` forward by `b` steps equals starting from `n`
+and taking `a + b` steps.
+
+    standardTrajectory (standardTrajectory n a) b = standardTrajectory n (a + b)
+
+Foundation for `acceleratedTrajectory_reaches_one_implies_standard`: chains
+the forward-step equivalence
+(`standardTrajectory n (1 + ν₂(3n+1)) = acceleratedStep n`) with the
+inner-trajectory IH witness to produce the outer-trajectory witness
+`m' = (1 + ν₂(3n+1)) + r`.
+
+**Why not `@[simp]`.** LHS pattern `standardTrajectory (standardTrajectory n a) b`
+overlaps with the existing `@[simp] theorem standardTrajectory_succ`. Per
+`docs/lean-api-discipline.md`, prefer nearby-proven local patterns over
+adding overlapping simp lemmas. Call this lemma explicitly via
+`rw [standardTrajectory_compose]`.
+
+**Proof.** Induction on `b`. Base `b = 0` is `rfl`. Step `b → b+1`: unfold
+via `standardTrajectory_succ`, apply IH, refold via `standardTrajectory_succ`. -/
+theorem standardTrajectory_compose (n a b : Nat) :
+    standardTrajectory (standardTrajectory n a) b = standardTrajectory n (a + b) := by
+  induction b with
+  | zero => rfl
+  | succ b ih =>
+    show standardTrajectory (standardTrajectory n a) (b + 1) = standardTrajectory n (a + b + 1)
+    rw [standardTrajectory_succ, ih, standardTrajectory_succ]
+
 /-- An accelerated trajectory starting on the odd domain and reaching
 `1` corresponds to a (finite) standard trajectory reaching `1`.
 
@@ -174,18 +230,52 @@ The `Odd n` precondition is essential for two reasons:
   of the accelerated trajectory stay in the odd domain, where the
   forward equivalence applies at each step.
 
-**Proof sketch.** Induction on the accelerated-trajectory length `m`.
+**Proof.** Induction on the accelerated-trajectory length `m`.
 - Base case `m = 0`: `trajectory n 0 = n = 1` forces `n = 1`, and
-  `standardTrajectory 1 0 = 1`.
-- Inductive case `m = k + 1`: by the forward theorem,
-  `standardTrajectory (trajectory n k) (1 + ν₂(3*(trajectory n k) + 1)) = 1`.
-  Take `m' = (1 + ν₂(3*(trajectory n k) + 1)) + (1 + ν₂(3n + 1) + ... + 1 + ν₂(...))`,
-  the sum of `1 + ν₂(3 n_i + 1)` over `i = 0 .. k-1` plus the final segment.
--/
+  `standardTrajectory n 0 = n = 1`.
+- Inductive case `m = k + 1`: rewrite the hypothesis via
+  `trajectory_succ_shift` to `trajectory (acceleratedStep n) k = 1`.
+  `acceleratedStep n` is odd (by `acceleratedStep_odd_of_odd n h_odd`),
+  so the IH applies with witness `r`. Compose via `standardTrajectory_compose`:
+  `standardTrajectory n ((1 + ν₂(3n+1)) + r) = standardTrajectory (standardTrajectory n (1 + ν₂(3n+1))) r
+                                       = standardTrajectory (acceleratedStep n) r  (by acceleratedStep_equiv_standardStep)
+                                       = 1                                        (by IH)
+
+The proof is **not** by direct construction of the full sum
+`(1 + ν₂(3n+1)) + (1 + ν₂(3 n_1 + 1)) + ... + (1 + ν₂(3 n_{k-1} + 1))`
+as originally spec'd; the front-of-trajectory induction (per
+re-review #3 P1 2026-08-16T18:04:30Z) reduces the witness to
+`(1 + ν₂(3n+1)) + r` where `r` is the IH witness for the inner
+trajectory. -/
 theorem acceleratedTrajectory_reaches_one_implies_standard (n m : Nat)
     (h_odd : Odd n) (h : trajectory n m = 1) : ∃ m', standardTrajectory n m' = 1 := by
-  -- TODO: complete the proof by induction on `m`, using
-  -- `acceleratedStep_equiv_standardStep` as the inductive step.
-  sorry
+  induction m using Nat.strongRecOn generalizing n with
+  | _ m ih =>
+    cases m with
+    | zero =>
+      -- h : trajectory n 0 = 1, so n = 1 (by trajectory_zero)
+      -- standardTrajectory n 0 = n (by standardTrajectory_zero), so standardTrajectory n 0 = 1
+      exact ⟨0, by
+        show standardTrajectory n 0 = 1
+        have hn : standardTrajectory n 0 = n := standardTrajectory_zero n
+        rw [hn]
+        have hn2 : n = trajectory n 0 := rfl
+        rw [hn2]
+        exact h⟩
+    | succ k =>
+      -- h : trajectory n (k + 1) = 1
+      rw [trajectory_succ_shift] at h
+      -- h : trajectory (acceleratedStep n) k = 1
+      -- ih : ∀ m' < succ k, ∀ n', Odd n' → trajectory n' m' = 1 → ∃ m'', standardTrajectory n' m'' = 1
+      -- Apply ih at m' = k (since k < succ k), n' = acceleratedStep n
+      have h_odd' : Odd (acceleratedStep n) := acceleratedStep_odd_of_odd n h_odd
+      obtain ⟨r, hr⟩ := ih k (by omega) (acceleratedStep n) h_odd' h
+      -- hr : standardTrajectory (acceleratedStep n) r = 1
+      -- Witness m' = (1 + ν₂(3n+1)) + r (forward step + inner IH witness)
+      exact ⟨(1 + (3*n+1).factorization 2) + r, by
+        show standardTrajectory n ((1 + (3*n+1).factorization 2) + r) = 1
+        rw [← standardTrajectory_compose n (1 + (3*n+1).factorization 2) r]
+        rw [acceleratedStep_equiv_standardStep n h_odd]
+        rw [hr]⟩
 
 end CollatzResearch
