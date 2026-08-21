@@ -279,12 +279,13 @@ def Holds (c : LeafClaim) (x : Nat) : Prop
       via `And.decidable` composed with `Nat.decLe`. -/
 instance Holds.decidable (c : LeafClaim) (x : Nat) :
     Decidable (c.Holds x) := by
+  unfold Holds
   cases c with
   | empty => exact (inferInstance : Decidable False)
-  | singleton _ => exact (inferInstance : Decidable (x = _))
-  | bounded _ => exact (inferInstance : Decidable (x ≤ _))
-  | interval _ _ _ =>
-    exact (inferInstance : Decidable (lo ≤ x % _ ∧ x % _ ≤ hi))
+  | singleton n => exact (inferInstance : Decidable (x = n))
+  | bounded K => exact (inferInstance : Decidable (x ≤ K))
+  | interval period lo hi =>
+    exact (inferInstance : Decidable (lo ≤ x % period ∧ x % period ≤ hi))
 
 end LeafClaim
 
