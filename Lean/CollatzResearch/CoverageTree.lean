@@ -234,6 +234,88 @@ def SatOrbit (_t : CoverageTree) (x : Nat) (l : CoverageLeaf) : Prop :=
            accelerated_orbit x k % period ≤ hi
   | none => False
 
+/-- A claim about which inputs reach a leaf. Pure data — equality-
+    comparable, serializable, no proof content. The Lean proof that
+    the claim holds for the routed inputs (and that every claimed
+    input reaches 1) is in `LeafCertificate` (PR #54).
+
+    **Q3 v3 scope:** only the `.interval` constructor is
+    constructively inhabited under current `descend` semantics
+    (residue-only routing). The other constructors (`.empty`,
+    `.singleton`, `.bounded`) are kept in the type for forward
+    compatibility with the bounded-orbit workstream (depends on
+    `descend_orbit_complete` from PR #29 + `coverage_tree_soundness_orbit`
+    from PR #36 spec). See `docs/story-q3-leaf-certificate.md`
+    § "Why finite claims are out of Q3 scope".
+
+    Constructive `routed_implies_claim` for these other
+    constructors is intentionally NOT attempted in this PR — the
+    current `descend` semantics produce infinite preimages for
+    nonempty leaves, so the structural proof obligation cannot be
+    discharged.
+
+    (Story Q3 / PR #53.) -/
+inductive LeafClaim where
+  | empty                       -- no inputs
+  | singleton (n : Nat)         -- exactly one input: n
+  | bounded (K : Nat)           -- inputs ≤ K (finite enumeration)
+  | interval (period lo hi : Nat)  -- residue interval [lo, hi] mod period
+  deriving Repr, DecidableEq
+
+namespace LeafClaim
+
+/-- The set of inputs claimed by a `LeafClaim`. Pure predicate. -/
+def Holds (c : LeafClaim) (x : Nat) : Prop
+  | .empty, _ => False
+  | .singleton n, x => x = n
+  | .bounded K, x => x ≤ K
+  | .interval period lo hi, x => lo ≤ x % period ∧ x % period ≤ hi
+
+/-- Decidability instance for `LeafClaim.Holds`. Cases:
+    - `.empty` → `Decidable False`
+    - `.singleton n` → `Decidable (x = n)` via `Nat.decEq`
+    - `.bounded K` → `Decidable (x ≤ K)` via `Nat.decLe`
+    - `.interval period lo hi` → `Decidable (lo ≤ x % period ∧ x % period ≤ hi)`
+      via `And.decidable` composed with `Nat.decLe`. -/
+instance Holds.decidable (c : LeafClaim) (x : Nat) :
+    Decidable (c.Holds x) := by
+  cases c with
+  | empty => exact (inferInstance : Decidable False)
+  | singleton _ => exact (inferInstance : Decidable (x = _))
+  | bounded _ => exact (inferInstance : Decidable (x ≤ _))
+  | interval _ _ _ =>
+    exact (inferInstance : Decidable (lo ≤ x % _ ∧ x % _ ≤ hi))
+
+end LeafClaim
+
+/-- Untrusted structural decoder: parses a `CoverageLeaf`'s
+    `leafProperty` into a `LeafClaim` (data only). Does NOT
+    construct the Lean proof. The proof is supplied by the caller.
+
+    **Q3 v3 scope:** the decoder recognises only the existing
+    `"<period>:<lo>-<hi>"` format (via `leanInterval`) and produces
+    the `.interval` claim. Other claim shapes (`.singleton`,
+    `.bounded`) require new `leafProperty` formats and are
+    deferred. The `WellFormed` guard ensures the interval is
+    structurally valid (modulo the conjunction `period > 0 ∧
+    lo ≤ hi ∧ hi < period`).
+
+    **Critical:** this is a STRUCTURAL DECODER, not a SEMANTIC
+    DECODER. It must never be used to manufacture semantic
+    evidence. The `leafProperty` string is an untrusted input;
+    the caller is responsible for verifying the resulting claim's
+    semantic obligations (`routed_implies_claim` +
+    `claim_reaches_one`, defined in PR #54).
+
+    (Story Q3 / PR #53.) -/
+def parse_leaf_claim (l : CoverageLeaf) : Option LeafClaim :=
+  match leanInterval l with
+  | some (period, lo, hi) =>
+    if hWF : WellFormed l then
+      some (LeafClaim.interval period lo hi)
+    else none
+  | none => none
+
 /-- Structural alignment: every leaf's declared `period` matches the
     modulus of its parent internal node at the leaf's depth. Captures
     the invariant needed for `descendOrbit` to imply `SatOrbit`.
