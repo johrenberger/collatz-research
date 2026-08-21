@@ -265,11 +265,12 @@ inductive LeafClaim where
 namespace LeafClaim
 
 /-- The set of inputs claimed by a `LeafClaim`. Pure predicate. -/
-def Holds (c : LeafClaim) (x : Nat) : Prop
-  | .empty, _ => False
-  | .singleton n, x => x = n
-  | .bounded K, x => x ≤ K
-  | .interval period lo hi, x => lo ≤ x % period ∧ x % period ≤ hi
+def Holds (c : LeafClaim) (x : Nat) : Prop :=
+  match c with
+  | .empty => False
+  | .singleton n => x = n
+  | .bounded K => x ≤ K
+  | .interval period lo hi => lo ≤ x % period ∧ x % period ≤ hi
 
 /-- Decidability instance for `LeafClaim.Holds`. Cases:
     - `.empty` → `Decidable False`
