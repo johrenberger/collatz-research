@@ -347,8 +347,9 @@ bridge cannot entail that. The conditional form makes the semantic
 gap explicit (see `docs/story-07c-2-promotion.md`).
 
 **Proof status: formally established.** No new `sorry`/`admit`/`axiom`.
-The proof applies `coverage_tree_soundness` and extracts `LeafReachesOne`
-from the leaf-semantic hypothesis. -/
+The proof applies `coverage_tree_soundness`, unfolds `LeafReachesOne`
+via `intro`, and re-applies `hLeaf` to the unfolded binders to obtain
+`ReachesOne`. -/
 theorem coverage_tree_soundness_full (t : CoverageTree)
     (hv : ValidTree t) (hic : IsComplete t)
     (hLeaf : ∀ l ∈ t.leaves, verified t l → LeafReachesOne t l)
@@ -356,7 +357,9 @@ theorem coverage_tree_soundness_full (t : CoverageTree)
     ∃ l, l ∈ t.leaves ∧ verified t l ∧ descend t x = some l ∧
          LeafReachesOne t l := by
   obtain ⟨l, hl, hver, hdesc⟩ := coverage_tree_soundness t hv hic x hx
-  exact ⟨l, hl, hver, hdesc, hLeaf l hl hver hdesc⟩
+  refine ⟨l, hl, hver, hdesc, ?_⟩
+  intro x' hdesc'
+  exact hLeaf l hl hver x' hdesc'
 
 /-- Orbit-aware soundness for `CoverageTree` (Story 07c / round-5, 07c-3).
 
