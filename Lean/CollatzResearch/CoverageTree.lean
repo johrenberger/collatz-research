@@ -126,6 +126,17 @@ def accelerated_orbit : Nat → Nat → Nat
     eventually reaches 1. (Story 07c / round-5, 07c-2.) -/
 def ReachesOne (n : Nat) : Prop := ∃ k, accelerated_orbit n k = 1
 
+/-- `LeafReachesOne t l` is a leaf-level semantic certificate: any
+    starting `x` that descends to leaf `l` under `descend t` reaches
+    1 via the accelerated orbit. The certificate is the leaf's
+    semantic content; `coverage_tree_soundness` only proves the tree
+    routes correctly. Promoting the global Collatz convergence claim
+    would require proving `LeafReachesOne` for every verified leaf in
+    some certified partition (see `docs/story-07c-2-promotion.md`
+    Q3 — structured certificate design). (Story 07c / round-5, 07c-2.) -/
+def LeafReachesOne (t : CoverageTree) (l : CoverageLeaf) : Prop :=
+  ∀ x, descend t x = some l → ReachesOne x
+
 /-- Orbit-aware descent: at each internal level, the residue lookup
     uses `accelerated_orbit x k % m` instead of `x % m`, where `k` is
     the depth index (incremented at each internal step). Structural
@@ -323,6 +334,29 @@ theorem coverage_tree_soundness (t : CoverageTree)
         obtain ⟨l, hl, hv', hdesc_child⟩ := hresult
         refine ⟨l, hl, hv', ?_⟩
         simpa [descendFrom, hchild_lookup] using hdesc_child
+
+/-- Semantic-leaf soundness for `CoverageTree` (Story 07c / round-5, 07c-2).
+
+Strengthens `coverage_tree_soundness` by adding a leaf-level
+`LeafReachesOne t l` certificate to the conclusion. The certificate
+is taken as an explicit hypothesis `hLeaf` rather than derived from
+`ValidTree t ∧ IsComplete t`, because the unconditional conclusion
+(`ReachesOne x` for every `x > 0` under any valid complete tree)
+would amount to the global Collatz theorem — a tree-soundness
+bridge cannot entail that. The conditional form makes the semantic
+gap explicit (see `docs/story-07c-2-promotion.md`).
+
+**Proof status: formally established.** No new `sorry`/`admit`/`axiom`.
+The proof applies `coverage_tree_soundness` and extracts `LeafReachesOne`
+from the leaf-semantic hypothesis. -/
+theorem coverage_tree_soundness_full (t : CoverageTree)
+    (hv : ValidTree t) (hic : IsComplete t)
+    (hLeaf : ∀ l ∈ t.leaves, verified t l → LeafReachesOne t l)
+    (x : Nat) (hx : x > 0) :
+    ∃ l, l ∈ t.leaves ∧ verified t l ∧ descend t x = some l ∧
+         LeafReachesOne t l := by
+  obtain ⟨l, hl, hver, hdesc⟩ := coverage_tree_soundness t hv hic x hx
+  exact ⟨l, hl, hver, hdesc, hLeaf l hl hver hdesc⟩
 
 /-- Orbit-aware soundness for `CoverageTree` (Story 07c / round-5, 07c-3).
 
