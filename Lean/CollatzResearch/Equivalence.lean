@@ -255,18 +255,18 @@ theorem acceleratedTrajectory_reaches_one_implies_standard (n m : Nat)
     | zero =>
       -- h : trajectory n 0 = 1, so n = 1 (by trajectory_zero)
       -- standardTrajectory n 0 = n (by standardTrajectory_zero), so standardTrajectory n 0 = 1
-      show standardTrajectory n 0 = 1
-      rw [standardTrajectory_zero, ← trajectory_zero]
-      exact h
+      exact ⟨0, by
+        show standardTrajectory n 0 = 1
+        rw [standardTrajectory_zero, ← trajectory_zero]
+        exact h⟩
     | succ k =>
       -- h : trajectory n (k + 1) = 1
       rw [trajectory_succ_shift] at h
       -- h : trajectory (acceleratedStep n) k = 1
-      -- ih : ∀ n : Nat, (∀ m' < succ k, P n) → P n
-      -- Strong induction recurses through the inner IH for m' < k, then
-      -- applies the outer IH at (acceleratedStep n, k).
+      -- ih : ∀ m' < succ k, ∀ n', Odd n' → trajectory n' m' = 1 → ∃ m'', standardTrajectory n' m'' = 1
+      -- Apply ih at m' = k (since k < succ k), n' = acceleratedStep n
       have h_odd' : Odd (acceleratedStep n) := acceleratedStep_odd_of_odd n h_odd
-      obtain ⟨r, hr⟩ := ih (acceleratedStep n) (Nat.strong_induction_on _ ih) h_odd' h
+      obtain ⟨r, hr⟩ := ih k (by omega) (acceleratedStep n) h_odd' h
       -- hr : standardTrajectory (acceleratedStep n) r = 1
       -- Witness m' = (1 + ν₂(3n+1)) + r (forward step + inner IH witness)
       exact ⟨(1 + (3*n+1).factorization 2) + r, by
