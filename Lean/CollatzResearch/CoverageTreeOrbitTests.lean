@@ -171,4 +171,23 @@ example (hv : ValidTree depthTwoTree := by native_decide)
 -- is available without it, and no zero convergence statement is added.
 -- (Implicit in `hx : 0 < x`.)
 
+-- Scenario 8: Compile-checked regression example for
+-- `coverage_tree_soundness_full` (public-facing name: "conditional
+-- semantic-leaf soundness"). Demonstrates the argument order and
+-- the conditional `LeafReachesOne` certificate boundary. The `hLeaf`
+-- provider is `by sorry` (placeholder for the structured
+-- `LeafCertificate` type that will be defined in Q3 per
+-- `docs/story-07c-2-promotion.md` Q3). This is API-surface
+-- verification, not a full Collatz proof; the per-leaf semantic
+-- guarantee is the next substantive workstream.
+-- Added in PR #51 per Codex P2 (Codex review at PR #49 run 191,
+-- 2026-08-21T13:48:47Z).
+example (hv : ValidTree depthTwoTree := by native_decide)
+    (hc : IsComplete depthTwoTree := by native_decide)
+    (hLeaf : ∀ l ∈ depthTwoTree.leaves, verified depthTwoTree l →
+             LeafReachesOne depthTwoTree l := by sorry) :
+    ∃ l, l ∈ depthTwoTree.leaves ∧ verified depthTwoTree l ∧
+         descend depthTwoTree 5 = some l ∧ LeafReachesOne depthTwoTree l := by
+  exact coverage_tree_soundness_full depthTwoTree hv hc hLeaf 5 (by norm_num)
+
 end CollatzResearch
