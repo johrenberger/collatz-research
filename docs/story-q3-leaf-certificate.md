@@ -1,11 +1,12 @@
 # Story Q3 — Structured `LeafCertificate` type for `coverage_tree_soundness_full`
 
-Status: **v2 spec, redesigned per Codex P1 + P2 feedback on PR #52 (run 222, 2026-08-21T19:36:30Z).**
+Status: **v3 spec, scope-corrected per Codex re-review on PR #52 (run 228, 2026-08-21T19:51:46Z).**
 
 ## Revision history
 
-- **v1 (PR #52, commit `7eac993`)**: initial sketch with a 4-constructor `LeafCertificate` data type. **Rejected by Codex** at run 222 because the certificate was **not linked to its leaf or to the routed inputs** — `coverage_tree_soundness_cert` was not kernel-equivalent to `coverage_tree_soundness_full`. Two P1s + one P2.
-- **v2 (THIS DOC, PR #52 follow-up commit)**: split into `LeafClaim` (pure data, decidable, serializable) + `LeafCertificate t l` (Prop indexed by tree AND leaf, with **two distinct obligations**: `routed_implies_claim` and `claim_reaches_one`). `bounded K` replaces the v1 `known_small` for finite cases. The parser is renamed `parse_leaf_claim` and explicitly flagged as an **untrusted structural decoder** — it must never manufacture semantic evidence. PR #51 narrative corrected (no `by sorry` was in the merged version).
+- **v1 (PR #52, commit `7eac993`)**: initial sketch with a 4-constructor `LeafCertificate` data type. **Rejected by Codex** at run 222 because the certificate was not linked to its leaf or to the routed inputs.
+- **v2 (PR #52, commit `3ac45c2`)**: split into `LeafClaim` (data) + `LeafCertificate t l` (Prop indexed by tree AND leaf, with two obligations). v2 was structurally correct but **still claimed** that `.empty`, `.singleton`, `.bounded` could have `routed_implies_claim` proved "structurally" — this is wrong because `descend` is residue-only routing (no Collatz reduction), so finite claims are not inhabitable under current routing semantics. **Re-review request changes** at run 228.
+- **v3 (THIS DOC)**: **scope-narrow** Q3 v3 to the indexed certificate infrastructure only. `.interval` claims stay in scope (structurable via `Sat`); `.empty`, `.singleton`, `.bounded` are kept in the type for forward compatibility but marked as **future orbit/reduction certificates**. Constructive finite-certificate work is moved to a separate **bounded-orbit workstream** that depends on the orbit-aware routing in master (PR #29 at `4a67591`: `descend_orbit_complete`). Also fixes three P2 nits: `ReachesOne` is an unbounded existential (not decidable); `deriving Repr, Decidable` on `LeafClaim` → `deriving Repr, DecidableEq`; closed prerequisites re-stated as downstream orbit bridges.
 
 ## Motivation
 
@@ -13,92 +14,75 @@ After the 07c-2 promotion (PR #49, merged 2026-08-21 at `29c41e0`), the
 Collatz Research project has a formally established
 `coverage_tree_soundness_full` theorem that takes an **explicit**
 `hLeaf : ∀ l ∈ t.leaves, verified t l → LeafReachesOne t l` hypothesis
-and routes any positive `x` to a leaf with the `LeafReachesOne`
-certificate in the conclusion (PR #51 added scenario 8 to
-`CoverageTreeOrbitTests.lean` as a compile-checked regression on the
-explicit-parameter API, merged 2026-08-21 at `388b4a7`).
+(PR #51 added scenario 8 to `CoverageTreeOrbitTests.lean` as a
+compile-checked regression on the explicit-parameter API, merged
+2026-08-21 at `388b4a7`).
 
-But `LeafReachesOne t l := ∀ x, descend t x = some l → ReachesOne x` is
-**trustable only via the `hLeaf` hypothesis**. The conditional form
-was the right thing for PR #49 — it stops short of claiming the global
-Collatz theorem from tree soundness alone. But it also leaves a real
-gap: **what should `hLeaf` look like as actual data, not as a
-hypothesis to be supplied by callers?**
+Q3 replaces the opaque `LeafReachesOne` claim with a typed
+**indexed** `LeafCertificate t l` Prop whose two obligations make the
+proof structure explicit. v3 narrows Q3 to delivering only the
+**infrastructure** — the data type, the indexed Prop, and the
+companion theorem — plus the `.interval` claim shape, whose
+`routed_implies_claim` is provable from current `Sat` semantics.
 
-v1's first attempt at answering that question failed. The proposed
-4-constructor `LeafCertificate` data type carried the proof inside
-each constructor (`hReach`, `h`, etc.) but had **no link** between the
-certificate and:
-1. The leaf it is attached to.
-2. The inputs that the tree routes to that leaf.
+The finite claims (`.empty`, `.singleton`, `.bounded`) are
+**deliberately deferred** to a separate orbit-aware workstream,
+because under current `descend` semantics (residue-only routing,
+no Collatz reduction), finite claims cannot be constructively
+inhabited for nonempty leaves. See § "Why finite claims are out
+of Q3 scope" below.
 
-Consequently, each proof branch in v1 was unjustified:
-- `empty` contained no proof that no input descends to the leaf.
-- `single n hReach` proved only `ReachesOne n`, not `ReachesOne x`
-  for an arbitrary `x` routed to that leaf.
-- `interval ... h ...` required `Sat t x l` (residue membership),
-  which `coverage_tree_soundness` does not derive.
-
-v2 fixes this by making the certificate a **Prop indexed by
-`(t, l)`** and separating the two distinct obligations
-explicitly. The kernel can then verify both.
-
-## Current state (recap, with PR #51 narrative correction)
+## Current state (recap)
 
 | Component | Status | Reference |
 |---|---|---|
 | `CoverageTree` / `CoverageLeaf` | Defined | `Lean/CollatzResearch/CoverageTree.lean` lines 50–71 |
-| `leafProperty : String` | Defined | `Lean/CollatzResearch/CoverageTree.lean` line 58 — opaque token |
-| `leanInterval` parser | Defined | `Lean/CollatzResearch/CoverageTree.lean` lines 173–185 — `"<period>:<lo>-<hi>"` → `Option (Nat × Nat × Nat)` |
-| `Sat` / `WellFormed` / `SatOrbit` | Defined | `Lean/CollatzResearch/CoverageTree.lean` lines 188–245 |
-| `coverage_tree_soundness` | Formally established | `Lean/CollatzResearch/CoverageTree.lean` lines 285–336 |
-| `coverage_tree_soundness_full` | Formally established | `Lean/CollatzResearch/CoverageTree.lean` lines 338–358 (PR #49, `29c41e0`) |
-| `coverage_tree_soundness_orbit` | Preparatory (`sorry`) | `Lean/CollatzResearch/CoverageTree.lean` lines 361–385 — separate workstream, **out of scope** |
-| `descend_orbit_complete` | Formally established | PR #29 at `4a67591` — separate workstream, **out of scope** |
-| Scenario 8 (PR #51) | Compile-checked | `Lean/CollatzResearch/CoverageTreeOrbitTests.lean` — invokes `coverage_tree_soundness_full` with **explicit** `hLeaf` parameter (no `:= by sorry` default, per Codex P1 at PR #51 run 196) |
+| `leafProperty : String` | Defined | line 58 — opaque token |
+| `leanInterval` parser | Defined | lines 173–185 — `"<period>:<lo>-<hi>"` → `Option (Nat × Nat × Nat)` |
+| `Sat` / `WellFormed` / `SatOrbit` | Defined | lines 188–245 |
+| `coverage_tree_soundness` | Formally established | lines 285–336 |
+| `coverage_tree_soundness_full` | Formally established | lines 338–358 (PR #49 at `29c41e0`) |
+| `coverage_tree_soundness_orbit` | Preparatory (`sorry`) | lines 361–385 — separate workstream |
+| `descend_orbit_complete` | Formally established | PR #29 at `4a67591` — orbit-aware routing |
+| Scenario 8 (PR #51) | Compile-checked | `CoverageTreeOrbitTests.lean` — invokes `coverage_tree_soundness_full` with explicit `hLeaf` (no `by sorry` default) |
 
-**Note (corrected from v1)**: PR #51 was merged with the **explicit**
-`hLeaf` parameter precisely to remove the `:= by sorry` default. The
-`by sorry` placeholder was the P1 fix at commit `23aef20`. Q3 does
-**not** remove a `sorry`; Q3 **replaces** the `LeafReachesOne` claim
-with the new indexed `LeafCertificate t l` (Prop with two obligations),
-keeping the explicit-parameter discipline. v1's framing — "PR #51
-scenario 8 used `by sorry` and will be removed by Q3" — was wrong on
-both counts and is corrected here.
+**`descend` semantics** (critical for Q3 scope): `descend t x` selects
+child edges by residue lookup on the **unchanged input** `x`. It never
+performs a Collatz step. The residue-routed preimage of a nonempty
+leaf is therefore **periodic** (every residue class mod `2^k` contains
+infinitely many positive integers). This is the model boundary that
+forces the v3 scope correction.
 
 ## Design — `LeafClaim` (data) + `LeafCertificate t l` (Prop)
-
-The design follows the three-option analysis from
-`docs/story-07c-2-promotion.md` § "Why this matters" (lines 88–101):
-
-1. **Structured certificates** ← preferred; the shape of Q3.
-2. **Proof-carrying strings** ← rejected; brittle.
-3. **External oracle** ← rejected; requires formal integration.
 
 Q3 splits the certificate into two parts:
 
 - **`LeafClaim`**: pure data — the structural description of which
-  inputs are claimed to reach the leaf. Decidable, serializable,
-  containable in `leafProperty : String`.
+  inputs are claimed to reach the leaf. Equality-comparable,
+  serializable, containable in `leafProperty : String`.
 - **`LeafCertificate t l`**: a `Prop` indexed by tree `t` AND leaf `l`,
   carrying **two distinct obligations** as fields.
 
-The split makes the claim auditable as data while keeping the proof
-obligations kernel-checked.
-
-### `LeafClaim` (data, decidable)
+### `LeafClaim` (data, equality-comparable)
 
 ```lean
-/-- A claim about which inputs reach a leaf. Pure data — decidable,
-    serializable, no proof content. The Lean proof that the claim
-    holds for the routed inputs (and that every claimed input reaches
-    1) is in `LeafCertificate`. -/
+/-- A claim about which inputs reach a leaf. Pure data — equality-
+    comparable, serializable, no proof content. The Lean proof that
+    the claim holds for the routed inputs (and that every claimed
+    input reaches 1) is in `LeafCertificate`.
+
+    **Q3 v3 scope:** only the `.interval` constructor is
+    constructively inhabited under current `descend` semantics.
+    The other constructors (`.empty`, `.singleton`, `.bounded`)
+    are kept in the type for forward compatibility with the
+    bounded-orbit workstream (which depends on orbit-aware routing
+    from PR #29). See § "Why finite claims are out of Q3 scope". -/
 inductive LeafClaim
   | empty                       -- no inputs
   | singleton (n : Nat)         -- exactly one input: n
   | bounded (K : Nat)           -- inputs ≤ K (finite enumeration)
   | interval (period lo hi : Nat)  -- residue interval [lo, hi] mod period
-  deriving Repr, Decidable
+  deriving Repr, DecidableEq
 
 /-- The set of inputs claimed by a `LeafClaim`. Pure predicate. -/
 def LeafClaim.Holds : LeafClaim → Nat → Prop
@@ -111,39 +95,26 @@ def LeafClaim.Holds : LeafClaim → Nat → Prop
 instance LeafClaim.Holds.decidable (c : LeafClaim) (x : Nat) :
     Decidable (c.Holds x) := by
   cases c <;> first
-  | exact (by infer_instance)
-  | exact (by exact Nat.decLe _ _)
   | exact (by exact Nat.decLe _ _ ∧ Nat.decLe _ _)
+  | exact (by exact Nat.decLe _ _)
 ```
 
-The four constructors:
-
-- **`.empty`**: the leaf claims no inputs reach it. The `Holds`
-  predicate is `False`, so the certificate's `routed_implies_claim`
-  must show that no input descends here.
-- **`.singleton n`**: the leaf claims exactly one input `n`. The
-  certificate must show that all routed inputs equal `n`.
-- **`.bounded K`**: the leaf claims inputs `x ≤ K`. **Finite
-  enumeration** — for small `K`, the certificate's
-  `claim_reaches_one` is provable by `decide` on the finite trajectory
-  table. The bound `K` is a **parameter of the claim**, not a hard-
-  coded constant.
-- **`.interval period lo hi`**: the leaf claims a residue interval
-  modulo `period`. **Not finite** — this is the unproven Collatz-for-
-  this-class obligation. The certificate's `claim_reaches_one` is the
-  caller's responsibility.
+**Derivation note (P2 fix from re-review)**: `deriving Repr, DecidableEq`
+(not `Decidable` — `Decidable` is for `Prop`, not for data types).
+`DecidableEq` provides decidable equality on `LeafClaim`. The
+`LeafClaim.Holds` decidability instance is derived separately (as
+shown above) via case analysis.
 
 ### `LeafCertificate t l` (Prop, indexed, two obligations)
 
 ```lean
 /-- A structured certificate that a leaf `l` in tree `t` carries to
-    prove `LeafReachesOne t l`. The certificate has two distinct
-    obligations:
+    prove `LeafReachesOne t l`. Two distinct obligations:
 
-    1. `routed_implies_claim`: every input routed to `l` satisfies the
-       claim. (Routing-to-claim obligation.)
-    2. `claim_reaches_one`: every input satisfying the claim reaches
-       1. (Reachability obligation.)
+    1. `routed_implies_claim`: every input routed to `l` satisfies
+       the claim. (Routing-to-claim obligation.)
+    2. `claim_reaches_one`: every input satisfying the claim
+       reaches 1. (Reachability obligation.)
 
     Composing these gives `LeafReachesOne t l`. -/
 structure LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Prop where
@@ -154,23 +125,49 @@ structure LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Prop where
     ∀ x, claim.Holds x → ReachesOne x
 ```
 
-**Important — no `Decidable LeafCertificate`**: the certificate is a
-`Prop` with universal-function fields (`routed_implies_claim`,
-`claim_reaches_one`). Per Codex's P1 decision, we do **not** promise
-a `Decidable` instance. The claim side (`LeafClaim`) is decidable;
-the proof side is kernel-checked. A separate checker can verify
-finite witnesses for `.bounded K` claims (e.g., a Python harness
-that runs `decide` on each `x ≤ K` and confirms `ReachesOne x`).
+**No `Decidable LeafCertificate`**: the certificate is a `Prop` with
+universal-function fields. We do not promise a `Decidable` instance
+(per re-review P2); a separate checker (Python or Lean tool) can
+verify finite witnesses for bounded claims via `BoundedOrbitCertificate`
+in the future orbit workstream.
 
-### Why this design (vs v1's rejected version)
+## Why finite claims are out of Q3 scope (the v3 scope correction)
 
-| v1 flaw | v2 fix |
-|---|---|
-| `single n hReach` carried only `ReachesOne n` | `LeafCertificate t l` carries `routed_implies_claim : ∀ x, descend t x = some l → claim.Holds x` — the claim is leaf-specific |
-| `interval ... h ...` mixed routing + reachability in one `h` | Split: `routed_implies_claim` (structural) + `claim_reaches_one` (the global-Collatz obligation) |
-| `empty` had no obligation | `.empty`'s `claim.Holds x = False` forces `routed_implies_claim` to prove no input descends |
-| No link between certificate and leaf | `LeafCertificate` is indexed by `(t, l)` — the routing-to-claim obligation is leaf-specific |
-| The parser produced semantic evidence | `parse_leaf_claim` is flagged as a **structural decoder only**; the proof is the caller's job |
+The v2 spec claimed `.singleton n` and `.bounded K` could have
+`routed_implies_claim` proved "structurally" from `ValidTree t ∧
+IsComplete t`. The Codex re-review at run 228 flagged this as wrong:
+
+> `descend t x` only selects child edges using residues of the
+> **unchanged input** `x`; it never performs a Collatz step or
+> otherwise reduces `x`. For a finite-depth, residue-routed tree, a
+> nonempty leaf's preimage is periodic and therefore generally
+> infinite. It cannot be contained in `{x | x = n}` or
+> `{x | x ≤ K}`. In particular, no structural proof of
+> `∀ x, descend t x = some l → x ≤ K` exists for a nonempty routed
+> leaf merely from `ValidTree` and `IsComplete`.
+
+The same applies to `.empty`: `False.elim` discharges the
+*reachability* field, but it does not establish
+`routed_implies_claim : descend t x = some l → False`. That requires
+a genuine unreachable-leaf proof.
+
+**Consequence**: under current `descend`, only `.interval` claims
+have a structurable `routed_implies_claim` (via `Sat t x l`). The
+other three constructors (`.empty`, `.singleton`, `.bounded`) are
+kept in the type for forward compatibility but cannot be inhabited
+without orbit reduction.
+
+**Future workstream**: the bounded-orbit workstream will add an
+orbit-aware `descendOrbit` with orbit-image bounds (e.g.,
+`∃ k, accelerated_orbit x k ≤ K`), enabling constructive
+`routed_implies_claim` for `.empty`, `.singleton`, and `.bounded`
+claims. This workstream depends on:
+- `descend_orbit_complete` (PR #29 at `4a67591`, in master) for the
+  orbit-aware routing skeleton
+- `coverage_tree_soundness_orbit` (PR #36 spec, `sorry` pending) for
+  the orbit-aware soundness closure
+- The 02c/03c closed lemmas (PRs #31, #37, #38, #46, #47) as
+  **downstream orbit bridges** (see § "Closed prerequisites")
 
 ## API integration
 
@@ -181,11 +178,10 @@ that runs `decide` on each `x ≤ K` and confirms `ReachesOne x`).
     `leafProperty` into a `LeafClaim` (data only). Does NOT
     construct the Lean proof. The proof is supplied by the caller.
 
-    This is a STRUCTURAL DECODER, not a SEMANTIC DECODER. It must
-    never be used to manufacture semantic evidence. The
-    `leafProperty` string is an untrusted input — the caller is
-    responsible for verifying the resulting claim's semantic
-    obligations. -/
+    **Q3 v3 scope:** the decoder recognises only the existing
+    `"<period>:<lo>-<hi>"` format and produces the `.interval`
+    claim. Other claim shapes (`.singleton`, `.bounded`) require
+    new `leafProperty` formats and are deferred. -/
 def parse_leaf_claim (l : CoverageLeaf) : Option LeafClaim :=
   match leanInterval l with
   | some (period, lo, hi) =>
@@ -195,14 +191,8 @@ def parse_leaf_claim (l : CoverageLeaf) : Option LeafClaim :=
   | none => none
 ```
 
-The decoder recognises only the existing `"<period>:<lo>-<hi>"`
-format and produces the `interval` claim. Other claim shapes
-(`.singleton`, `.bounded`) would require new `leafProperty` formats
-and are out of scope for v2.
-
-**Critical**: `parse_leaf_claim` is not `certificate_of_leaf`. The
-proof is not constructed here. This is the P2 fix from Codex — the
-legacy parser is preserved as an untrusted decoder.
+The decoder is **structural only** (per re-review decision #3); it
+must never manufacture semantic evidence.
 
 ### `coverage_tree_soundness_cert` (revised theorem)
 
@@ -215,10 +205,11 @@ legacy parser is preserved as an untrusted decoder.
     proof composes `routed_implies_claim` and `claim_reaches_one`
     to derive `LeafReachesOne t l`.
 
-    **Easier to audit** — the two obligations are explicit at the
-    call site, and the kernel verifies them. The certificate is
-    leaf-specific (indexed by `l`), so the routing-to-claim
-    obligation is provable from the local tree structure. -/
+    **Q3 v3 scope:** the theorem is universally quantified over
+    `LeafClaim` shapes. For `.interval` claims,
+    `routed_implies_claim` is structural (via `Sat`); for the other
+    constructors, it must come from the bounded-orbit workstream
+    (see § "Why finite claims are out of Q3 scope"). -/
 theorem coverage_tree_soundness_cert (t : CoverageTree)
     (hv : ValidTree t) (hic : IsComplete t)
     (hCert : ∀ l ∈ t.leaves, verified t l → LeafCertificate t l)
@@ -232,24 +223,11 @@ theorem coverage_tree_soundness_cert (t : CoverageTree)
          ((hCert l hl hver).routed_implies_claim x' hdesc')
 ```
 
-The proof is the **composition** of the two obligations:
-
-1. `coverage_tree_soundness` gives `l ∈ t.leaves`, `verified t l`,
-   and `descend t x = some l`.
-2. `hCert l hl hver : LeafCertificate t l` gives the two obligations
-   for this specific leaf.
-3. `(hCert l hl hver).routed_implies_claim x' hdesc'` proves
-   `claim.Holds x'`.
-4. `(hCert l hl hver).claim_reaches_one x'` proves `ReachesOne x'`.
-
-This is the kernel-equivalent composition — no axioms, no `sorry`.
-
-### Scenario 8 update (Q3 revision)
+### Scenario 8 update (Q3 v3)
 
 `CoverageTreeOrbitTests.lean` scenario 8 is updated to use the new
-`coverage_tree_soundness_cert` API instead of `coverage_tree_soundness_full`,
-with the parameter changed to the **indexed** `LeafCertificate depthTwoTree l`
-(per Codex P1 decision #5):
+`coverage_tree_soundness_cert` API with the **indexed**
+`LeafCertificate depthTwoTree l` parameter:
 
 ```lean
 -- Scenario 8 (Q3): compile-checked regression example for
@@ -266,113 +244,165 @@ example (hv : ValidTree depthTwoTree := by native_decide)
   exact coverage_tree_soundness_cert depthTwoTree hv hc hCert 5 (by norm_num)
 ```
 
-## Per-shape proof obligations (revised — finite vs infinite split)
+## Per-shape proof obligations (revised — Q3 v3 scope)
 
-| Claim | `claim.Holds` | `routed_implies_claim` provable? | `claim_reaches_one` provable? | Strategy |
+| Claim | `claim.Holds` | `routed_implies_claim` provable under current `descend`? | `claim_reaches_one` provable? | Q3 v3 status |
 |---|---|---|---|---|
-| `.empty` | `False` | **Yes** — `False.elim` (any routed input → False) | **Vacuously** — `False → ReachesOne x` | Trivial |
-| `.singleton n` | `x = n` | **Yes** — structural: only `n` descends | **Constructive** (small `n`) — trajectory computation | `ReachesOne n` via `decide` |
-| `.bounded K` | `x ≤ K` | **Yes** — structural: bounded set | **Constructive** — finite enumeration of `x ≤ K` | Enumerate `ReachesOne x` for each `x ≤ K` |
-| `.interval period lo hi` | `lo ≤ x % period ∧ x % period ≤ hi` | **Yes** — structural: residue matches | **Hypothesis-bearing** — global Collatz for class | Caller supplies `ReachesOne` proof |
+| `.empty` | `False` | **No** — requires genuine unreachable-leaf proof (orbit-aware) | Vacuously | Future: bounded-orbit workstream |
+| `.singleton n` | `x = n` | **No** — preimage is periodic and infinite | Constructive (small `n`: trajectory) | Future: bounded-orbit workstream |
+| `.bounded K` | `x ≤ K` | **No** — preimage is periodic and infinite | Constructive (finite enumeration of `x ≤ K`) | Future: bounded-orbit workstream |
+| `.interval period lo hi` | residue `[lo, hi]` mod `period` | **Yes** — structural via `Sat t x l` | **Hypothesis-bearing** — global Collatz for class | **Q3 v3 scope** |
 
-**Critical correction from v1**: v1 claimed `period = 2, lo = 0, hi = 1`
-was a "small finite-enumeration case". This is **wrong** — that
-interval covers **all** natural numbers (since `x % 2 ∈ {0, 1}`), so
-it is exactly the global Collatz obligation, not a finite case.
+**Per the re-review at run 228**: "If finite certificates remain in
+the data type, state that their `routed_implies_claim` fields are not
+expected to be inhabitable under present `descend` except for
+separately proved degenerate leaves." This is what the table above
+encodes.
 
-Finite enumeration requires an explicit bound like `x ≤ K` (via
-`.bounded K`), **not** a residue class. The 02c/03c closed lemmas
-are bridges — they do not discharge `∀ x, ReachesOne x` on any
-infinite residue class.
+## ReachesOne decidability clarification (P2 fix)
 
-## Closed prerequisites (02c/03c)
+`ReachesOne x := ∃ k, accelerated_orbit x k = 1` is an **unbounded
+existential** (over `k : Nat`). It is **not decidable** in general.
+
+For finite claims (deferred to the bounded-orbit workstream), a
+finite checker must supply **explicit bounded witnesses**: for each
+input `x` in the claim's domain, provide a `k : Nat` and a checked
+equality `accelerated_orbit x k = 1`. Lean can then reduce/check each
+concrete witness via `decide`. The orbit-aware workstream will
+introduce a `BoundedOrbitCertificate` (or similar) bundling these
+witnesses.
+
+For `.interval` claims (Q3 v3 scope), `claim_reaches_one` is
+hypothesis-bearing — the caller supplies the unbounded
+`ReachesOne x` proof directly (typically via an external source or
+axiom).
+
+## Closed prerequisites (02c/03c) — re-stated as downstream orbit bridges
 
 The following 5 lemmas, closed in PRs #31 + #37 + #38 + #46 + #47,
-are **direct inputs** to the `routed_implies_claim` side and
-structural arguments:
+are **downstream orbit bridges** for the future bounded-orbit
+workstream. They do **not** establish `routed_implies_claim` under
+current `descend` semantics (per the re-review P2):
 
-| Lemma | PR | Usage in Q3 |
+| Lemma | PR | Role in future bounded-orbit workstream |
 |---|---|---|
-| `acceleratedStep_odd_of_odd` | #31 | Structural: odd-input orbit step produces odd output |
-| `standardStep_positive` | #37 | Structural: standard step preserves positivity |
-| `acceleratedStep_positive_of_odd` | #38 | Structural: accelerated step preserves positivity for odd input |
-| `acceleratedStep_equiv_standardStep` | #46 | Structural: accelerated ≡ standard step composition |
-| `acceleratedTrajectory_reaches_one_implies_standard` | #47 | Structural: accelerated trajectory reaching 1 → standard trajectory |
+| `acceleratedStep_odd_of_odd` | #31 | Bridge: odd-input orbit step produces odd output |
+| `standardStep_positive` | #37 | Bridge: standard step preserves positivity |
+| `acceleratedStep_positive_of_odd` | #38 | Bridge: accelerated step preserves positivity for odd input |
+| `acceleratedStep_equiv_standardStep` | #46 | Bridge: accelerated ≡ standard step composition |
+| `acceleratedTrajectory_reaches_one_implies_standard` | #47 | Bridge: accelerated trajectory reaching 1 → standard trajectory |
 
-These are **bridges** — they prove the structural relationships
-needed for `routed_implies_claim`. They do **not** discharge
-`claim_reaches_one` for any infinite residue class (per Codex P1.2).
-For finite `.bounded K` claims, the `claim_reaches_one` proof is by
-finite enumeration (using `decide` on each `x ≤ K`'s trajectory).
+The re-review is explicit: "The 02c/03c lemmas concern dynamics and
+equivalence. They do not establish the current tree's
+`descend t x = some l → claim.Holds x` structural relation; that
+relation must come from the tree layout/labels and a dedicated
+alignment invariant."
 
-## Implementation plan (revised)
+Q3 v3 does not use these lemmas directly. They will be relevant when
+the bounded-orbit workstream adds orbit-image bounds.
 
-The split into multiple PRs is deliberate: each PR has a single
-**verifiable** claim (data type, theorem + scenario, constructive
-proofs, docs).
+## Implementation plan (revised — Q3 v3)
 
-- **PR #53** (docs + Lean): add `LeafClaim` inductive type +
-  `LeafClaim.Holds` predicate + `parse_leaf_claim` + `Decidable`
-  instances. Lean CI gate.
-- **PR #54** (Lean + docs): add `LeafCertificate t l` Prop +
-  `coverage_tree_soundness_cert` theorem + scenario 8 update
-  (indexed cert parameter). Lean CI gate.
-- **PR #55** (Lean + docs): constructive proofs for `.bounded K`
-  (small K via `decide` on finite trajectory). **K is a
-  parameter**; the default value is chosen **after** the
-  checker/witness representation has measured CI cost (per Codex
-  decision #2). Lean CI gate.
-- **PR #56** (docs-only): lessons-learned doc (if notable patterns
-  emerge from PRs #53–55).
+| PR | Scope | Lean CI |
+|---|---|---|
+| **#53** | `LeafClaim` data type + `LeafClaim.Holds` + `parse_leaf_claim` + `DecidableEq` + `LeafClaim.Holds.decidable` instance | Yes |
+| **#54** | `LeafCertificate t l` Prop + `coverage_tree_soundness_cert` + scenario 8 update (indexed cert) | Yes |
+| ~~**#55**~~ | ~~Constructive proofs for `.bounded K`~~ — **REMOVED** from Q3 v3; moved to bounded-orbit workstream | — |
+| **#56** | Lessons-learned doc (if notable patterns emerge from PRs #53–54) | No |
+
+**Future workstream (separate, NOT in Q3 v3)**: bounded-orbit
+certificates — depends on `descend_orbit_complete` (PR #29) and
+`coverage_tree_soundness_orbit` (PR #36 spec). Will introduce
+`BoundedOrbitCertificate` for finite claims via orbit-image bounds.
+
+## Future workstream: bounded-orbit certificates
+
+**Goal**: provide constructive `routed_implies_claim` for
+`.empty`, `.singleton`, and `.bounded` claims via orbit-aware
+routing (`descendOrbit`) and orbit-image bounds.
+
+**Prerequisites** (already in master or pending):
+- `descend_orbit_complete` (PR #29 at `4a67591`, formally established)
+- `coverage_tree_soundness_orbit` (PR #36 spec, `sorry` pending —
+  separate workstream)
+- The 02c/03c closed lemmas (PRs #31, #37, #38, #46, #47) as
+  orbit bridges
+
+**Design sketch** (out of scope for Q3 v3):
+
+```lean
+/-- Orbit-image bound: x reaches a value ≤ K within its
+    accelerated orbit. Finite enumeration then proves ReachesOne
+    for each value ≤ K. -/
+def BoundedOrbit (x : Nat) (K : Nat) : Prop :=
+  ∃ k, accelerated_orbit x k ≤ K
+
+/-- A bounded-orbit certificate bundles orbit witnesses for the
+    finite domain. The future workstream will construct this from
+    `parse_leaf_claim` + per-input trajectory checks. -/
+structure BoundedOrbitCertificate (t : CoverageTree) (l : CoverageLeaf) : Prop where
+  -- ... (future design)
+```
+
+The Q3 v3 implementation does not deliver this. It is sketched here
+so the data type (`LeafClaim`) and Prop (`LeafCertificate t l`) can
+accommodate it without breaking changes.
 
 ## Codex decisions acknowledged
 
-Per the Codex review at run 222 (2026-08-21T19:36:30Z):
+Per the re-review at run 228 (2026-08-21T19:51:46Z):
 
-1. **Keep `interval` hypothesis-bearing.** Neither `noncomputable` nor
-   `classical` marks an axiom or solves the proof obligation. The
-   `claim_reaches_one` obligation for `interval` claims is the caller's
-   responsibility.
-2. **Do not select `K = 64` yet.** The bound `K` is a certificate
-   parameter; the default value is chosen after the
-   checker/witness representation has measured CI cost. PR #55 will
-   introduce the bound; the default value will be set there.
-3. **Preserve the legacy parser only as an untrusted structural
-   decoder.** `parse_leaf_claim` decodes the structural data only;
-   the proof is the caller's job. It must not manufacture semantic
-   evidence.
-4. **`coverage_tree_soundness_cert` is a good name** — kept as the
-   companion theorem name.
-5. **Keep Scenario 8, but make its parameter `LeafCertificate depthTwoTree l`** (indexed by tree AND leaf), not an unindexed certificate.
+1. **Remove finite claims from Q3 v3 implementation, OR mark them
+   explicitly as future orbit/reduction certificates.** v3 marks them
+   as future (kept in the type for forward compatibility, but not
+   constructively inhabited under current `descend`).
+2. **PRs #53–#54 establish only the generic indexed certificate
+   interface + conditional companion theorem.** No claim that Q3
+   constructively supplies certificates for present nonempty leaves.
+3. **Finite certificates stay in the data type** (for forward
+   compatibility) with explicit note that `routed_implies_claim` is
+   not expected to be inhabitable under present `descend` except for
+   separately proved degenerate leaves.
+4. **Constructive finite-certificate work moves to a separate
+   bounded-orbit workstream** that depends on `descend_orbit_complete`
+   (PR #29) + `coverage_tree_soundness_orbit` (PR #36 spec).
+5. **ReachesOne is an unbounded existential**, not decidable.
+   Finite checkers must supply explicit bounded witnesses.
+6. **`deriving Repr, Decidable` → `deriving Repr, DecidableEq`** on
+   `LeafClaim` (`Decidable` is for `Prop`, not data types).
+7. **02c/03c lemmas are downstream orbit bridges**, not direct inputs
+   to `routed_implies_claim`.
 
-## Out of scope (unchanged from v1)
+After these scope corrections, Codex supports merging the spec.
+
+## Out of scope (unchanged from v2)
 
 1. **Actual Collatz proof.** Q3 makes the dependency explicit but does
-   not prove the Collatz theorem for any non-trivial interval. The
-   project does not have this proof; PR #49 deliberately scopes
-   around it.
+   not prove the Collatz theorem for any non-trivial interval.
 2. **`coverage_tree_soundness_orbit`** (the `sorry` from PR #36).
-   Separate orbit-aware routing workstream. Not touched by Q3.
-3. **Python oracle bridge.** Promoting
-   `tests/test_coverage_tree.py` to formal proofs requires a
-   Python↔Lean translation layer. Not in Q3 v2.
-4. **Composite certificates** (`union`, `inter`,
+   Separate orbit-aware routing workstream.
+3. **Bounded-orbit certificates.** Q3 v3 defers `.empty`,
+   `.singleton`, `.bounded` constructive certificates to a separate
+   future workstream (see § "Future workstream: bounded-orbit
+   certificates").
+4. **Python oracle bridge.** Promoting `tests/test_coverage_tree.py`
+   to formal proofs requires a Python↔Lean translation layer.
+5. **Composite certificates** (`union`, `inter`,
    `tree_of_certificates`). Deferred to Q3 follow-ups if needed.
-5. **Replacing `leafProperty : String`.** Q3 v2 adds `LeafCertificate`
-   alongside the existing field; replacing the field is a breaking
-   change that affects the Python side and tests. Deferred to Q3 v3
-   after the type stabilises.
+6. **Replacing `leafProperty : String`.** Deferred to a future Q3
+   version after the type stabilises.
 
 ## References
 
 - **PR #49** (07c-2 promotion): `29c41e0`
 - **PR #50** (lessons-learned doc): `7d42bfb`
 - **PR #51** (P2 follow-ups + scenario 8): `388b4a7`
-- **PR #52 v1** (this branch, commit `7eac993`): rejected by Codex at run 222
-- **PR #52 v2** (THIS DOC): redesigned per Codex feedback
+- **PR #52 v1** (this branch, commit `7eac993`): rejected at run 222
+- **PR #52 v2** (this branch, commit `3ac45c2`): request-changes re-review at run 228
+- **PR #52 v3** (THIS DOC): scope-corrected per re-review
+- **PR #29** (07c-4 `descend_orbit_complete`): `4a67591` — orbit-aware routing in master
+- **PR #36** (07c-2 v2 spec + `coverage_tree_soundness_orbit`): `57b6d37` — orbit-aware soundness (sorry pending)
 - **Spec parent**: `docs/story-07c-2-promotion.md` Q3 (lines 75–104)
 - **Theorem status**: `docs/theorem-status.md` row for `LeafReachesOne`
-- **Closed prerequisites**: PRs #31, #37, #38, #46, #47 (02c/03c)
-- **Out-of-scope siblings**: `coverage_tree_soundness_orbit` (PR #36
-  spec, `sorry` workstream), `descend_orbit_complete` (PR #29,
-  formally established, separate workstream)
+- **Closed prerequisites** (re-stated as downstream orbit bridges):
+  PRs #31, #37, #38, #46, #47 (02c/03c)
