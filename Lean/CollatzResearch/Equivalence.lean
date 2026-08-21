@@ -259,7 +259,8 @@ theorem acceleratedTrajectory_reaches_one_implies_standard (n m : Nat)
         show standardTrajectory n 0 = 1
         have hn : standardTrajectory n 0 = n := standardTrajectory_zero n
         rw [hn]
-        rw [← trajectory_zero]
+        have hn2 : n = trajectory n 0 := rfl
+        rw [hn2]
         exact h⟩
     | succ k =>
       -- h : trajectory n (k + 1) = 1
@@ -273,7 +274,7 @@ theorem acceleratedTrajectory_reaches_one_implies_standard (n m : Nat)
       -- Witness m' = (1 + ν₂(3n+1)) + r (forward step + inner IH witness)
       exact ⟨(1 + (3*n+1).factorization 2) + r, by
         show standardTrajectory n ((1 + (3*n+1).factorization 2) + r) = 1
-        rw [show standardTrajectory n ((1 + (3*n+1).factorization 2) + r) = standardTrajectory (standardTrajectory n (1 + (3*n+1).factorization 2)) r from standardTrajectory_compose n (1 + (3*n+1).factorization 2) r]
+        rw [← standardTrajectory_compose n (1 + (3*n+1).factorization 2) r]
         rw [acceleratedStep_equiv_standardStep n h_odd]
         rw [hr]⟩
 
