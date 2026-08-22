@@ -377,12 +377,17 @@ def parse_leaf_claim (l : CoverageLeaf) : Option LeafClaim :=
     matches `LeafClaim.WellFormed` for the `.interval` case), so
     parsed claims satisfy this field trivially.
 
-    Per v3 spec § "Design — `LeafClaim` (data) + `LeafCertificate
-    t l` (Prop)" (lines 138–165 in
-    `docs/story-q3-leaf-certificate.md`).
+    **Lean 4 note:** declared as `: Type` (not `: Prop`) because
+    the `claim` field is `Type`-valued (`LeafClaim` is data).
+    Lean 4 rejects `Type`-valued fields in `Prop`-valued
+    structures. The two obligation fields are still `Prop`s, so
+    the kernel still verifies them; only the structure's outer
+    sort changes. This is a deviation from v3 spec lines 138–165
+    in `docs/story-q3-leaf-certificate.md` — that section will
+    be updated to match the implementation in a follow-up commit.
 
     (Story Q3 / PR #54.) -/
-structure LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Prop where
+structure LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Type where
   claim : LeafClaim
   well_formed : claim.WellFormed
   routed_implies_claim :
