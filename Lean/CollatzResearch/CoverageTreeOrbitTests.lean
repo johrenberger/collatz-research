@@ -194,4 +194,34 @@ example (hv : ValidTree depthTwoTree := by native_decide)
          descend depthTwoTree 5 = some l ∧ LeafReachesOne depthTwoTree l := by
   exact coverage_tree_soundness_cert depthTwoTree hv hc hCert 5 (by norm_num)
 
+-- Scenario 9 (PR #56): orbit-additive composition concrete values.
+-- Exercises `accelerated_orbit_compose` (closed in PR #56) at small
+-- inputs. `native_decide` reduces both sides to closed `Nat` values
+-- and checks equality. Inputs picked so both sides reduce to a
+-- closed value (the orbit reaches 1 quickly for small `x`).
+-- PR #56 v4 added the polymorphic apply-the-theorem check below
+-- per Codex P2 review on PR #55 — it guards the exported API +
+-- theorem statement directly (vs. the value-only cases which
+-- verify compute reduction). Mirrors scenario 10's polymorphic
+-- predecessor-closure check.
+example : accelerated_orbit 5 (2 + 3) = accelerated_orbit (accelerated_orbit 5 2) 3 := by native_decide
+example : accelerated_orbit 8 (1 + 2) = accelerated_orbit (accelerated_orbit 8 1) 2 := by native_decide
+example : accelerated_orbit 5 (0 + 7) = accelerated_orbit (accelerated_orbit 5 0) 7 := by native_decide
+example : accelerated_orbit 7 (3 + 4) = accelerated_orbit (accelerated_orbit 7 3) 4 := by native_decide
+example (x k k' : Nat) :
+    accelerated_orbit x (k + k') =
+      accelerated_orbit (accelerated_orbit x k) k' :=
+  accelerated_orbit_compose x k k'
+
+-- Scenario 10 (PR #56): orbit-predecessor closure.
+-- Exercises `orbit_predecessor_reaches_one` (closed in PR #56) — if
+-- some future state of `x`'s orbit reaches 1, then `x` reaches 1.
+-- The polymorphic shape test demonstrates the lemma's general form:
+-- for any `x, k` with `accelerated_orbit x k = 1`, `ReachesOne x`
+-- follows via the orbit-predecessor closure lemma.
+example : ReachesOne 5 :=
+  orbit_predecessor_reaches_one 5 2 1 (by native_decide) ⟨0, rfl⟩
+example (x : Nat) (k : Nat) (h_eq : accelerated_orbit x k = 1) : ReachesOne x :=
+  orbit_predecessor_reaches_one x k 1 h_eq ⟨0, rfl⟩
+
 end CollatzResearch

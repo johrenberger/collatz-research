@@ -122,9 +122,66 @@ def accelerated_orbit : Nat → Nat → Nat
     recursive computation must fully close at concrete inputs. -/
 @[simp] theorem accelerated_orbit_zero (n : Nat) : accelerated_orbit n 0 = n := rfl
 
+/-- `@[simp]` lemma so `simp`/`rw` can unfold `accelerated_orbit n (k + 1)`
+    to `acceleratedStep (accelerated_orbit n k)` (the inductive step).
+    Companion to `accelerated_orbit_zero`. NEW Q4 v3 / PR #56 —
+    needed by `accelerated_orbit_compose` (induction on `k'` uses
+    `rw [accelerated_orbit_succ]` on both sides of the goal). -/
+@[simp] theorem accelerated_orbit_succ (n k : Nat) :
+    accelerated_orbit n (k + 1) = acceleratedStep (accelerated_orbit n k) := rfl
+
+/-- Orbit-additive composition: stepping forward by `k + k'` equals
+    stepping forward by `k` then by `k'` more. Proof by induction on
+    `k'` (the outer index, NOT `k`); the IH directly matches the
+    post-`rw` goal after both sides are unfolded with `accelerated_orbit_succ`.
+
+    This is the elementary orbit-composition lemma: stepping forward
+    by `k + k'` is the same as stepping forward by `k` then by `k'`
+    more. It is the foundation for `orbit_predecessor_reaches_one`,
+    which is in turn the "close the orbit" step of the Q4 v3 companion
+    theorem's proof. NEW Q4 v3 / PR #56 — the actual Q4 mechanism;
+    without it PR #58 cannot establish the advertised
+    `coverage_tree_soundness_orbit_cert` theorem.
+
+    (Story Q4 v3 / PR #56.) -/
+theorem accelerated_orbit_compose (x : Nat) (k k' : Nat) :
+    accelerated_orbit x (k + k') = accelerated_orbit (accelerated_orbit x k) k' := by
+  induction k' with
+  | zero =>
+    rw [Nat.add_zero, accelerated_orbit_zero]
+  | succ k' ih =>
+    rw [Nat.add_succ, accelerated_orbit_succ, accelerated_orbit_succ, ih]
+
 /-- `ReachesOne n` iff applying `acceleratedStep` repeatedly to `n`
     eventually reaches 1. (Story 07c / round-5, 07c-2.) -/
 def ReachesOne (n : Nat) : Prop := ∃ k, accelerated_orbit n k = 1
+
+/-- Orbit-predecessor closure: if some future state of `x`'s orbit
+    reaches 1, then `x` reaches 1. Built on `accelerated_orbit_compose`.
+
+    Proof sketch: given `accelerated_orbit x k = y` and `ReachesOne y`
+    (i.e., `∃ k', accelerated_orbit y k' = 1`), compose via
+    `accelerated_orbit_compose` to get `accelerated_orbit x (k + k') = 1`,
+    so `ReachesOne x`.
+
+    This is the "close the orbit" lemma: any future orbit state that
+    reaches 1 propagates reachability back to the original input.
+    NEW Q4 v3 / PR #56 — the Q4 mechanism's final composition step.
+    PR #58's `coverage_tree_soundness_orbit_cert` proof uses this
+    lemma as the closing step after `cert.claim_reaches_one` derives
+    `ReachesOne (accelerated_orbit x' k)`.
+
+    Placed after `def ReachesOne` so the `ReachesOne` references in
+    the type signature resolve; each declaration follows its
+    dependencies. PR history (v1→v2→v3 forward-reference fixes)
+    lives in the PR #56 squash-merge commit body.
+
+    (Story Q4 v3 / PR #56.) -/
+theorem orbit_predecessor_reaches_one (x : Nat) (k : Nat) (y : Nat)
+    (h_eq : accelerated_orbit x k = y) (h_reaches : ReachesOne y) :
+    ReachesOne x := by
+  obtain ⟨k', hk'⟩ := h_reaches
+  exact ⟨k + k', by rw [accelerated_orbit_compose, h_eq, hk']⟩
 
 /-- `LeafReachesOne t l` is a leaf-level semantic certificate: any
     starting `x` that descends to leaf `l` under `descend t` reaches
@@ -154,6 +211,35 @@ def descendFromOrbit : Nat → CoverageNode → Nat → Nat → Option CoverageL
 /-- Orbit-aware descent entry point. -/
 def descendOrbit (t : CoverageTree) (x : Nat) (k : Nat) : Option CoverageLeaf :=
   descendFromOrbit t.maxDepth t.root x k
+
+/-- Orbit-routing leaf-level semantic predicate, parallel to
+    `LeafReachesOne` (which is defined over the residue-only router
+    `descend`). `OrbitLeafReachesOne t l` asserts: every input `x`
+    that the orbit-aware router `descendOrbit` selects for leaf `l`
+    reaches 1 via the accelerated orbit.
+
+    This is the predicate concluded by
+    `coverage_tree_soundness_orbit_cert` (PR #58 deliverable). It is
+    **NOT** interchangeable with `LeafReachesOne t l` — the two certify
+    different routing relations (orbit-aware vs residue-only).
+
+    NEW Q4 v3 / PR #56 — required to resolve the routing-relation
+    mismatch in the v2 companion theorem (which concluded
+    `LeafReachesOne t l` over `descendOrbit` routing). The v3 spec
+    (PR #55) concludes `OrbitLeafReachesOne t l` instead, so the
+    theorem conclusion type matches the routing evidence used in
+    the proof (per Codex run-21848 P1 review on PR #55).
+
+    Placed after `def descendOrbit` (and after `def ReachesOne` via
+    the v2 fix on `orbit_predecessor_reaches_one`) so the body's
+    `descendOrbit t x 0 = some l → ReachesOne x` references resolve;
+    each declaration follows its dependencies. PR history
+    (v1→v2→v3 forward-reference fixes) lives in the PR #56
+    squash-merge commit body.
+
+    (Story Q4 v3 / PR #56.) -/
+def OrbitLeafReachesOne (t : CoverageTree) (l : CoverageLeaf) : Prop :=
+  ∀ x, descendOrbit t x 0 = some l → ReachesOne x
 
 /-- The root domain: defined INDEPENDENTLY of `descend` (per Codex P0). -/
 def rootDomain : Nat → Prop := fun n => n > 0
@@ -680,5 +766,15 @@ example :
     descendFrom 2
       (.internal 4 [(3, .internal 2 [(1, .leaf { leafId := "L2", leafProperty := "P2" })])])
       7 = some { leafId := "L2", leafProperty := "P2" } := rfl
+
+-- PR #56 compile-checked scenario: `OrbitLeafReachesOne` def unfolds
+-- correctly to `∀ x, descendOrbit t x 0 = some l → ReachesOne x`.
+-- This is the API-shape guard that the predicate type-matches the
+-- companion theorem conclusion (PR #58 deliverable) and the orbit-
+-- routing hypothesis used in the proof. Mirrors the parallel
+-- `LeafReachesOne` def (Story 07c / round-5, 07c-2) — both defs are
+-- simple lambdas whose def-equality is closed by `rfl`.
+example (t : CoverageTree) (l : CoverageLeaf) :
+    OrbitLeafReachesOne t l = ∀ x, descendOrbit t x 0 = some l → ReachesOne x := rfl
 
 end CollatzResearch
