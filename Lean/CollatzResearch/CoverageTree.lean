@@ -377,14 +377,22 @@ def parse_leaf_claim (l : CoverageLeaf) : Option LeafClaim :=
     matches `LeafClaim.WellFormed` for the `.interval` case), so
     parsed claims satisfy this field trivially.
 
-    **Lean 4 note:** declared as `: Type` (not `: Prop`) because
-    the `claim` field is `Type`-valued (`LeafClaim` is data).
-    Lean 4 rejects `Type`-valued fields in `Prop`-valued
-    structures. The two obligation fields are still `Prop`s, so
-    the kernel still verifies them; only the structure's outer
-    sort changes. This is a deviation from v3 spec lines 138–165
-    in `docs/story-q3-leaf-certificate.md` — that section will
-    be updated to match the implementation in a follow-up commit.
+    **Sort rationale (`: Type`, not `: Prop`).** The `claim` field is
+    `Type`-valued (`LeafClaim` is data). Lean 4 rejects `Type`-valued
+    fields in `: Prop`-valued structures (Prop structures cannot carry
+    data fields). The two obligation fields are still `Prop`s, so the
+    kernel still verifies them — only the structure's outer sort is
+    `Type`. This makes `LeafCertificate t l` a **proof-carrying data
+    bundle**: inspectable data (`claim`, `well_formed`) plus
+    kernel-checked proof fields (`routed_implies_claim`,
+    `claim_reaches_one`). It is **NOT** proof-irrelevant evidence;
+    the structure is intended to be constructed, pattern-matched on,
+    and projected through.
+
+    The companion theorem `coverage_tree_soundness_cert` takes
+    `(hCert : ∀ l ∈ t.leaves, verified t l → LeafCertificate t l)`
+    as an **explicit** hypothesis (no default, no `by sorry`) per
+    the project "no new sorry" discipline (PR #51 P1).
 
     (Story Q3 / PR #54.) -/
 structure LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Type where
@@ -531,10 +539,17 @@ theorem coverage_tree_soundness_full (t : CoverageTree)
     `coverage_tree_soundness_full` by composing
     `routed_implies_claim` and `claim_reaches_one`.
 
-    **Kernel-equivalent** to `coverage_tree_soundness_full`: the
-    proof is `exact (hCert l hl hver).claim_reaches_one x'
+    A **sound, typed refinement** of `coverage_tree_soundness_full`:
+    the proof is `exact (hCert l hl hver).claim_reaches_one x'
     ((hCert l hl hver).routed_implies_claim x' hdesc')` — no
-    axioms, no `sorry`.
+    axioms, no `sorry`. The new `hCert` hypothesis is **strictly
+    stronger** than `coverage_tree_soundness_full`'s `hLeaf` (a
+    `LeafCertificate t l` factors through `LeafReachesOne t l` via
+    `claim_reaches_one ∘ routed_implies_claim`; the reverse is not
+    supplied and generally cannot construct a well-formed claim plus
+    its all-claim reachability proof from `hLeaf` alone). PR #54
+    does **NOT** establish any new global or per-leaf Collatz
+    reachability result.
 
     **Easier to audit** — the two obligations are explicit at the
     call site, the certificate is data (with kernel-checked proof

@@ -98,4 +98,23 @@ example : (LeafClaim.bounded 10).Holds 10 = True := by
 example : (LeafClaim.bounded 10).Holds 11 = False := by
   native_decide
 
+/-- Scenario 14 (Q3 / PR #54 P2 — API-shape regression).
+    `LeafCertificate` is intentionally `: Type`-valued (a proof-carrying
+    data bundle), NOT `: Prop`. The `claim : LeafClaim` data field
+    cannot live in a `: Prop` structure (Lean 4 elaboration rejects
+    `Type`-valued fields in `Prop`-valued structures). This `#check`
+    documents the current sort for CI-side reviewers; if a future PR
+    flips the sort back to `: Prop`, the elaboration error surfaces in
+    CI on this line, and any scenario that constructs a `LeafCertificate`
+    value below will fail to compile.
+
+    Expected `#check` output:
+    `LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Type`
+
+    Companion guard: the structural `decide`-based instance
+    `LeafClaim.Holds.decidable` (scenarios 6–13) shows that the
+    data-side obligations remain kernel-checked even though the
+    enclosing structure is `: Type`-valued. -/
+#check @LeafCertificate
+
 end CollatzResearch
