@@ -199,10 +199,19 @@ example (hv : ValidTree depthTwoTree := by native_decide)
 -- inputs. `native_decide` reduces both sides to closed `Nat` values
 -- and checks equality. Inputs picked so both sides reduce to a
 -- closed value (the orbit reaches 1 quickly for small `x`).
+-- PR #56 v4 added the polymorphic apply-the-theorem check below
+-- per Codex P2 review on PR #55 — it guards the exported API +
+-- theorem statement directly (vs. the value-only cases which
+-- verify compute reduction). Mirrors scenario 10's polymorphic
+-- predecessor-closure check.
 example : accelerated_orbit 5 (2 + 3) = accelerated_orbit (accelerated_orbit 5 2) 3 := by native_decide
 example : accelerated_orbit 8 (1 + 2) = accelerated_orbit (accelerated_orbit 8 1) 2 := by native_decide
 example : accelerated_orbit 5 (0 + 7) = accelerated_orbit (accelerated_orbit 5 0) 7 := by native_decide
 example : accelerated_orbit 7 (3 + 4) = accelerated_orbit (accelerated_orbit 7 3) 4 := by native_decide
+example (x k k' : Nat) :
+    accelerated_orbit x (k + k') =
+      accelerated_orbit (accelerated_orbit x k) k' :=
+  accelerated_orbit_compose x k k'
 
 -- Scenario 10 (PR #56): orbit-predecessor closure.
 -- Exercises `orbit_predecessor_reaches_one` (closed in PR #56) — if

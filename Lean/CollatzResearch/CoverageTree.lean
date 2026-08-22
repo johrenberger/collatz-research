@@ -171,17 +171,10 @@ def ReachesOne (n : Nat) : Prop := ∃ k, accelerated_orbit n k = 1
     lemma as the closing step after `cert.claim_reaches_one` derives
     `ReachesOne (accelerated_orbit x' k)`.
 
-    Placed AFTER `def ReachesOne` so the `ReachesOne` references in
-    the type signature resolve; PR #56 v1 had this block BEFORE
-    `def ReachesOne`, breaking the file with cascading errors:
-    `Function expected at ReachesOne` at the type signature (lines
-    172:52 + 173:4), cascading `Unknown identifier descendOrbit`
-    at line 212:7 (downstream of the failed `?m.1` for `ReachesOne`
-    turning every later LeafReachesOne/descendOrbit reference into
-    a metavariable), and `Type mismatch` on the
-    `OrbitLeafReachesOne t l = ... = rfl` def-equality scenario
-    (line 766:81, where `rfl` couldn't unify `?m.8 = ?m.8` against
-    the expected `OrbitLeafReachesOne t l = ...` equation).
+    Placed after `def ReachesOne` so the `ReachesOne` references in
+    the type signature resolve; each declaration follows its
+    dependencies. PR history (v1→v2→v3 forward-reference fixes)
+    lives in the PR #56 squash-merge commit body.
 
     (Story Q4 v3 / PR #56.) -/
 theorem orbit_predecessor_reaches_one (x : Nat) (k : Nat) (y : Nat)
@@ -237,18 +230,12 @@ def descendOrbit (t : CoverageTree) (x : Nat) (k : Nat) : Option CoverageLeaf :=
     theorem conclusion type matches the routing evidence used in
     the proof (per Codex run-21848 P1 review on PR #55).
 
-    Placed AFTER `def descendOrbit` (and AFTER `def ReachesOne` via
+    Placed after `def descendOrbit` (and after `def ReachesOne` via
     the v2 fix on `orbit_predecessor_reaches_one`) so the body's
-    `descendOrbit t x 0 = some l → ReachesOne x` references both
-    resolve. PR #56 v2 had this block between `LeafReachesOne` and
-    `descendFromOrbit`, breaking the file with cascading errors:
-    `Unknown identifier descendOrbit` at the body (line 224:7 in
-    v2, `?m.1` for `descendOrbit` leaking into the RHS of the
-    def-equality scenario), and `Type mismatch` on the
-    `OrbitLeafReachesOne t l = ... = rfl` def-equality scenario
-    (line 778:81 in v2, where `rfl` couldn't unify `?m.8 = ?m.8`
-    against the expected equation because `descendOrbit` and
-    `ReachesOne` were metavariables).
+    `descendOrbit t x 0 = some l → ReachesOne x` references resolve;
+    each declaration follows its dependencies. PR history
+    (v1→v2→v3 forward-reference fixes) lives in the PR #56
+    squash-merge commit body.
 
     (Story Q4 v3 / PR #56.) -/
 def OrbitLeafReachesOne (t : CoverageTree) (l : CoverageLeaf) : Prop :=
