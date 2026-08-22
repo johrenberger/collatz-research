@@ -172,25 +172,26 @@ example (hv : ValidTree depthTwoTree := by native_decide)
 -- (Implicit in `hx : 0 < x`.)
 
 -- Scenario 8: Compile-checked regression example for
--- `coverage_tree_soundness_full` (public-facing name: "conditional
--- semantic-leaf soundness"). Demonstrates the argument order and
--- the conditional `LeafReachesOne` certificate boundary. The `hLeaf`
--- parameter is **explicit** (no default `by sorry`) — this preserves
--- the project's "no new sorry" discipline while still compile-checking
--- the API surface. The per-leaf semantic certificate construction is
--- the next substantive workstream (Q3 per
--- `docs/story-07c-2-promotion.md` Q3).
+-- `coverage_tree_soundness_cert` (Story Q3 / PR #54). Demonstrates
+-- the typed `LeafCertificate depthTwoTree l` (indexed by tree AND
+-- leaf) certificate parameter and the argument order. The `hCert`
+-- parameter is **explicit** (no default) — preserves the project's
+-- "no new sorry" discipline (PR #51 P1) while still compile-checking
+-- the public API surface. The per-leaf semantic certificate
+-- construction (i.e., the actual proofs of `routed_implies_claim`
+-- and `claim_reaches_one`) is the next substantive workstream
+-- (Q3 follow-up per `docs/story-q3-leaf-certificate.md`).
 -- Added in PR #51 per Codex P2 (Codex review at PR #49 run 191,
--- 2026-08-21T13:48:47Z). Adjusted in PR #51 follow-up per Codex P1
--- (PR #51 run 196, 2026-08-21T16:21:58Z) — remove the `by sorry`
--- default so the example is a true API-boundary regression, not an
--- admitted proof in a compiled module.
+-- 2026-08-21T13:48:47Z). Updated in PR #54 to use the typed
+-- `LeafCertificate` Prop instead of the opaque `LeafReachesOne`
+-- hypothesis (per v3 spec § "Scenario 8 update" lines 196–217
+-- in `docs/story-q3-leaf-certificate.md`).
 example (hv : ValidTree depthTwoTree := by native_decide)
     (hc : IsComplete depthTwoTree := by native_decide)
-    (hLeaf : ∀ l ∈ depthTwoTree.leaves, verified depthTwoTree l →
-             LeafReachesOne depthTwoTree l) :
+    (hCert : ∀ l ∈ depthTwoTree.leaves, verified depthTwoTree l →
+             LeafCertificate depthTwoTree l) :
     ∃ l, l ∈ depthTwoTree.leaves ∧ verified depthTwoTree l ∧
          descend depthTwoTree 5 = some l ∧ LeafReachesOne depthTwoTree l := by
-  exact coverage_tree_soundness_full depthTwoTree hv hc hLeaf 5 (by norm_num)
+  exact coverage_tree_soundness_cert depthTwoTree hv hc hCert 5 (by norm_num)
 
 end CollatzResearch
