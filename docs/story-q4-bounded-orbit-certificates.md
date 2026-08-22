@@ -126,12 +126,24 @@ instance IsFiniteClaim.decidable : (c : LeafClaim) → Decidable (IsFiniteClaim 
   | .bounded _ => inferInstance
   | .interval _ _ _ => inferInstance
 
-/-- Structural lifting: a `FiniteOrbitClaim` always corresponds to a
-    `LeafClaim` that satisfies `IsFiniteClaim`. -/
-def toLeafClaim : FiniteOrbitClaim → LeafClaim
-  | .empty => .empty
-  | .singleton n => .singleton n
-  | .bounded K => .bounded K
+/-- Trivial well-formedness predicate on `FiniteOrbitClaim`: every
+    value is well-formed by construction (the type only contains finite
+    constructors). The predicate is kept for symmetry with Q3 v4
+    `LeafCertificate.WellFormed` (which is non-trivial for `.interval`
+    claims) and for future structural guards if needed, e.g.,
+    `K > 0` for `.bounded K` claims.
+
+    For `LeafClaim` values, the `IsFiniteClaim` predicate (defined
+    above) discriminates finite vs interval shapes. The two predicates
+    serve different concerns: `IsFinite` is the per-certificate
+    well-formedness guard (always `True` for `FiniteOrbitClaim`);
+    `IsFiniteClaim` discriminates `LeafClaim` values that come from
+    external sources (parsers, deserializers). -/
+def IsFinite : FiniteOrbitClaim → Prop
+  | _ => True
+
+instance IsFinite.decidable : (c : FiniteOrbitClaim) → Decidable c.IsFinite
+  | _ => inferInstance
 
 end FiniteOrbitClaim
 ```
@@ -177,9 +189,11 @@ proof fields are consistent with the data field.
     finite claims constructively inhabitable under `descendOrbit`.
 
     **Three obligation fields:**
-    1. `wellFormed : True` — trivially discharged (every `FiniteOrbitClaim`
-       is well-formed by construction; the field is kept for future
-       structural guards if needed, e.g., `K > 0` for `.bounded K`).
+    1. `wellFormed : claim.IsFinite` — trivially discharged (every
+       `FiniteOrbitClaim` value satisfies `IsFinite` by construction;
+       the field is kept for symmetry with Q3 v4 `LeafCertificate.WellFormed`
+       and for future structural guards if needed, e.g., `K > 0` for
+       `.bounded K`).
     2. `orbit_hits_claim`: every input routed (orbit-aware) to `l`
        reaches an orbit state satisfying the claim. (Routing-to-orbit-state
        obligation.) This is the field where the Q4 mechanism lives.
@@ -194,7 +208,7 @@ proof fields are consistent with the data field.
     project "no new sorry" discipline (PR #51 P1). -/
 structure BoundedOrbitCertificate (t : CoverageTree) (l : CoverageLeaf) : Type where
   claim : FiniteOrbitClaim
-  wellFormed : True
+  wellFormed : claim.IsFinite
   orbit_hits_claim :
     ∀ x, descendOrbit t x 0 = some l →
       ∃ k, claim.Holds (accelerated_orbit x k)
@@ -203,9 +217,11 @@ structure BoundedOrbitCertificate (t : CoverageTree) (l : CoverageLeaf) : Type w
 ```
 
 **Sort rationale (`: Type`, not `: Prop`).** Same as Q3 v4: the `claim`
-data field forces `: Type`. The mandatory `wellFormed : True` field is
-a placeholder for future structural guards (e.g., requiring `.bounded K`
-to have `K > 0`); it is trivially discharged today.
+data field forces `: Type`. The mandatory `wellFormed : claim.IsFinite`
+field is a trivial guard today (every `FiniteOrbitClaim` value satisfies
+`IsFinite` by construction); the field is kept for symmetry with Q3 v4
+`LeafCertificate.WellFormed` and for future structural guards if needed
+(e.g., requiring `.bounded K` to have `K > 0`).
 
 **Why no `K : Nat` data field?** Q4 v1 had `K : Nat` as a separate
 data field with `orbit_image_bound : claim matches .bounded K' → K' = K`
