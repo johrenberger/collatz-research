@@ -19,11 +19,12 @@ compile-checked regression on the explicit-parameter API, merged
 2026-08-21 at `388b4a7`).
 
 Q3 replaces the opaque `LeafReachesOne` claim with a typed
-**indexed** `LeafCertificate t l` Prop whose two obligations make the
-proof structure explicit. v3 narrows Q3 to delivering only the
-**infrastructure** — the data type, the indexed Prop, and the
-companion theorem — plus the `.interval` claim shape, whose
-`routed_implies_claim` is provable from current `Sat` semantics.
+**indexed** `LeafCertificate t l` (Type-valued proof-carrying data
+bundle) whose two obligation fields make the proof structure
+explicit. v3 narrows Q3 to delivering only the **infrastructure** —
+the data type, the indexed structure, and the companion theorem —
+plus the `.interval` claim shape, whose `routed_implies_claim` is
+provable from current `Sat` semantics.
 
 The finite claims (`.empty`, `.singleton`, `.bounded`) are
 **deliberately deferred** to a separate orbit-aware workstream,
@@ -53,15 +54,23 @@ leaf is therefore **periodic** (every residue class mod `2^k` contains
 infinitely many positive integers). This is the model boundary that
 forces the v3 scope correction.
 
-## Design — `LeafClaim` (data) + `LeafCertificate t l` (Prop)
+## Design — `LeafClaim` (data) + `LeafCertificate t l` (Type, proof-carrying data bundle)
 
 Q3 splits the certificate into two parts:
 
 - **`LeafClaim`**: pure data — the structural description of which
   inputs are claimed to reach the leaf. Equality-comparable,
   serializable, containable in `leafProperty : String`.
-- **`LeafCertificate t l`**: a `Prop` indexed by tree `t` AND leaf `l`,
-  carrying **two distinct obligations** as fields.
+- **`LeafCertificate t l`**: a `Type`-valued **proof-carrying data
+  bundle** indexed by tree `t` AND leaf `l`. The `claim : LeafClaim`
+  data field forces the structure to live in `Type` (Lean 4
+  elaboration rejects `Type`-valued fields in `: Prop`-valued
+  structures; a record declared `: Prop` carrying a `Type`-valued
+  field will not compile). The structure carries **two distinct
+  obligation proofs** as `Prop`-valued fields; the kernel still
+  verifies both. The bundle is inspectable data plus kernel-checked
+  proof fields — it is NOT proof-irrelevant evidence and is intended
+  to be constructed, pattern-matched on, and projected through.
 
 ### `LeafClaim` (data, equality-comparable)
 
@@ -105,31 +114,55 @@ instance LeafClaim.Holds.decidable (c : LeafClaim) (x : Nat) :
 `LeafClaim.Holds` decidability instance is derived separately (as
 shown above) via case analysis.
 
-### `LeafCertificate t l` (Prop, indexed, two obligations)
+### `LeafCertificate t l` (Type, proof-carrying data bundle, indexed by tree AND leaf)
 
 ```lean
 /-- A structured certificate that a leaf `l` in tree `t` carries to
-    prove `LeafReachesOne t l`. Two distinct obligations:
+    prove `LeafReachesOne t l`. Three components:
 
-    1. `routed_implies_claim`: every input routed to `l` satisfies
-       the claim. (Routing-to-claim obligation.)
-    2. `claim_reaches_one`: every input satisfying the claim
-       reaches 1. (Reachability obligation.)
+    1. `claim : LeafClaim` — data describing which inputs are claimed.
+    2. `well_formed : claim.WellFormed` — proof that the claim is
+       structurally valid (mandatory field; prevents `.interval 0 0 0`,
+       `.interval 2 2 1`, etc. from slipping through).
+    3. `routed_implies_claim` — routing-to-claim obligation: every
+       input routed to `l` satisfies the claim.
+    4. `claim_reaches_one` — reachability obligation: every input
+       satisfying the claim reaches 1.
 
-    Composing these gives `LeafReachesOne t l`. -/
-structure LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Prop where
+    Composing the two obligation proofs gives `LeafReachesOne t l`.
+
+    Declared as `: Type` (not `: Prop`) because `claim : LeafClaim`
+    is a data field; Lean 4 rejects `Type`-valued fields in
+    `: Prop`-valued structures. The two obligation fields are still
+    `Prop`s, so the kernel still verifies them — only the structure's
+    outer sort is `Type`. This makes `LeafCertificate t l` a
+    proof-carrying data bundle. -/
+structure LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Type where
   claim : LeafClaim
+  well_formed : claim.WellFormed
   routed_implies_claim :
     ∀ x, descend t x = some l → claim.Holds x
   claim_reaches_one :
     ∀ x, claim.Holds x → ReachesOne x
 ```
 
-**No `Decidable LeafCertificate`**: the certificate is a `Prop` with
-universal-function fields. We do not promise a `Decidable` instance
-(per re-review P2); a separate checker (Python or Lean tool) can
-verify finite witnesses for bounded claims via `BoundedOrbitCertificate`
-in the future orbit workstream.
+**Sort rationale (`: Type`, not `: Prop`).** The v3 spec originally
+declared `LeafCertificate t l : Prop`. PR #54 implementation
+discovered that Lean 4 elaboration rejects `Type`-valued fields in
+`: Prop`-valued structures — a `Prop`-valued record carrying
+`claim : LeafClaim` (a `Type`) will not compile. The structure was
+flipped to `: Type` so the data field is legal. Codex review at
+PR #54 run 21786 (2026-08-22T12:45:01Z) confirmed this is a real
+Lean 4 elaboration limitation, not a bug — the two obligation
+fields are still `Prop`s, and the kernel still verifies them. The
+sort change is reflected throughout the spec at PR #54 v3.
+
+**No `Decidable LeafCertificate`**: `LeafCertificate t l` is
+`: Type`-valued; the structure is constructible on demand (the
+caller supplies all fields explicitly). Its `Prop`-valued obligation
+fields are kernel-checked at the call site. A separate checker
+(Python or Lean tool) can verify finite witnesses for bounded claims
+via `BoundedOrbitCertificate` in the future orbit workstream.
 
 ## Why finite claims are out of Q3 scope (the v3 scope correction)
 
@@ -198,12 +231,20 @@ must never manufacture semantic evidence.
 
 ```lean
 /-- Variant of `coverage_tree_soundness_full` where the per-leaf
-    certificate is the typed `LeafCertificate t l` Prop (indexed by
-    tree AND leaf) rather than an opaque `LeafReachesOne` claim.
+    certificate is the typed `LeafCertificate t l` `: Type`-valued
+    proof-carrying data bundle (indexed by tree AND leaf) rather than
+    an opaque `LeafReachesOne` claim.
 
-    **Kernel-equivalent** to `coverage_tree_soundness_full`: the
-    proof composes `routed_implies_claim` and `claim_reaches_one`
-    to derive `LeafReachesOne t l`.
+    A **sound, typed refinement** of `coverage_tree_soundness_full`:
+    the proof composes `routed_implies_claim` and `claim_reaches_one`
+    to derive `LeafReachesOne t l`. The new `hCert` hypothesis is
+    **strictly stronger** than `coverage_tree_soundness_full`'s
+    `hLeaf` (a `LeafCertificate t l` factors through
+    `LeafReachesOne t l` via `claim_reaches_one ∘ routed_implies_claim`;
+    the reverse is not supplied and generally cannot construct a
+    well-formed claim plus its all-claim reachability proof from
+    `hLeaf` alone). PR #54 does **NOT** establish any new global or
+    per-leaf Collatz reachability result.
 
     **Q3 v3 scope:** the theorem is universally quantified over
     `LeafClaim` shapes. For `.interval` claims,
@@ -306,7 +347,7 @@ the bounded-orbit workstream adds orbit-image bounds.
 | PR | Scope | Lean CI |
 |---|---|---|
 | **#53** | `LeafClaim` data type + `LeafClaim.Holds` + `parse_leaf_claim` + `DecidableEq` + `LeafClaim.Holds.decidable` instance | Yes |
-| **#54** | `LeafCertificate t l` Prop + `coverage_tree_soundness_cert` + scenario 8 update (indexed cert) | Yes |
+| **#54** | `LeafCertificate t l` (`: Type`-valued) + `coverage_tree_soundness_cert` + scenario 8 update (indexed cert) | Yes |
 | ~~**#55**~~ | ~~Constructive proofs for `.bounded K`~~ — **REMOVED** from Q3 v3; moved to bounded-orbit workstream | — |
 | **#56** | Lessons-learned doc (if notable patterns emerge from PRs #53–54) | No |
 
@@ -345,8 +386,9 @@ structure BoundedOrbitCertificate (t : CoverageTree) (l : CoverageLeaf) : Prop w
 ```
 
 The Q3 v3 implementation does not deliver this. It is sketched here
-so the data type (`LeafClaim`) and Prop (`LeafCertificate t l`) can
-accommodate it without breaking changes.
+so the data type (`LeafClaim`) and the `: Type`-valued proof-carrying
+data bundle (`LeafCertificate t l`) can accommodate it without
+breaking changes.
 
 ## Codex decisions acknowledged
 

@@ -354,6 +354,55 @@ def parse_leaf_claim (l : CoverageLeaf) : Option LeafClaim :=
     else none
   | none => none
 
+/-- A structured certificate that a leaf `l` in tree `t` carries
+    to prove `LeafReachesOne t l`. The certificate has two
+    distinct obligations:
+
+    1. `routed_implies_claim`: every input routed to `l` satisfies
+       the claim. (Routing-to-claim obligation.)
+    2. `claim_reaches_one`: every input satisfying the claim
+       reaches 1. (Reachability obligation.)
+
+    Composing these gives `LeafReachesOne t l`.
+
+    The `well_formed` field enforces `LeafClaim.WellFormed` so
+    that direct construction of `.interval 0 0 0` or `.interval
+    2 2 1` etc. cannot slip through as a purported certificate.
+    Per Codex P2 at PR #53 review run 199
+    (2026-08-22T00:13:50Z): "Define a claim well-formedness
+    predicate before PR #54" — now enforced as a mandatory field.
+
+    `parse_leaf_claim` already produces well-formed claims (it
+    gates on the existing `WellFormed l` predicate, which
+    matches `LeafClaim.WellFormed` for the `.interval` case), so
+    parsed claims satisfy this field trivially.
+
+    **Sort rationale (`: Type`, not `: Prop`).** The `claim` field is
+    `Type`-valued (`LeafClaim` is data). Lean 4 rejects `Type`-valued
+    fields in `: Prop`-valued structures (Prop structures cannot carry
+    data fields). The two obligation fields are still `Prop`s, so the
+    kernel still verifies them — only the structure's outer sort is
+    `Type`. This makes `LeafCertificate t l` a **proof-carrying data
+    bundle**: inspectable data (`claim`, `well_formed`) plus
+    kernel-checked proof fields (`routed_implies_claim`,
+    `claim_reaches_one`). It is **NOT** proof-irrelevant evidence;
+    the structure is intended to be constructed, pattern-matched on,
+    and projected through.
+
+    The companion theorem `coverage_tree_soundness_cert` takes
+    `(hCert : ∀ l ∈ t.leaves, verified t l → LeafCertificate t l)`
+    as an **explicit** hypothesis (no default, no `by sorry`) per
+    the project "no new sorry" discipline (PR #51 P1).
+
+    (Story Q3 / PR #54.) -/
+structure LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Type where
+  claim : LeafClaim
+  well_formed : claim.WellFormed
+  routed_implies_claim :
+    ∀ x, descend t x = some l → claim.Holds x
+  claim_reaches_one :
+    ∀ x, claim.Holds x → ReachesOne x
+
 /-- Structural alignment: every leaf's declared `period` matches the
     modulus of its parent internal node at the leaf's depth. Captures
     the invariant needed for `descendOrbit` to imply `SatOrbit`.
@@ -480,6 +529,49 @@ theorem coverage_tree_soundness_full (t : CoverageTree)
   refine ⟨l, hl, hver, hdesc, ?_⟩
   intro x' hdesc'
   exact hLeaf l hl hver x' hdesc'
+
+/-- Typed-certificate variant of `coverage_tree_soundness_full`
+    (Story Q3 / PR #54).
+
+    Takes an indexed `LeafCertificate t l` (with mandatory
+    `well_formed` field per Codex P2 at PR #53 review run 199)
+    per verified leaf, and produces the same conclusion as
+    `coverage_tree_soundness_full` by composing
+    `routed_implies_claim` and `claim_reaches_one`.
+
+    A **sound, typed refinement** of `coverage_tree_soundness_full`:
+    the proof is `exact (hCert l hl hver).claim_reaches_one x'
+    ((hCert l hl hver).routed_implies_claim x' hdesc')` — no
+    axioms, no `sorry`. The new `hCert` hypothesis is **strictly
+    stronger** than `coverage_tree_soundness_full`'s `hLeaf` (a
+    `LeafCertificate t l` factors through `LeafReachesOne t l` via
+    `claim_reaches_one ∘ routed_implies_claim`; the reverse is not
+    supplied and generally cannot construct a well-formed claim plus
+    its all-claim reachability proof from `hLeaf` alone). PR #54
+    does **NOT** establish any new global or per-leaf Collatz
+    reachability result.
+
+    **Easier to audit** — the two obligations are explicit at the
+    call site, the certificate is data (with kernel-checked proof
+    witnesses), and the mandatory `well_formed` field prevents
+    malformed `.interval` claims from slipping through as
+    purported certificates.
+
+    Per v3 spec § "API integration" (lines 167–217 in
+    `docs/story-q3-leaf-certificate.md`).
+
+    (Story Q3 / PR #54.) -/
+theorem coverage_tree_soundness_cert (t : CoverageTree)
+    (hv : ValidTree t) (hic : IsComplete t)
+    (hCert : ∀ l ∈ t.leaves, verified t l → LeafCertificate t l)
+    (x : Nat) (hx : x > 0) :
+    ∃ l, l ∈ t.leaves ∧ verified t l ∧ descend t x = some l ∧
+         LeafReachesOne t l := by
+  obtain ⟨l, hl, hver, hdesc⟩ := coverage_tree_soundness t hv hic x hx
+  refine ⟨l, hl, hver, hdesc, ?_⟩
+  intro x' hdesc'
+  exact (hCert l hl hver).claim_reaches_one x'
+         ((hCert l hl hver).routed_implies_claim x' hdesc')
 
 /-- Orbit-aware soundness for `CoverageTree` (Story 07c / round-5, 07c-3).
 

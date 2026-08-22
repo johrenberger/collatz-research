@@ -98,4 +98,31 @@ example : (LeafClaim.bounded 10).Holds 10 = True := by
 example : (LeafClaim.bounded 10).Holds 11 = False := by
   native_decide
 
+/-- Scenario 14 (Q3 / PR #54 v4 P2 — API-shape regression; replaces
+    the v3 `#check @LeafCertificate` which only printed the sort
+    rather than guarding it).
+
+    `LeafCertificate` is intentionally `: Type`-valued (a proof-carrying
+    data bundle), NOT `: Prop`. The `claim : LeafClaim` data field
+    cannot live in a `: Prop` structure (Lean 4 elaboration rejects
+    `Type`-valued fields in `Prop`-valued structures; even if it did
+    compile, the field could not be eliminated to `Type`).
+
+    This `def` performs a `Prop → Type` elimination by projecting
+    `c.claim : LeafClaim` out of a `LeafCertificate t l`. A future PR
+    flipping the sort to `: Prop` will fail to typecheck this def —
+    you cannot project a `Type`-valued field out of a `Prop`-valued
+    structure (no dependent elimination from `Prop` into `Type`).
+
+    Companion guard: the structural `decide`-based instance
+    `LeafClaim.Holds.decidable` (scenarios 6–13) shows that the
+    data-side obligations remain kernel-checked even though the
+    enclosing structure is `: Type`-valued.
+
+    Per Codex P2 at PR #54 re-review run 21819
+    (2026-08-22T13:02:38Z): "`#check` alone is documentation." -/
+def certificateClaim {t : CoverageTree} {l : CoverageLeaf}
+    (c : LeafCertificate t l) : LeafClaim :=
+  c.claim
+
 end CollatzResearch
