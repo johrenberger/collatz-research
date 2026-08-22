@@ -239,20 +239,23 @@ def SatOrbit (_t : CoverageTree) (x : Nat) (l : CoverageLeaf) : Prop :=
     the claim holds for the routed inputs (and that every claimed
     input reaches 1) is in `LeafCertificate` (PR #54).
 
-    **Q3 v3 scope:** only the `.interval` constructor is
-    constructively inhabited under current `descend` semantics
-    (residue-only routing). The other constructors (`.empty`,
-    `.singleton`, `.bounded`) are kept in the type for forward
-    compatibility with the bounded-orbit workstream (depends on
-    `descend_orbit_complete` from PR #29 + `coverage_tree_soundness_orbit`
-    from PR #36 spec). See `docs/story-q3-leaf-certificate.md`
+    **Q3 v3 scope:** `.interval` is the only **structurally
+    plausible claim shape** under current `descend` semantics
+    (residue-only routing), pending a dedicated alignment
+    invariant that will be defined in PR #54. The other
+    constructors (`.empty`, `.singleton`, `.bounded`) are kept
+    in the type for forward compatibility with the
+    bounded-orbit workstream (depends on `descend_orbit_complete`
+    from PR #29 + `coverage_tree_soundness_orbit` from PR #36
+    spec). See `docs/story-q3-leaf-certificate.md`
     § "Why finite claims are out of Q3 scope".
 
-    Constructive `routed_implies_claim` for these other
-    constructors is intentionally NOT attempted in this PR — the
-    current `descend` semantics produce infinite preimages for
-    nonempty leaves, so the structural proof obligation cannot be
-    discharged.
+    No `routed_implies_claim` proof exists for any claim shape
+    yet — the structural `descend t x = some l → claim.Holds x`
+    obligation requires an alignment invariant that is not yet
+    formalized. Finite claims (`.empty`, `.singleton`,
+    `.bounded`) additionally require the future orbit-reduction
+    relation (`descendOrbit` + bounded orbit images).
 
     (Story Q3 / PR #53.) -/
 inductive LeafClaim where
@@ -287,6 +290,39 @@ instance Holds.decidable (c : LeafClaim) (x : Nat) :
   | bounded K => exact (inferInstance : Decidable (x ≤ K))
   | interval period lo hi =>
     exact (inferInstance : Decidable (lo ≤ x % period ∧ x % period ≤ hi))
+
+/-- Well-formedness for a `LeafClaim` (data-level invariant):
+    - `.empty`, `.singleton n`, `.bounded K` are always well-formed.
+    - `.interval period lo hi` requires `period > 0 ∧ lo ≤ hi ∧ hi < period`
+      (same conjunction as the existing `WellFormed` predicate on
+      `CoverageLeaf`, kept in sync).
+
+    `parse_leaf_claim` already enforces this invariant via the
+    existing `WellFormed l` guard (so parsed claims satisfy
+    `LeafClaim.WellFormed`), but the public `LeafClaim` constructor
+    still permits malformed values like `.interval 0 0 0` or
+    `.interval 2 2 1` to be constructed directly. The forthcoming
+    `LeafCertificate t l` Prop (PR #54) should require
+    `LeafClaim.WellFormed` as an explicit field so that a certificate
+    cannot carry a malformed/noncanonical claim.
+
+    Per Codex P2 at PR #53 review run 199 (2026-08-22T00:13:50Z):
+    "Define a claim well-formedness predicate before PR #54."
+
+    (Story Q3 / PR #53 v2.) -/
+def WellFormed : LeafClaim → Prop
+  | .empty => True
+  | .singleton _ => True
+  | .bounded _ => True
+  | .interval period lo hi => period > 0 ∧ lo ≤ hi ∧ hi < period
+
+instance WellFormed.decidable (c : LeafClaim) : Decidable c.WellFormed := by
+  cases c with
+  | empty => exact (inferInstance : Decidable True)
+  | singleton _ => exact (inferInstance : Decidable True)
+  | bounded _ => exact (inferInstance : Decidable True)
+  | interval period lo hi =>
+    exact (inferInstance : Decidable (period > 0 ∧ lo ≤ hi ∧ hi < period))
 
 end LeafClaim
 
