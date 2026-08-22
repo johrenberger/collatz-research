@@ -152,6 +152,10 @@ theorem accelerated_orbit_compose (x : Nat) (k k' : Nat) :
   | succ k' ih =>
     rw [Nat.add_succ, accelerated_orbit_succ, accelerated_orbit_succ, ih]
 
+/-- `ReachesOne n` iff applying `acceleratedStep` repeatedly to `n`
+    eventually reaches 1. (Story 07c / round-5, 07c-2.) -/
+def ReachesOne (n : Nat) : Prop := ∃ k, accelerated_orbit n k = 1
+
 /-- Orbit-predecessor closure: if some future state of `x`'s orbit
     reaches 1, then `x` reaches 1. Built on `accelerated_orbit_compose`.
 
@@ -167,16 +171,24 @@ theorem accelerated_orbit_compose (x : Nat) (k k' : Nat) :
     lemma as the closing step after `cert.claim_reaches_one` derives
     `ReachesOne (accelerated_orbit x' k)`.
 
+    Placed AFTER `def ReachesOne` so the `ReachesOne` references in
+    the type signature resolve; PR #56 v1 had this block BEFORE
+    `def ReachesOne`, breaking the file with cascading errors:
+    `Function expected at ReachesOne` at the type signature (lines
+    172:52 + 173:4), cascading `Unknown identifier descendOrbit`
+    at line 212:7 (downstream of the failed `?m.1` for `ReachesOne`
+    turning every later LeafReachesOne/descendOrbit reference into
+    a metavariable), and `Type mismatch` on the
+    `OrbitLeafReachesOne t l = ... = rfl` def-equality scenario
+    (line 766:81, where `rfl` couldn't unify `?m.8 = ?m.8` against
+    the expected `OrbitLeafReachesOne t l = ...` equation).
+
     (Story Q4 v3 / PR #56.) -/
 theorem orbit_predecessor_reaches_one (x : Nat) (k : Nat) (y : Nat)
     (h_eq : accelerated_orbit x k = y) (h_reaches : ReachesOne y) :
     ReachesOne x := by
   obtain ⟨k', hk'⟩ := h_reaches
   exact ⟨k + k', by rw [accelerated_orbit_compose, h_eq, hk']⟩
-
-/-- `ReachesOne n` iff applying `acceleratedStep` repeatedly to `n`
-    eventually reaches 1. (Story 07c / round-5, 07c-2.) -/
-def ReachesOne (n : Nat) : Prop := ∃ k, accelerated_orbit n k = 1
 
 /-- `LeafReachesOne t l` is a leaf-level semantic certificate: any
     starting `x` that descends to leaf `l` under `descend t` reaches
