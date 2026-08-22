@@ -201,6 +201,24 @@ theorem orbit_predecessor_reaches_one (x : Nat) (k : Nat) (y : Nat)
 def LeafReachesOne (t : CoverageTree) (l : CoverageLeaf) : Prop :=
   ∀ x, descend t x = some l → ReachesOne x
 
+/-- Orbit-aware descent: at each internal level, the residue lookup
+    uses `accelerated_orbit x k % m` instead of `x % m`, where `k` is
+    the depth index (incremented at each internal step). Structural
+    recursion matches `descendFrom`; only the residue computation is
+    orbit-aware. (Story 07c / round-5, 07c-3.) -/
+def descendFromOrbit : Nat → CoverageNode → Nat → Nat → Option CoverageLeaf
+  | _, .leaf l, _, _ => some l
+  | 0, .internal _ _, _, _ => none
+  | depth + 1, .internal m children, x, k =>
+    let r := accelerated_orbit x k % m
+    match children.lookup r with
+    | some child => descendFromOrbit depth child x (k + 1)
+    | none => none
+
+/-- Orbit-aware descent entry point. -/
+def descendOrbit (t : CoverageTree) (x : Nat) (k : Nat) : Option CoverageLeaf :=
+  descendFromOrbit t.maxDepth t.root x k
+
 /-- Orbit-routing leaf-level semantic predicate, parallel to
     `LeafReachesOne` (which is defined over the residue-only router
     `descend`). `OrbitLeafReachesOne t l` asserts: every input `x`
@@ -219,27 +237,22 @@ def LeafReachesOne (t : CoverageTree) (l : CoverageLeaf) : Prop :=
     theorem conclusion type matches the routing evidence used in
     the proof (per Codex run-21848 P1 review on PR #55).
 
+    Placed AFTER `def descendOrbit` (and AFTER `def ReachesOne` via
+    the v2 fix on `orbit_predecessor_reaches_one`) so the body's
+    `descendOrbit t x 0 = some l → ReachesOne x` references both
+    resolve. PR #56 v2 had this block between `LeafReachesOne` and
+    `descendFromOrbit`, breaking the file with cascading errors:
+    `Unknown identifier descendOrbit` at the body (line 224:7 in
+    v2, `?m.1` for `descendOrbit` leaking into the RHS of the
+    def-equality scenario), and `Type mismatch` on the
+    `OrbitLeafReachesOne t l = ... = rfl` def-equality scenario
+    (line 778:81 in v2, where `rfl` couldn't unify `?m.8 = ?m.8`
+    against the expected equation because `descendOrbit` and
+    `ReachesOne` were metavariables).
+
     (Story Q4 v3 / PR #56.) -/
 def OrbitLeafReachesOne (t : CoverageTree) (l : CoverageLeaf) : Prop :=
   ∀ x, descendOrbit t x 0 = some l → ReachesOne x
-
-/-- Orbit-aware descent: at each internal level, the residue lookup
-    uses `accelerated_orbit x k % m` instead of `x % m`, where `k` is
-    the depth index (incremented at each internal step). Structural
-    recursion matches `descendFrom`; only the residue computation is
-    orbit-aware. (Story 07c / round-5, 07c-3.) -/
-def descendFromOrbit : Nat → CoverageNode → Nat → Nat → Option CoverageLeaf
-  | _, .leaf l, _, _ => some l
-  | 0, .internal _ _, _, _ => none
-  | depth + 1, .internal m children, x, k =>
-    let r := accelerated_orbit x k % m
-    match children.lookup r with
-    | some child => descendFromOrbit depth child x (k + 1)
-    | none => none
-
-/-- Orbit-aware descent entry point. -/
-def descendOrbit (t : CoverageTree) (x : Nat) (k : Nat) : Option CoverageLeaf :=
-  descendFromOrbit t.maxDepth t.root x k
 
 /-- The root domain: defined INDEPENDENTLY of `descend` (per Codex P0). -/
 def rootDomain : Nat → Prop := fun n => n > 0
