@@ -114,7 +114,7 @@ instance LeafClaim.Holds.decidable (c : LeafClaim) (x : Nat) :
 `LeafClaim.Holds` decidability instance is derived separately (as
 shown above) via case analysis.
 
-### `LeafCertificate t l` (Prop, indexed, two obligations)
+### `LeafCertificate t l` (Type, proof-carrying data bundle, indexed by tree AND leaf)
 
 ```lean
 /-- A structured certificate that a leaf `l` in tree `t` carries to
@@ -231,8 +231,9 @@ must never manufacture semantic evidence.
 
 ```lean
 /-- Variant of `coverage_tree_soundness_full` where the per-leaf
-    certificate is the typed `LeafCertificate t l` Prop (indexed by
-    tree AND leaf) rather than an opaque `LeafReachesOne` claim.
+    certificate is the typed `LeafCertificate t l` `: Type`-valued
+    proof-carrying data bundle (indexed by tree AND leaf) rather than
+    an opaque `LeafReachesOne` claim.
 
     A **sound, typed refinement** of `coverage_tree_soundness_full`:
     the proof composes `routed_implies_claim` and `claim_reaches_one`
@@ -346,7 +347,7 @@ the bounded-orbit workstream adds orbit-image bounds.
 | PR | Scope | Lean CI |
 |---|---|---|
 | **#53** | `LeafClaim` data type + `LeafClaim.Holds` + `parse_leaf_claim` + `DecidableEq` + `LeafClaim.Holds.decidable` instance | Yes |
-| **#54** | `LeafCertificate t l` Prop + `coverage_tree_soundness_cert` + scenario 8 update (indexed cert) | Yes |
+| **#54** | `LeafCertificate t l` (`: Type`-valued) + `coverage_tree_soundness_cert` + scenario 8 update (indexed cert) | Yes |
 | ~~**#55**~~ | ~~Constructive proofs for `.bounded K`~~ — **REMOVED** from Q3 v3; moved to bounded-orbit workstream | — |
 | **#56** | Lessons-learned doc (if notable patterns emerge from PRs #53–54) | No |
 
@@ -385,8 +386,9 @@ structure BoundedOrbitCertificate (t : CoverageTree) (l : CoverageLeaf) : Prop w
 ```
 
 The Q3 v3 implementation does not deliver this. It is sketched here
-so the data type (`LeafClaim`) and Prop (`LeafCertificate t l`) can
-accommodate it without breaking changes.
+so the data type (`LeafClaim`) and the `: Type`-valued proof-carrying
+data bundle (`LeafCertificate t l`) can accommodate it without
+breaking changes.
 
 ## Codex decisions acknowledged
 
