@@ -923,6 +923,65 @@ theorem descend_orbit_complete (t : CoverageTree) (hv : ValidTree t) (hc : IsCom
         · simpa [descendFromOrbit, hchild_lookup] using hdesc_child
         · exact OrbitRoute.internal hpair_mem hroute_child
 
+/-- Bounded-orbit companion theorem for `FiniteOrbitClaim` shapes
+    (`.empty`, `.singleton n`, `.bounded K`) — **parallel** to (NOT a
+    refinement of) `coverage_tree_soundness_full` /
+    `coverage_tree_soundness_cert`.
+
+    Certifies the **orbit-aware routing relation** (`descendOrbit t x 0`)
+    rather than the residue-only routing relation (`descend t x`).
+    Concludes `OrbitLeafReachesOne t l` (NEW Q4 v3 predicate), defined
+    over `descendOrbit`, NOT `LeafReachesOne t l` (defined over `descend`).
+
+    Per Codex run-21848 P1: the previous v2 spec concluded
+    `LeafReachesOne t l` while constructing a proof over `descendOrbit`;
+    the kernel rejected this because `descend t x = some l` and
+    `descendOrbit t x 0 = some l` are different routing relations.
+    v3 introduces `OrbitLeafReachesOne` so the conclusion type matches
+    the routing evidence used in the proof.
+
+    Proof sketch:
+      1. `descend_orbit_complete` provides orbit-aware routing with
+         `OrbitRoute` witness.
+      2. `cert.orbit_hits_claim` lifts the routing to an orbit-state
+         claim (`∃ k, claim.Holds (accelerated_orbit x' k)`).
+      3. `cert.claim_reaches_one` derives
+         `ReachesOne (accelerated_orbit x' k)`.
+      4. `orbit_predecessor_reaches_one` closes: original `x'` reaches 1
+         via the orbit-predecessor closure lemma.
+
+    **Q4 v3 scope:** the theorem is universally quantified over
+    `FiniteOrbitClaim` shapes. For `.interval` claims, use
+    `coverage_tree_soundness_cert` (Q3 v4) instead. The two theorems
+    certify DIFFERENT routing relations and are PARALLEL, not
+    refinements of each other.
+
+    **Hypothesis-bearing.** Does NOT prove any new global or per-leaf
+    Collatz reachability result beyond what `BoundedOrbitCertificate t l`
+    packages. External computation may propose witnesses, but
+    `BoundedOrbitCertificate` requires Lean-checked proof fields (or a
+    separately proved Lean checker).
+
+    **Position note.** Declared after `descend_orbit_complete` — the
+    theorem's proof body uses `descend_orbit_complete` for orbit-
+    aware routing + `OrbitRoute` witness, so it must be in scope.
+
+    (Story Q4 / PR #58.) -/
+theorem coverage_tree_soundness_orbit_cert (t : CoverageTree)
+    (hv : ValidTree t) (hic : IsComplete t)
+    (hCert : ∀ l ∈ t.leaves, verified t l → BoundedOrbitCertificate t l)
+    (x : Nat) (hx : x > 0) :
+    ∃ l, l ∈ t.leaves ∧ verified t l ∧
+         descendOrbit t x 0 = some l ∧
+         OrbitLeafReachesOne t l := by
+  obtain ⟨l, hl, hver, hdesc, hroute⟩ := descend_orbit_complete t hv hic x hx
+  obtain cert := hCert l hl hver
+  refine ⟨l, hl, hver, hdesc, ?_⟩
+  intro x' hdesc'
+  obtain ⟨k, hk⟩ := cert.orbit_hits_claim x' hdesc'
+  exact orbit_predecessor_reaches_one x' k (accelerated_orbit x' k) rfl
+         (cert.claim_reaches_one _ hk)
+
 -- Depth-0/1/2 regression examples (per Codex 4922430978).
 example : descendFrom 0 (.leaf { leafId := "L0", leafProperty := "P0" }) 5 = some { leafId := "L0", leafProperty := "P0" } := rfl
 

@@ -224,4 +224,38 @@ example : ReachesOne 5 :=
 example (x : Nat) (k : Nat) (h_eq : accelerated_orbit x k = 1) : ReachesOne x :=
   orbit_predecessor_reaches_one x k 1 h_eq ⟨0, rfl⟩
 
+-- Scenario 11 (Q4 / PR #58): orbit-aware executable spec for
+-- `coverage_tree_soundness_orbit_cert`. `hCert` is **explicit** (no
+-- default) per project "no new sorry" discipline (PR #51 P1). The
+-- per-leaf certificate construction (proofs of `orbit_hits_claim`
+-- and `claim_reaches_one`) is the next substantive workstream.
+-- Conclusion uses `OrbitLeafReachesOne depthTwoTree l`, NOT
+-- `LeafReachesOne depthTwoTree l` (v2 routing-relation mismatch fix).
+example (hv : ValidTree depthTwoTree := by native_decide)
+    (hc : IsComplete depthTwoTree := by native_decide)
+    (hCert : ∀ l ∈ depthTwoTree.leaves, verified depthTwoTree l →
+             BoundedOrbitCertificate depthTwoTree l) :
+    ∃ l, l ∈ depthTwoTree.leaves ∧ verified depthTwoTree l ∧
+         descendOrbit depthTwoTree 5 0 = some l ∧
+         OrbitLeafReachesOne depthTwoTree l := by
+  exact coverage_tree_soundness_orbit_cert depthTwoTree hv hc hCert 5 (by norm_num)
+
+-- Scenario 12 (Q4 / PR #58): API-shape regression for the two
+-- parallel leaf-level semantic predicates. Prevents conflating
+-- `LeafReachesOne` (over `descend`) with `OrbitLeafReachesOne`
+-- (over `descendOrbit`). `applyResidueReaches` accepts
+-- `LeafReachesOne`; `applyOrbitReaches` accepts `OrbitLeafReachesOne`
+-- — strictly different routing-hyp types (`descend t x = some l`
+-- vs `descendOrbit t x 0 = some l`). Passing the wrong hypothesis
+-- surfaces a Lean type error.
+def applyResidueReaches (t : CoverageTree) (l : CoverageLeaf)
+    (h : LeafReachesOne t l) (x : Nat) (hdesc : descend t x = some l) :
+    ReachesOne x :=
+  h x hdesc
+
+def applyOrbitReaches (t : CoverageTree) (l : CoverageLeaf)
+    (h : OrbitLeafReachesOne t l) (x : Nat) (hdesc : descendOrbit t x 0 = some l) :
+    ReachesOne x :=
+  h x hdesc
+
 end CollatzResearch
