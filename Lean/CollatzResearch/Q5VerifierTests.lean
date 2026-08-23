@@ -14,6 +14,7 @@ Per the Q5 v2 spec fix (PR #61 v2), all trajectories use correct `acceleratedSte
 -/
 
 import CollatzResearch.CoverageTree
+import CollatzResearch.BoundedInputOrbitCertificate
 
 namespace CollatzResearch
 
