@@ -212,21 +212,54 @@ No local `lake` commands run — Lean validation runs only in GitHub CI. The "no
 
 The Q4 v3 spec (`docs/story-q4-bounded-orbit-certificates.md` § "Out of scope") explicitly defers external-certificate inhabitation to Q5+. The certificate contract is **already defined** in master — `BoundedOrbitCertificate t l` at `437225f`. Q5+ just needs to construct inhabitant instances.
 
-### 3.1 Two viable paths for Q5+
+**Note (Codex review feedback on PR #60, 2026-08-23):** § 3 was substantively revised in v2 to address three architectural refinement points — search-outside-Lean / verify-inside-Lean trust boundary, per-leaf availability pattern, and scope to concrete generated tree / bounded certificate dataset. The original v1 § 3 ("Two viable paths: Path A / Path B") left an implementation-equivalence gap in Path A that the new architecture closes.
 
-**Path A: Python finite-trajectory checker + Lean-checked correctness proof**
-- Implement the trajectory check in Python (fast iteration, well-understood patterns from `tests/test_coverage_tree.py`)
-- Add a Lean theorem `checker_correct : checker_sound py_checker → ...` that certifies the Python implementation is sound (per-leaf)
-- Trust boundary: Python is untrusted at runtime; Lean only trusts the certified correctness proof
+### 3.1 Recommended Q5 architecture: search outside Lean, verify inside Lean
 
-**Path B: Pure-Lean finite-trajectory checker**
-- Implement the trajectory check directly in Lean
-- No external trust boundary (everything is kernel-checked)
-- More work, no external trust, but slower to iterate
+Per Codex review feedback on PR #60, the recommended Q5 architecture is a pipeline where Python handles search/generation (fast iteration, easy to debug) and Lean handles verification (kernel-checked, trusted):
 
-**Recommendation**: Path A is faster to a working Q5; Path B is more rigorous. The Q4 v3 spec did not specify which path.
+```
+Python search/generator → serialized proof artifact → small Lean verifier
+                       → verifier soundness theorem → BoundedOrbitCertificate
+                       → existing companion theorem
+```
 
-### 3.2 Per-shape proof obligations
+**Why not the naive Path A** (Python checker + Lean `checker_sound` theorem certifying the Python implementation is sound): the Lean theorem `checker_sound py_checker → ...` would require an implementation-equivalence proof between the Python implementation and the Lean specification. That proof is hard to get right, and an unverified implementation-equivalence gap leaks into the trusted computing base.
+
+**Correct architecture** (per Codex review on PR #60):
+- **Python search/generator**: emits deterministic, serialized trajectory certificates (e.g., JSON-encoded list of `(input, steps, witness)` per claim).
+- **Small Lean verifier**: parses the serialized certificate + checks `∀ claim, checkTrajectory c = true → ReachesOne n` (a `Decidable` predicate on serialized certificates).
+- **Verifier soundness theorem**: `checkTrajectory c = true → ReachesOne n` (kernel-checked).
+- **`BoundedOrbitCertificate` construction**: `cert.orbit_hits_claim` and `cert.claim_reaches_one` populated from the verified serialized certificate.
+- **Existing companion theorem**: `coverage_tree_soundness_orbit_cert` applies unchanged.
+
+**Trust boundary**: Python can be buggy without entering the trusted computing base. Only the small Lean verifier + verifier soundness theorem need to be trusted. Python's role is reduced to generating candidates; verification is entirely in Lean.
+
+### 3.2 Per-leaf availability (Codex feedback #2 on PR #60)
+
+Avoid the naive shape `∀ x > 0, ∃ l, BoundedOrbitCertificate t l` — that doesn't relate `x` to the selected leaf; one reusable certified leaf could satisfy it for every `x`.
+
+**Correct shape**: prove per-leaf availability separately, then compose with existing routing:
+- `per_leaf_available : ∀ l ∈ t.leaves, verified t l → BoundedOrbitCertificate t l`
+- Compose with `descend_orbit_complete` + `coverage_tree_soundness_orbit_cert`
+
+OR include the actual `descendOrbit t x 0 = some l` witness in the existential:
+- `∀ x > 0, ∃ l, descendOrbit t x 0 = some l ∧ BoundedOrbitCertificate t l`
+
+The first shape (per-leaf + compose) is cleaner — it separates the per-leaf certificate construction from the routing.
+
+### 3.3 Avoid universal acceptance criterion (Codex feedback #3 on PR #60)
+
+If every selected leaf of every valid complete tree automatically receives an inhabited `BoundedOrbitCertificate`, the conditional boundary that correctly prevents the companion theorem from becoming a global Collatz result may disappear.
+
+**Scope Q5 to a concrete generated tree / bounded certificate dataset**:
+- A concrete `depthTwoTree` (or similar finite tree) is generated and verified
+- Lean verifies each finite certificate (per-leaf via the verifier soundness theorem)
+- Those verified instances are composed with `coverage_tree_soundness_orbit_cert` to close the per-`x` theorem for THAT specific tree
+
+The universal-`∀ t`-quantified theorem stays conditional (assumes `hCert`). The Q5 acceptance criterion is "the verified certificate dataset for THIS specific tree", not "all valid complete trees".
+
+### 3.4 Per-shape proof obligations
 
 Per the Q4 v3 spec table:
 
@@ -237,18 +270,19 @@ Per the Q4 v3 spec table:
 | `.bounded K` | `accelerated_orbit x k ≤ K` | Finite enumeration: `∀ y ≤ K, ReachesOne y` | Per-bound — needs all `y ≤ K` trajectory certificates |
 | `.interval _ _ _` | NOT APPLICABLE | N/A | Out of Q5+ scope (handled by Q3 v4 `LeafCertificate` + `coverage_tree_soundness_cert`) |
 
-### 3.3 Trust boundary hygiene
+### 3.5 Trust boundary hygiene
 
 - **Python tests** in `tests/test_coverage_tree.py` are **UNTRUSTED RUNTIME EVIDENCE**, not formal Lean substitution (per MEMORY.md note + PR #55 v3 spec § "Restoring the direct Lean D1 regression is a separate workstream")
 - **The depth-two discriminator** (scenario 5 `descendOrbit depthTwoTree 5 0 = some D1` as Lean assertion) is DEFERRED — Lean 4 toolchain can't compile-check the recursive `descendFromOrbit` (uses `acceleratedStep` → `twoAdicValuation` → `Nat.factorization`, opaque to kernel reduction). The discriminator IS covered via scenario 6 (theorem + `OrbitRoute` witness at theorem level) + Python runtime tests.
-- **Q5+ Lean proofs of checker correctness** must be kernel-checked, not Python-evidenced. The `Enforce Lean admission budget` step will catch any new admission.
+- **Q5+ Lean proofs of verifier soundness** must be kernel-checked, not Python-evidenced. The `Enforce Lean admission budget` step will catch any new admission.
+- **Per the recommended architecture** (§ 3.1): Python can be buggy without entering the trusted computing base. The verifier soundness theorem is the only bridge from Python output to Lean-checked result.
 
-### 3.4 Q5+ execution order (suggested)
+### 3.6 Q5+ execution order (suggested, per the recommended architecture)
 
-1. **Q5 PR #1 (spec)**: design the checker + the correctness proof structure. Decide Path A vs Path B. Document the per-shape proof obligation strategy.
-2. **Q5 PR #2 (foundation)**: implement the trajectory check + prove per-leaf basis lemmas (e.g., `trajectory_reaches_one_implies_standard` style).
-3. **Q5 PR #3 (checker)**: integrate the checker with `BoundedOrbitCertificate` construction. Prove `checker_sound : checker_sound py_checker → (∀ x, x > 0 → ∃ l, BoundedOrbitCertificate (depthTwoTree) l)` (per-leaf).
-4. **Q5 PR #4 (integration)**: extend `coverage_tree_soundness_orbit_cert` to allow the checker to satisfy `hCert` automatically. The theorem becomes "for all valid complete trees, for all positive x, descendOrbit selects a leaf with an inhabited BoundedOrbitCertificate" (not just an assumed one).
+1. **Q5 PR #1 (spec)**: design the serialized certificate format + verifier interface. Document the per-shape proof obligation strategy + the concrete tree scope.
+2. **Q5 PR #2 (verifier)**: implement the small Lean verifier (`checkTrajectory`) + prove the verifier soundness theorem (`checkTrajectory c = true → ReachesOne n`). Lean-only — no Python integration at this stage.
+3. **Q5 PR #3 (Python generator)**: implement the Python trajectory generator that emits serialized certificates. UNTRUSTED — only the verifier soundness theorem matters.
+4. **Q5 PR #4 (integration)**: prove per-leaf availability (`per_leaf_available`) for a concrete tree (e.g., `depthTwoTree`) by composing Python-generated certificates with the Lean verifier. Extend the companion theorem's `hCert` substitution for that specific tree.
 
 ---
 
