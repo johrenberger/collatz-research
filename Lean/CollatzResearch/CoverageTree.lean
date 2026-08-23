@@ -532,16 +532,39 @@ def IsFiniteClaim : LeafClaim → Prop
     - `.empty`, `.singleton _`, `.bounded _` → `Decidable True`
     - `.interval _ _ _` → `Decidable False`
 
-    The `inferInstance` form picks up `Decidable True` /
-    `Decidable False` automatically without explicit `exact`s.
-    Mirrors the `WellFormed.decidable` instance style for
-    `LeafClaim` (which also uses the equations-form on
-    `LeafClaim` constructors with `inferInstance`). -/
-instance IsFiniteClaim.decidable : (c : LeafClaim) → Decidable (IsFiniteClaim c)
-  | .empty => inferInstance
-  | .singleton _ => inferInstance
-  | .bounded _ => inferInstance
-  | .interval _ _ _ => inferInstance
+    Uses the explicit `cases c with` form (matching
+    `LeafClaim.WellFormed.decidable` for `LeafClaim`, which uses
+    the same form) rather than the equations-form `| .empty =>
+    inferInstance | ...` from the Q4 v3 spec sketch. The reason:
+    equations-form doesn't unfold `IsFiniteClaim c` to `True` /
+    `False` before invoking `inferInstance`, so the bare
+    `inferInstance` (without explicit type annotation) cannot
+    resolve `Decidable (IsFiniteClaim .empty)` — it sees
+    `Decidable (IsFiniteClaim .empty)` and tries to find an
+    instance for that unreduced type, failing because no such
+    instance exists (only `Decidable True` and `Decidable False`
+    are core instances). The `cases c with` form unfolds
+    `IsFiniteClaim c` via pattern matching, and the explicit
+    `(inferInstance : Decidable True)` /
+    `(inferInstance : Decidable False)` annotations tell
+    `inferInstance` which core instance to look for.
+
+    **Lesson recorded (PR #57 v1→v2):** equations-form for
+    `Decidable` instances requires either explicit type
+    annotations on each branch's `inferInstance` call, or the
+    `cases`-with-explicit-form. Bare `inferInstance` in
+    equations-form fails to resolve when the motive involves a
+    `def` that needs to be unfolded before instance resolution.
+    PR #56's two forward-ref cascades had the same root cause:
+    elaborate-time type resolution didn't see the needed unfold.
+    (Story Q4 / PR #57 v2.) -/
+instance IsFiniteClaim.decidable (c : LeafClaim) :
+    Decidable (IsFiniteClaim c) := by
+  cases c with
+  | empty => exact (inferInstance : Decidable True)
+  | singleton _ => exact (inferInstance : Decidable True)
+  | bounded _ => exact (inferInstance : Decidable True)
+  | interval _ _ _ => exact (inferInstance : Decidable False)
 
 end FiniteOrbitClaim
 
