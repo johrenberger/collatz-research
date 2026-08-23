@@ -225,19 +225,12 @@ example (x : Nat) (k : Nat) (h_eq : accelerated_orbit x k = 1) : ReachesOne x :=
   orbit_predecessor_reaches_one x k 1 h_eq ⟨0, rfl⟩
 
 -- Scenario 11 (Q4 / PR #58): orbit-aware executable spec for
--- `coverage_tree_soundness_orbit_cert`. The `hCert` parameter is
--- **explicit** (no default) — preserves the project's "no new sorry"
--- discipline (PR #51 P1) while still compile-checking the public
--- API surface. The per-leaf certificate construction (the actual
--- proofs of `orbit_hits_claim` and `claim_reaches_one`) is the next
--- substantive workstream (Q4 follow-up per
--- `docs/story-q4-bounded-orbit-certificates.md`).
---
--- The conclusion uses `OrbitLeafReachesOne depthTwoTree l`, NOT
--- `LeafReachesOne depthTwoTree l` — the v2 spec incorrectly used
--- `LeafReachesOne` here, which would not elaborate (kernel-rejected
--- routing-relation mismatch per Codex run-21848 P1 review on PR #55).
--- This scenario compile-checks the v3 conclusion type.
+-- `coverage_tree_soundness_orbit_cert`. `hCert` is **explicit** (no
+-- default) per project "no new sorry" discipline (PR #51 P1). The
+-- per-leaf certificate construction (proofs of `orbit_hits_claim`
+-- and `claim_reaches_one`) is the next substantive workstream.
+-- Conclusion uses `OrbitLeafReachesOne depthTwoTree l`, NOT
+-- `LeafReachesOne depthTwoTree l` (v2 routing-relation mismatch fix).
 example (hv : ValidTree depthTwoTree := by native_decide)
     (hc : IsComplete depthTwoTree := by native_decide)
     (hCert : ∀ l ∈ depthTwoTree.leaves, verified depthTwoTree l →
@@ -249,20 +242,12 @@ example (hv : ValidTree depthTwoTree := by native_decide)
 
 -- Scenario 12 (Q4 / PR #58): API-shape regression for the two
 -- parallel leaf-level semantic predicates. Prevents conflating
--- `LeafReachesOne` (defined over the residue-only router `descend`)
--- with `OrbitLeafReachesOne` (defined over the orbit-aware router
--- `descendOrbit`).
---
--- `applyResidueReaches` accepts `LeafReachesOne`; its routing-hyp
--- parameter has type `descend t x = some l`.
--- `applyOrbitReaches` accepts `OrbitLeafReachesOne`; its routing-hyp
--- parameter has type `descendOrbit t x 0 = some l`.
---
--- The two functions require strictly different routing-hypothesis
--- types. Passing the wrong hypothesis at a call site will surface
--- a Lean type error. This is the executable-spec-layer guard against
--- the v2 routing-relation mismatch (Codex run-21858 P2 review on
--- PR #55).
+-- `LeafReachesOne` (over `descend`) with `OrbitLeafReachesOne`
+-- (over `descendOrbit`). `applyResidueReaches` accepts
+-- `LeafReachesOne`; `applyOrbitReaches` accepts `OrbitLeafReachesOne`
+-- — strictly different routing-hyp types (`descend t x = some l`
+-- vs `descendOrbit t x 0 = some l`). Passing the wrong hypothesis
+-- surfaces a Lean type error.
 def applyResidueReaches (t : CoverageTree) (l : CoverageLeaf)
     (h : LeafReachesOne t l) (x : Nat) (hdesc : descend t x = some l) :
     ReachesOne x :=

@@ -958,23 +958,13 @@ theorem descend_orbit_complete (t : CoverageTree) (hv : ValidTree t) (hc : IsCom
 
     **Hypothesis-bearing.** Does NOT prove any new global or per-leaf
     Collatz reachability result beyond what `BoundedOrbitCertificate t l`
-    packages. The actual Collatz evidence comes from external sources
-    supplied at certificate construction time.
+    packages. External computation may propose witnesses, but
+    `BoundedOrbitCertificate` requires Lean-checked proof fields (or a
+    separately proved Lean checker).
 
-    **Position note (v1→v2 evolution).** v1 `b283456` placed this
-    theorem between `coverage_tree_soundness_cert` (line ~820) and
-    `coverage_tree_soundness_orbit` (line ~849). That placement was
-    RED on a forward-reference cascade: the theorem's proof body
-    uses `descend_orbit_complete` (line ~934) which was defined AFTER
-    the misplaced insertion. v2 fix: moved theorem + docstring to
-    AFTER `descend_orbit_complete` (this position) so all deps are
-    in scope. Same root cause as PR #56's two forward-reference
-    cascades (v1 `ReachesOne` forward-ref + v2 `descendOrbit`
-    forward-ref): the editor (me) did not check the file's full
-    forward-reference graph (every consumer after every dep) and
-    just looked at the new code. Lesson reinforced: position-sensitive
-    edits require checking the whole def order, not just the new
-    code's neighbors.
+    **Position note.** Declared after `descend_orbit_complete` — the
+    theorem's proof body uses `descend_orbit_complete` for orbit-
+    aware routing + `OrbitRoute` witness, so it must be in scope.
 
     (Story Q4 / PR #58.) -/
 theorem coverage_tree_soundness_orbit_cert (t : CoverageTree)
