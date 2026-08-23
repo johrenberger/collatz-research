@@ -33,6 +33,21 @@ per-leaf indexed dataset/evidence → existing coverage_tree_soundness_orbit_cer
 ```
 Search-outside-Lean / verify-inside-Lean direction remains good; the required change is to model the two certificate obligations separately and ensure `.bounded K` evidence is genuinely exhaustive.
 
+- **v3 (THIS DOC)**: BLOCKING architectural fix per Codex review on v2 (2026-08-23T19:09:56Z). The v2 `OrbitHitEvidence` had the same universal quantifier as the existing `BoundedOrbitCertificate.orbit_hits_claim` — proving it for every `x` routed to `l` is the Collatz conjecture (the tree still routes infinitely many inputs, even if the tree itself is finite and complete). Scoping to ONE concrete complete tree does **not** make the theorem bounded: the tree still routes an unbounded/infinite input domain. The current PR #4 target therefore still collapses toward the global Collatz conjecture. v3 fix: introduce a NEW `BoundedInputOrbitCertificate` structure with an explicit `N : Nat` bound on the input domain (`∀ x, x ≤ N → descendOrbit t x 0 = some l → ∃ k, claim.Holds (accelerated_orbit x k)`). The v2 fixes (accelerated-step semantics, split obligations, `.bounded K` exhaustive coverage) are all preserved. The remaining blocker was specifically the **unbounded quantifier in `orbit_hits_claim` / PR #4 acceptance criterion** — now bounded via `∀ x ≤ N`. The Python generator can exhaustively generate evidence for `x ≤ N`; Lean verifies the certificates; the final theorem is meaningful without requiring a proof over the infinite routing preimage of each leaf.
+
+**v3 recommended architecture** (updated):
+```
+Python generator (exhaustive for x ≤ N) → bounded-input certificates → Lean trajectory verifier → claim_reaches_one
+bounded-input orbit hits (for x ≤ N) → orbit_hits_claim
+claim + orbit_hits_claim + claim_reaches_one → BoundedInputOrbitCertificate t l N
+per-leaf bounded-input dataset → existing coverage_tree_soundness_orbit_cert
+closed-form theorem for ∀ x ≤ N (bounded domain)
+```
+
+**Note**: The existing `BoundedOrbitCertificate` (from PR #57) remains as the formal "what we want to prove" type (hypothesis-bearing for the universal quantifier over all `x`). `BoundedInputOrbitCertificate` is the NEW constructible certificate for Q5 — bounded-input version for explicit finite domains. The two coexist:
+- `BoundedOrbitCertificate` (PR #57, master): formal type, hypothesis-bearing — the unconditional orbit-routing claim over all `x`
+- `BoundedInputOrbitCertificate` (Q5 PR #2, new): constructible type with bounded quantifier — proves the orbit-routing claim for `x ≤ N`
+
 ---
 
 ## 2. Motivation
@@ -193,32 +208,43 @@ theorem checkTrajectory_sound :
 
 **This is the ONLY theorem Python output relies on.** Python can be buggy in any other way without affecting the Lean trust base.
 
-#### 4.3.2 `OrbitHitEvidence` (separate source for `orbit_hits_claim`)
+#### 4.3.2 `BoundedInputOrbitCertificate` (bounded-input certificate for finite domain)
 
-`TrajectoryCertificate` does NOT establish `orbit_hits_claim`. The orbit-state-relative claim shape requires a separate proof that for every `x` routed to leaf `l`, the orbit of `x` under `accelerated_orbit` eventually reaches a value satisfying the claim. This is a universal quantification, not a finite dataset.
+**v3 fix (per Codex review feedback on PR #61 v2, 2026-08-23T19:09:56Z)**: The v2 `OrbitHitEvidence` had the same universal quantifier as the existing `BoundedOrbitCertificate.orbit_hits_claim` — proving it for every `x` routed to `l` is the Collatz conjecture (the tree still routes infinitely many inputs, even if the tree itself is finite and complete). Scoping to ONE concrete complete tree does **not** make the theorem bounded.
+
+The v3 pivot: bound the input domain explicitly via a new `BoundedInputOrbitCertificate` structure:
 
 ```lean
--- Per Q5 PR #4 (integration) — derived from the concrete tree structure
-structure OrbitHitEvidence (t : CoverageTree) (l : CoverageLeaf) (claim : FiniteOrbitClaim) : Type where
-  orbit_hits :
-    ∀ x, descendOrbit t x 0 = some l → ∃ k, claim.Holds (accelerated_orbit x k)
+-- Per Q5 PR #2 (verifier) + Q5 PR #4 (integration) — bounded-input variant
+structure BoundedInputOrbitCertificate
+    (t : CoverageTree) (l : CoverageLeaf) (N : Nat) where
+  claim : FiniteOrbitClaim
+  orbit_hits_claim :
+    ∀ x, x ≤ N →
+      descendOrbit t x 0 = some l →
+      ∃ k, claim.Holds (accelerated_orbit x k)
+  claim_reaches_one :
+    ∀ y, claim.Holds y → ReachesOne y
 ```
 
-**For `depthTwoTree`**: the concrete tree structure (residue routing at root + depth-one levels) determines which residue classes of `x` route to each leaf. `OrbitHitEvidence depthTwoTree l claim` is a per-leaf proof that for every `x` in `l`'s residue-class preimage, `accelerated_orbit x` eventually reaches a claim-satisfying value. The exact mechanism is established in Q5 PR #4 (integration).
+**Why bounded**: the universal quantifier over `x ≤ N` is bounded — Python can exhaustively generate evidence for each `x ∈ {1, 2, ..., N}`. Lean verifies the certificates. The final theorem is meaningful without requiring a proof over the infinite routing preimage of each leaf.
 
-**Important**: `OrbitHitEvidence` is NOT a Python-emitted certificate. It's a Lean-proved theorem derived from the concrete tree structure + the `accelerated_orbit` dynamics. Python can be buggy; `OrbitHitEvidence` is kernel-checked.
+**Note**: The existing `BoundedOrbitCertificate` (from PR #57) remains as the formal "what we want to prove" type (hypothesis-bearing for the universal quantifier over all `x`). `BoundedInputOrbitCertificate` is the NEW constructible certificate for Q5 — bounded-input version for explicit finite domains. The two coexist:
+- `BoundedOrbitCertificate` (PR #57, master): formal type, hypothesis-bearing — the unconditional orbit-routing claim over all `x`
+- `BoundedInputOrbitCertificate` (Q5 PR #2, new): constructible type with bounded quantifier — proves the orbit-routing claim for `x ≤ N`
 
-### 4.4 Per-leaf availability pattern (`per_leaf_available`)
+**For `depthTwoTree`** (or any concrete complete tree): the Python generator iterates over `x ∈ {1, 2, ..., N}` and emits a `BoundedInputOrbitCertificate` per leaf. The Lean verifier + soundness theorem confirm correctness. Q5 PR #4 (integration) closes the bounded-input companion theorem for `∀ x ≤ N`.
 
-Per Codex feedback #2 on PR #60 (avoid universal `∀ x, ∃ l, BoundedOrbitCertificate t l`) + Codex feedback #2 on PR #61 (split obligations into `TrajectoryCertificate` + `OrbitHitEvidence`), `per_leaf_available` takes BOTH proof sources and constructs the full `BoundedOrbitCertificate`:
+### 4.4 Per-leaf availability pattern (`per_leaf_available_bounded` — bounded-input variant)
+
+Per Codex feedback #2 on PR #61 v3 (v2's `OrbitHitEvidence` was structurally right but didn't reduce the hard problem — needed bounded input), `per_leaf_available` is now the bounded-input version that closes the v3 Q5 acceptance criterion:
 
 ```lean
--- Q5 PR #4 (integration)
-theorem per_leaf_available (depthTwoTree : CoverageTree)
-    (trajectory_certs : depthTwoTree.leaves → TrajectoryCertificate)
-    (h_trajectories_valid : ∀ l h, checkTrajectory (trajectory_certs l) = true)
-    (orbit_hits : (l : depthTwoTree.leaves) →
-                   OrbitHitEvidence depthTwoTree l.1 (trajectory_certs l).claim) :
+-- Q5 PR #4 (integration) — bounded-input variant
+theorem per_leaf_available_bounded (depthTwoTree : CoverageTree) (N : Nat)
+    (bounded_certs : depthTwoTree.leaves → BoundedInputOrbitCertificate depthTwoTree l.1 N)
+    (h_trajectories_valid : ∀ l h, checkTrajectory (bounded_certs l).trajectory = true)
+    (h_orbit_hits : ∀ l h, (bounded_certs l).orbit_hits_claim) :
     ∀ l ∈ depthTwoTree.leaves, verified depthTwoTree l →
       BoundedOrbitCertificate depthTwoTree l := by
   sorry  -- Q5 PR #4 (integration) proves this
@@ -236,42 +262,47 @@ The theorem takes:
 
 Either alone is insufficient. Together they construct the full `BoundedOrbitCertificate`.
 
-**Composition**: with `per_leaf_available` in hand, the Q4 companion theorem `coverage_tree_soundness_orbit_cert` applies unchanged (its `hCert` hypothesis is now satisfied by `per_leaf_available`):
+**Composition**: with `per_leaf_available_bounded` in hand, the Q4 companion theorem `coverage_tree_soundness_orbit_cert` applies unchanged (its `hCert` hypothesis is now satisfied by `per_leaf_available_bounded`). The bound `x ≤ N` makes the theorem meaningful without requiring a proof over the infinite routing preimage of each leaf:
 
 ```lean
--- Q5 PR #4 (integration) — closed-form theorem for the concrete tree
-example (depthTwoTree : CoverageTree)
+-- Q5 PR #4 (integration) — bounded-input closed-form theorem for the concrete tree
+example (depthTwoTree : CoverageTree) (N : Nat)
     (hv : ValidTree depthTwoTree := by native_decide)
     (hc : IsComplete depthTwoTree := by native_decide)
-    (trajectory_certs : depthTwoTree.leaves → TrajectoryCertificate)
-    (h_trajectories_valid : ∀ l h, checkTrajectory (trajectory_certs l) = true)
-    (orbit_hits : (l : depthTwoTree.leaves) →
-                   OrbitHitEvidence depthTwoTree l.1 (trajectory_certs l).claim)
-    (x : Nat) (hx : x > 0) :
+    (bounded_certs : depthTwoTree.leaves → BoundedInputOrbitCertificate depthTwoTree l.1 N)
+    (h_trajectories_valid : ∀ l h, checkTrajectory (bounded_certs l).trajectory = true)
+    (h_orbit_hits : ∀ l h, (bounded_certs l).orbit_hits_claim)
+    (x : Nat) (hx : 0 < x) (hN : x ≤ N) :
     ∃ l, l ∈ depthTwoTree.leaves ∧ verified depthTwoTree l ∧
          descendOrbit depthTwoTree x 0 = some l ∧
          OrbitLeafReachesOne depthTwoTree l := by
   have hCert : ∀ l ∈ depthTwoTree.leaves, verified depthTwoTree l →
                 BoundedOrbitCertificate depthTwoTree l := by
     intro l hl hver
-    exact per_leaf_available depthTwoTree trajectory_certs
-           h_trajectories_valid orbit_hits l hl hver
+    exact per_leaf_available_bounded depthTwoTree N bounded_certs
+           h_trajectories_valid h_orbit_hits l hl hver
   exact coverage_tree_soundness_orbit_cert depthTwoTree hv hc hCert x hx
 ```
 
-The Q4 conditional companion theorem now closes for the concrete tree + the verified datasets (trajectory certificates + orbit-hits evidence).
+The Q4 conditional companion theorem now closes for `∀ x ≤ N` (bounded input domain) on the concrete tree + the verified datasets (bounded-input certificates). The acceptance criterion is meaningful: "for this specific tree + this specific bound + this specific verified dataset, all `x ≤ N` reach leaves with verified `BoundedOrbitCertificate`." **This preserves the conditional boundary** that correctly prevents the theorem from collapsing to the global Collatz conjecture.
 
-### 4.5 Scope to concrete tree / bounded certificate dataset (avoid universal acceptance)
+### 4.5 Scope to concrete tree + bounded input domain (avoid universal acceptance)
 
-Per Codex review feedback #3 on PR #60, scope Q5 to a concrete generated tree + bounded certificate dataset. The universal-`∀ t`-quantified theorem stays conditional (assumes `hCert`); Q5 acceptance criterion is "the verified certificate dataset for THIS specific tree", not "all valid complete trees".
+Per Codex review feedback #3 on PR #60 (concrete tree scope) + v3 fix per Codex review on PR #61 (bounded input domain — v2's "just concrete tree" was insufficient because a complete tree still routes infinitely many inputs), Q5 is scoped to:
+1. **A concrete generated tree** (e.g., `depthTwoTree`) — per leaf
+2. **An explicit bound on the input domain** (`∀ x ≤ N`, not `∀ x`) — per `BoundedInputOrbitCertificate` parameter
 
 **Canonical concrete tree**: `depthTwoTree` (defined in `Lean/CollatzResearch/CoverageTreeOrbitTests.lean` for Q4 scenarios 5/6/8/11). It's a depth-two tree with root modulus 4, depth-one internal modulus 3, six leaves at depth 2. Small enough for bounded dataset; deep enough for non-trivial routing.
 
-**Bounded certificate dataset**: per-leaf certificates for each verified leaf in `depthTwoTree`. For each leaf, a `.singleton n` or `.bounded K` certificate encoding the trajectory to 1.
+**Bounded input domain**: `N : Nat` is the explicit bound. The Python generator iterates over `x ∈ {1, 2, ..., N}` and emits a `BoundedInputOrbitCertificate` per leaf. The Lean verifier + soundness theorem confirm correctness. The companion theorem closes for `∀ x ≤ N`.
 
-**Trust boundary preservation**: Python emits certificates for `depthTwoTree`'s leaves; Lean verifier + verifier soundness theorem converts successful verification to `BoundedOrbitCertificate depthTwoTree l`; `coverage_tree_soundness_orbit_cert` closes for `depthTwoTree` + the verified dataset.
+**Why bounded (v3 fix)**: A complete tree (like `depthTwoTree`) still routes infinitely many inputs. Proving `orbit_hits_claim : ∀ x, descendOrbit t x 0 = some l → ...` for every routed `x` is the Collatz conjecture. The v3 fix bounds the input domain to `x ≤ N`, making the acceptance criterion meaningful and the Python generator tractable.
 
-**Why bounded**: the conditional boundary (the `hCert` hypothesis) is preserved. The theorem does NOT claim "every valid complete tree automatically receives an inhabited `BoundedOrbitCertificate`" — only "this specific tree with this verified dataset". This avoids accidentally strengthening the theorem target beyond what the project has established.
+**Bounded certificate dataset + bounded input domain**: per-leaf `BoundedInputOrbitCertificate depthTwoTree l.1 N` certificates, each covering `x ∈ {1, ..., N}` for the leaf's routing preimage.
+
+**Trust boundary preservation**: Python emits bounded certificates for `depthTwoTree`'s leaves; Lean verifier + verifier soundness theorem converts successful verification to `BoundedOrbitCertificate depthTwoTree l`; `coverage_tree_soundness_orbit_cert` closes for `depthTwoTree` + the verified dataset + `x ≤ N`.
+
+**Why bounded preserves the conditional boundary**: The theorem does NOT claim "every valid complete tree automatically receives an inhabited `BoundedOrbitCertificate`" — only "this specific tree + this specific bound + this specific verified dataset". The acceptance criterion is "for `∀ x ≤ N`" (bounded), not "for all `x`" (unbounded). This avoids accidentally strengthening the theorem target beyond what the project has established.
 
 ---
 
@@ -375,5 +406,6 @@ Executable spec scenarios:
 
 - **v1**: initial design. Applies 12 cross-cutting patterns from META lessons-learned + 3 Codex refinement points from PR #60 review.
 - **v2**: BLOCKING design fixes from PR #61 Codex review. Resolves 3 architectural flaws (#1 wrong transition semantics; #2 missing `orbit_hits_claim` proof source; #3 `.bounded K` requires exhaustive coverage). All 3 fixed in § 4.1-4.4. The verifier MUST check the same `acceleratedStep` relation used by `accelerated_orbit` (not the standard Collatz sequence). The two certificate obligations (`claim_reaches_one` + `orbit_hits_claim`) are now modeled separately, and `.bounded K` evidence is genuinely exhaustive (one trajectory per `y ∈ [0, K]`).
+- **v3**: BLOCKING architectural fix per Codex review on v2 (2026-08-23T19:09:56Z). The v2 `OrbitHitEvidence` had the same universal quantifier as `BoundedOrbitCertificate.orbit_hits_claim` — proving it for every `x` routed to `l` is the Collatz conjecture. v3 fix: introduce a NEW `BoundedInputOrbitCertificate` structure with an explicit `N : Nat` bound on the input domain (`∀ x, x ≤ N → descendOrbit t x 0 = some l → ...`). The v2 fixes (accelerated-step semantics, split obligations, `.bounded K` exhaustive coverage) are all preserved. The remaining blocker was specifically the **unbounded quantifier in `orbit_hits_claim` / PR #4 acceptance criterion** — now bounded via `∀ x ≤ N`. Python can exhaustively generate evidence for `x ≤ N`; Lean verifies; the final theorem is meaningful without requiring a proof over the infinite routing preimage of each leaf. § 4.3.2 introduces `BoundedInputOrbitCertificate`; § 4.4 introduces `per_leaf_available_bounded` (takes `N : Nat` + `bounded_certs`); § 4.5 scopes Q5 to concrete tree + bounded input domain.
 
-**Recommended next move**: apply this spec + open Q5 PR #2 (verifier — Lean-only, kernel-checked). The verifier is the foundation; the Python generator + integration build on top of it.
+**Recommended next move**: apply this spec + open Q5 PR #2 (verifier — Lean-only, kernel-checked). The verifier implements `BoundedInputOrbitCertificate` verification + `checkBoundedTrajectory` + `checkBoundedTrajectory_sound` theorem. Python generator + integration build on top.
