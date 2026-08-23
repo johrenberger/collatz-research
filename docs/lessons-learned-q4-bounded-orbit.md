@@ -2,7 +2,7 @@
 
 **Status:** Arc complete (MERGED 2026-08-23).
 **Scope:** 4 PRs, ~2 calendar days (2026-08-22 to 2026-08-23).
-**Outcome:** `coverage_tree_soundness_orbit_cert` companion theorem formally established at `21262fb`; Q4 bounded-orbit data-side arc fully closed (spec + foundation + data layer + companion theorem).
+**Outcome:** `coverage_tree_soundness_orbit_cert` companion theorem formally established at `21262fb`; Q4 bounded-orbit formal infrastructure / conditional-theorem arc closed (spec + foundation + data layer + companion theorem + lessons-learned). **External-certificate inhabitation deferred** to future Lean-proof / certificate-checker workstream (Python↔Lean bridge, finite-trajectory checker, etc.).
 
 This document captures the architectural decisions, the recurring CI cycle lesson (3rd time this pattern hits in Q4), and reusable patterns from the Q4 arc, so future contributors can avoid the same pitfalls and reuse the working patterns.
 
@@ -75,7 +75,7 @@ The two companion theorems (`coverage_tree_soundness_cert` and `coverage_tree_so
 
 ### 2.2 Orbit-state-relative claim shape (`orbit_hits_claim : ∃ k, claim.Holds (accelerated_orbit x k)`)
 
-The certificate's `orbit_hits_claim` field asserts the routed input's **orbit** reaches a state satisfying the claim, NOT that the original input satisfies the claim. This is structurally different from Q3 v4's `LeafCertificate.routed_implies_claim` (which is about the original input `x` directly). The orbit-state-relative shape is what makes finite claims constructively inhabitable under `descendOrbit` — the original input `x` may not be in `.singleton n` or `.bounded K`, but its orbit at some step `k` may be. Combined with `orbit_predecessor_reaches_one : ReachesOne (accelerated_orbit x k) → ReachesOne x` (built on `accelerated_orbit_compose`), this is the actual Q4 mechanism: orbit-state reachability lifts back to original-input reachability via orbit-predecessor closure.
+The certificate's `orbit_hits_claim` field asserts the routed input's **orbit** reaches a state satisfying the claim, NOT that the original input satisfies the claim. This is structurally different from Q3 v4's `LeafCertificate.routed_implies_claim` (which is about the original input `x` directly). The orbit-state-relative shape **expresses finite claims as an orbit-state-relative certificate contract** (∃ k, claim.Holds (accelerated_orbit x k) + claim_reaches_one), not ruled out by the original-input structural mismatch that ruled out v1's `claim.Holds x` form. **Constructive inhabitation remains a future workstream**: no certificate inhabitant, checker, or Python-to-Lean bridge was constructed in Q4 — `coverage_tree_soundness_orbit_cert` merely assumes `hCert` as an explicit hypothesis, and PR #58's scenario takes `hCert` as an explicit parameter. Combined with `orbit_predecessor_reaches_one : ReachesOne (accelerated_orbit x k) → ReachesOne x` (built on `accelerated_orbit_compose`), this is the actual Q4 mechanism: orbit-state reachability lifts back to original-input reachability via orbit-predecessor closure.
 
 ```lean
 structure BoundedOrbitCertificate (t : CoverageTree) (l : CoverageLeaf) : Type where
@@ -116,7 +116,7 @@ The Q4 implementation arc hit the same root cause three times across PRs #56 →
 
 **Lesson**: three surface-level differences, same underlying failure mode. Two docstring-anchored fixes for the SAME pattern in the SAME PR (PR #56 v1→v2→v3) is the kind of failure that signals the editor didn't check the file's def order at commit time.
 
-The docstring for `IsFiniteClaim.decidable` (PR #57 v2) and `coverage_tree_soundness_orbit_cert` (PR #58 v2) both carry paragraph-length placement / elaboration notes explaining the v1→v2 evolution for the next editor. These are durable rules, not transient history — they belong in the production Lean docstrings per the lean-api-discipline skill.
+The docstring for `IsFiniteClaim.decidable` (PR #57 v2) and `coverage_tree_soundness_orbit_cert` (PR #58 v2) both carry paragraph-length placement / elaboration notes explaining the v1→v2 evolution for the next editor. These were initially placed in production Lean docstrings but were trimmed in v3 to concise durable rules (placement requirement only, no iteration history) per Codex P2 #2 (PR #57, PR #58); this lessons document retains the full chronology, and section 6.7 is the canonical trim policy.
 
 ---
 
@@ -165,7 +165,7 @@ def OrbitLeafReachesOne (t : CoverageTree) (l : CoverageLeaf) : Prop :=
 
 ### 6.2 Orbit-state-relative claim shape for finite-claim certificates
 
-For certificates about finite `LeafClaim` shapes (`.empty`, `.singleton n`, `.bounded K`), assert the claim about an **orbit state**, not the original input. The claim `∃ k, claim.Holds (accelerated_orbit x k)` is what makes finite claims constructively inhabitable under `descendOrbit`.
+For certificates about finite `LeafClaim` shapes (`.empty`, `.singleton n`, `.bounded K`), assert the claim about an **orbit state**, not the original input. The claim `∃ k, claim.Holds (accelerated_orbit x k)` is **expressible as an orbit-state-relative certificate contract** (not ruled out by the original-input structural mismatch), but **constructive inhabitation remains a future Lean-proof / certificate-checker workstream** — `coverage_tree_soundness_orbit_cert` assumes `hCert` as an explicit hypothesis, not an inhabited certificate.
 
 **When to apply**: any time you have a `LeafClaim.Holds` predicate referenced in an obligation field, AND the leaf is routed by `descendOrbit` (or any orbit-reducer), use the orbit-state-relative shape with `accelerated_orbit x k`. Pair with an orbit-predecessor closure lemma (`ReachesOne (accelerated_orbit x k) → ReachesOne x`) to close the proof.
 
@@ -275,10 +275,10 @@ Executable spec scenarios mirror the parameter shape with `example (hv := by nat
 
 ## 7. Conclusion
 
-The Q4 bounded-orbit arc delivered `coverage_tree_soundness_orbit_cert` as a parallel orbit-routing companion theorem to Q3 v4's `coverage_tree_soundness_cert`. The architectural innovation is the parallel-predicate design (`OrbitLeafReachesOne` alongside `LeafReachesOne`) paired with the orbit-state-relative claim shape (`orbit_hits_claim : ∃ k, claim.Holds (accelerated_orbit x k)`) — together these make finite `LeafClaim` claims (`.empty` / `.singleton n` / `.bounded K`) constructively inhabitable under orbit-aware routing.
+The Q4 bounded-orbit arc delivered `coverage_tree_soundness_orbit_cert` as a parallel orbit-routing companion theorem to Q3 v4's `coverage_tree_soundness_cert`. The architectural innovation is the parallel-predicate design (`OrbitLeafReachesOne` alongside `LeafReachesOne`) paired with the orbit-state-relative claim shape (`orbit_hits_claim : ∃ k, claim.Holds (accelerated_orbit x k)`) — together these **express** finite `LeafClaim` claims (`.empty` / `.singleton n` / `.bounded K`) **as orbit-state-relative certificate contracts** (not ruled out by the original-input structural mismatch), but **constructive inhabitation of `BoundedOrbitCertificate t l` remains a future Lean-proof / certificate-checker workstream** (no certificate inhabitant was constructed in Q4; `coverage_tree_soundness_orbit_cert` assumes `hCert` as an explicit hypothesis).
 
 The recurring CI cycle lesson (3rd time the same underlying failure mode hit in Q4 across PRs #56 → #57 → #58) is captured for future bounded-orbit work and any future position-sensitive Lean edits: verify the file's full forward-reference graph before committing, not just the new code added. Three surface-level differences (consumer-before-dep def, equations-form `inferInstance` elaboration order, theorem-before-dep) all share the same root cause — didn't verify the elaboration graph before committing.
 
-The Q4 data-side arc (spec + foundation + data layer + companion theorem) is fully closed at `21262fb`. Remaining external-certificate work (constructive construction of `BoundedOrbitCertificate t l` from external sources, Python↔Lean translation layer) is a separate Q5+ workstream, deferred.
+The Q4 formal infrastructure / conditional-theorem arc (spec + foundation + data layer + companion theorem + lessons-learned) is closed at `21262fb`; **external-certificate inhabitation remains a future workstream** (Python↔Lean bridge, finite-trajectory checker, etc.). Remaining external-certificate work (constructive construction of `BoundedOrbitCertificate t l` from external sources, Python↔Lean translation layer) is a separate Q5+ workstream, deferred.
 
 See `docs/story-q4-bounded-orbit-certificates.md` for the v3 spec (~574 lines); `docs/lessons-learned-07c-2.md` for the parallel Q3 lessons-learned doc.
