@@ -2,7 +2,6 @@
   "schema_version": 1,
   "allowed": {
     "Lean/CollatzResearch/Affine.lean": 4,
-    "Lean/CollatzResearch/BoundedInputOrbitCertificate.lean": 1,
     "Lean/CollatzResearch/Certificate.lean": 1,
     "Lean/CollatzResearch/CoverageTree.lean": 1,
     "Lean/CollatzResearch/Dynamics.lean": 2,
