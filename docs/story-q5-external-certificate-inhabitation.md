@@ -19,6 +19,19 @@ This doc applies the 12 cross-cutting meta-lessons captured in `docs/lessons-lea
   - **#1 Trust boundary explicit**: search outside Lean, verify inside Lean. Python emits deterministic serialized trajectory certificates; Lean parses + verifies them; verifier soundness theorem is the only bridge from Python output to Lean-checked result.
   - **#2 Per-leaf availability pattern**: prove `per_leaf_available : ∀ l ∈ t.leaves, verified t l → BoundedOrbitCertificate t l` separately, compose with existing routing. NOT the universal `∀ x, ∃ l, BoundedOrbitCertificate t l`.
   - **#3 Avoid universal acceptance criterion**: scope to a concrete generated tree (`depthTwoTree`) + bounded certificate dataset. Universal-`∀ t`-quantified theorem stays conditional (assumes `hCert`).
+- **v2 (THIS DOC)**: BLOCKING design fixes from PR #61 Codex review. Resolves 3 architectural flaws:
+  - **#1 Wrong transition semantics** (fix in § 4.1): v1 example used `5 → 16 → 8 → 4 → 2 → 1` labeled as `acceleratedStep` (actually `standardStep`). In this project `acceleratedStep 5 = 1` (one step: `3*5+1 = 16`, divide by `2^4 = 1`). Fixed: examples now use correct `acceleratedStep` trajectories (`.singleton 5` → `5 → 1`; `.singleton 7` → `7 → 11 → 17 → 13 → 5 → 1`). **Critical**: the verifier MUST check the same `acceleratedStep` relation used by `accelerated_orbit` (not the standard Collatz sequence).
+  - **#2 Missing `orbit_hits_claim` proof source** (fix in § 4.3.2 + § 4.4): trajectory validity only proves `claim_reaches_one`; `orbit_hits_claim` (universal routing-to-claim obligation over every `x` routed to `l`) requires a separate leaf-indexed `OrbitHitEvidence t l claim` derived from concrete tree structure. Fixed: § 4.3.2 adds `OrbitHitEvidence` structure; § 4.4 `per_leaf_available` now takes BOTH `TrajectoryCertificate` dataset (for `claim_reaches_one` via `checkTrajectory_sound`) AND `OrbitHitEvidence` dataset (for `orbit_hits_claim`). Either alone is insufficient; together they construct the full `BoundedOrbitCertificate`.
+  - **#3 `.bounded K` requires exhaustive coverage** (fix in § 4.1 + § 4.2 + § 4.3.1): v1 shape `{"type":"bounded","K":K,"y":Y}` only proved ONE trajectory for ONE `Y ≤ K`. But `claim_reaches_one` for `.bounded K` is `∀ y, y ≤ K → ReachesOne y`. Fixed: `.bounded K` certificate now carries `trajectories : List (List TrajectoryCertificateOp)` covering every `y ∈ [0, K]`; verifier checks `trajectories.length = K + 1` AND each trajectory is valid; soundness theorem yields `∀ y, y ≤ K → ReachesOne y`.
+
+**v2 recommended architecture** (updated):
+```
+Python generator → accelerated-trajectory certificates → Lean trajectory verifier → claim_reaches_one
+concrete-tree routing/finite-bound proof → orbit_hits_claim
+claim + orbit_hits_claim + claim_reaches_one → BoundedOrbitCertificate t l
+per-leaf indexed dataset/evidence → existing coverage_tree_soundness_orbit_cert
+```
+Search-outside-Lean / verify-inside-Lean direction remains good; the required change is to model the two certificate obligations separately and ensure `.bounded K` evidence is genuinely exhaustive.
 
 ---
 
@@ -66,84 +79,162 @@ existing companion theorem: coverage_tree_soundness_orbit_cert (hCert populated 
 
 ### 4.1 Serialized certificate format (text-based JSON)
 
-The Python generator emits deterministic, serialized trajectory certificates. The format is text-based JSON for inspectability + easy debugging:
+The Python generator emits deterministic, serialized trajectory certificates. The format is text-based JSON for inspectability + easy debugging.
 
+**Per Codex review feedback on PR #61 (v2 fix)**: in this project `acceleratedStep` for an odd `n` is the result of reducing `3n+1` by its **full 2-adic factor** (divide by `2^ν₂(3n+1)`). So `acceleratedStep 5 = 1` (since `3*5+1 = 16`, `ν₂(16) = 4`, `16 / 16 = 1`), not the standard Collatz sequence. The trajectory `5 → 16 → 8 → 4 → 2 → 1` is the standard Collatz trajectory under `standardStep`, NOT `acceleratedStep`. The verifier MUST check the same `acceleratedStep` relation used by `accelerated_orbit`.
+
+**Simple example — `.singleton 5`** (one step):
 ```json
 {
   "claim": { "type": "singleton", "n": 5 },
   "trajectory": [
     { "step": 0, "value": 5, "op": "start" },
-    { "step": 1, "value": 16, "op": "acceleratedStep" },
-    { "step": 2, "value": 8,  "op": "acceleratedStep" },
-    { "step": 3, "value": 4,  "op": "acceleratedStep" },
-    { "step": 4, "value": 2,  "op": "acceleratedStep" },
+    { "step": 1, "value": 1, "op": "acceleratedStep" }
+  ]
+}
+```
+`acceleratedStep 5 = 1` because `3*5+1 = 16` divides by `2^4 = 16` to give `1`. The trajectory is `5 → 1`.
+
+**Multi-step example — `.singleton 7`** (six steps under `acceleratedStep`):
+```json
+{
+  "claim": { "type": "singleton", "n": 7 },
+  "trajectory": [
+    { "step": 0, "value": 7,  "op": "start" },
+    { "step": 1, "value": 11, "op": "acceleratedStep" },
+    { "step": 2, "value": 17, "op": "acceleratedStep" },
+    { "step": 3, "value": 13, "op": "acceleratedStep" },
+    { "step": 4, "value": 5,  "op": "acceleratedStep" },
     { "step": 5, "value": 1,  "op": "acceleratedStep" }
   ]
 }
 ```
+`accelerated_orbit 7 = 7 → 11 → 17 → 13 → 5 → 1`. Each step is `acceleratedStep` of the previous: `7 → 11` (`3*7+1 = 22`, `ν₂(22) = 1`, `22/2 = 11`); `11 → 17` (`3*11+1 = 34`, `ν₂(34) = 1`, `34/2 = 17`); `17 → 13` (`3*17+1 = 52`, `ν₂(52) = 2`, `52/4 = 13`); `13 → 5` (`3*13+1 = 40`, `ν₂(40) = 3`, `40/8 = 5`); `5 → 1` (as above).
 
-**Shape**:
-- `claim`: `{"type": "singleton", "n": N}` (per-instance trajectory reaching `N`) or `{"type": "bounded", "K": K, "y": Y}` (per-bound trajectory within `Y ≤ K`)
-- `trajectory`: list of `{step, value, op}` where `op` is `"start"` for the first step + `"acceleratedStep"` for subsequent steps
+**Bounded example — `.bounded K`** (per Codex feedback #3: must aggregate ALL `y ≤ K` trajectories, not one):
+```json
+{
+  "claim": { "type": "bounded", "K": 2 },
+  "trajectories": [
+    { "y": 0, "trajectory": [{ "step": 0, "value": 0, "op": "start" }, { "step": 1, "value": 1, "op": "acceleratedStep" }] },
+    { "y": 1, "trajectory": [{ "step": 0, "value": 1, "op": "start" }] },
+    { "y": 2, "trajectory": [{ "step": 0, "value": 2, "op": "start" }, { "step": 1, "value": 1, "op": "acceleratedStep" }] }
+  ]
+}
+```
+`claim_reaches_one` for `.bounded K` is `∀ y, y ≤ K → ReachesOne y`. The certificate MUST carry a trajectory for EACH `y ≤ K` (here: `K = 2`, so 3 trajectories for `y = 0, 1, 2`). A single trajectory for a single `y` is insufficient — the verifier checks `trajectories.length = K + 1` AND each trajectory is valid AND reaches 1.
+
+**Shape summary**:
+- `claim`: `{"type": "singleton", "n": N}` OR `{"type": "bounded", "K": K}` (note: bounded does NOT carry a single `y`; the trajectories cover all `y ≤ K`)
+- `trajectory` (for singleton): list of `{step, value, op}` where `op` is `"start"` for the first step + `"acceleratedStep"` for subsequent steps
+- `trajectories` (for bounded): list of `{y, trajectory}` covering every `y ∈ [0, K]`
 
 **Why JSON**: easy to inspect + diff + version; trivially serializable from Python; trivially parsable in Lean (via Mathlib `Json` or a small hand-rolled parser for this fixed schema).
 
 **Determinism**: Python generator must be deterministic (same input → same output bytes) so that the Lean verifier can trust the certificate contents without re-running Python.
 
-### 4.2 Verifier interface (`Certificate` inductive type + `checkTrajectory : Certificate → Bool`)
+### 4.2 Verifier interface (`TrajectoryCertificate` inductive type + `checkTrajectory : TrajectoryCertificate → Bool`)
 
-Lean defines a `Certificate` structure (or inductive) that represents a parsed trajectory:
+Lean defines a `TrajectoryCertificate` inductive that represents a parsed trajectory. Per Codex feedback #3 on PR #61 (v2 fix), the certificate supports two shapes — `.singleton` (single trajectory for one value) + `.bounded` (aggregation of trajectories covering all `y ≤ K`):
 
 ```lean
 -- Per Q5 PR #2 (verifier implementation)
-inductive CertificateOp where
-  | start : Nat → CertificateOp           -- the starting value
-  | acceleratedStep : Nat → CertificateOp  -- the result of acceleratedStep
+inductive TrajectoryCertificateOp where
+  | start : Nat → TrajectoryCertificateOp           -- the starting value
+  | acceleratedStep : Nat → TrajectoryCertificateOp  -- the result of acceleratedStep
 
-structure Certificate where
-  claim : FiniteOrbitClaim
-  trajectory : List CertificateOp
+inductive TrajectoryCertificate where
+  | singleton (n : Nat) (trajectory : List TrajectoryCertificateOp)
+  | bounded (K : Nat) (trajectories : List (List TrajectoryCertificateOp))
 
-def checkTrajectory : Certificate → Bool
-  -- 1. Verify trajectory[0] is `start` (the claim's anchor value)
+def check_singleton_trajectory (n : Nat) (traj : List TrajectoryCertificateOp) : Bool
+  -- 1. Verify traj[0] is `start n` (the anchor value)
   -- 2. Verify each subsequent step is `acceleratedStep` of the previous step
-  -- 3. Verify the final value satisfies the claim
+  --    (full 2-adic reduction: step_i+1 = step_i * 3 + 1 divided by 2^ν₂(...))
+  -- 3. Verify the final value is 1
+
+def checkTrajectory : TrajectoryCertificate → Bool
+  | .singleton n traj => check_singleton_trajectory n traj
+  | .bounded K trajs =>
+    trajs.length = K + 1 ∧  -- exactly K+1 trajectories, one per y ∈ [0, K]
+    ∀ i, i < trajs.length → check_singleton_trajectory i trajs[i]!
 ```
 
-The verifier is `Decidable` (returns `Bool`) so it can be used in `if`/`then`/`else` expressions.
+The verifier is `Decidable` (returns `Bool`) so it can be used in `if`/`then`/`else` expressions. Note: `check_singleton_trajectory` checks the **actual `acceleratedStep` semantics** (full 2-adic reduction of `3n+1`), NOT the standard Collatz sequence. The verifier soundness theorem (§ 4.3.1) relies on this.
 
-### 4.3 Verifier soundness theorem (`checkTrajectory_sound`)
+### 4.3 Verifier soundness theorem + `OrbitHitEvidence` (split obligations)
 
-The kernel-checked bridge from Python output to Lean-checked result:
+Per Codex feedback #2 on PR #61 (v2 fix), the spec splits the two certificate obligations:
+- `TrajectoryCertificate` / verifier soundness theorem proves ONLY `claim_reaches_one`
+- Separate leaf-indexed `OrbitHitEvidence t l claim` proves `orbit_hits_claim`
+
+**Why split**: `BoundedOrbitCertificate t l` requires BOTH obligations:
+- `claim_reaches_one : ∀ y, claim.Holds y → ReachesOne y` (provided by `TrajectoryCertificate` + verifier soundness)
+- `orbit_hits_claim : ∀ x, descendOrbit t x 0 = some l → ∃ k, claim.Holds (accelerated_orbit x k)` (universal routing-to-claim obligation; provided by `OrbitHitEvidence`)
+
+A finite trajectory dataset does NOT establish the universal `orbit_hits_claim`. The two proof sources are independent and both required.
+
+#### 4.3.1 `TrajectoryCertificate` verifier soundness theorem
+
+The kernel-checked bridge from Python output to `claim_reaches_one`:
 
 ```lean
-theorem checkTrajectory_sound (c : Certificate) (h : checkTrajectory c = true) :
-    (∃ n, c.claim = FiniteOrbitClaim.singleton n ∧
-         c.trajectory matches n's orbit reaching 1) ∨
-    (∃ K Y, c.claim = FiniteOrbitClaim.bounded K ∧ Y ≤ K ∧
-         c.trajectory matches Y's orbit reaching 1) := by
+theorem checkTrajectory_sound :
+    ∀ c, checkTrajectory c = true →
+      match c with
+      | .singleton n _ => ReachesOne n
+      | .bounded K _ => ∀ y, y ≤ K → ReachesOne y := by
   sorry  -- Q5 PR #2 (verifier) proves this
 ```
 
-**Statement**: if `checkTrajectory c = true`, then the trajectory encoded in `c` correctly reaches 1 for the claimed finite value. **This is the ONLY theorem Python output relies on.** Python can be buggy in any other way without affecting the Lean trust base.
+**Statement**: if `checkTrajectory c = true`, then either:
+- `.singleton n _` → `ReachesOne n` (single trajectory reaches 1)
+- `.bounded K _` → `∀ y, y ≤ K → ReachesOne y` (every y in [0, K] reaches 1 — exhaustive coverage per Codex feedback #3)
+
+**This is the ONLY theorem Python output relies on.** Python can be buggy in any other way without affecting the Lean trust base.
+
+#### 4.3.2 `OrbitHitEvidence` (separate source for `orbit_hits_claim`)
+
+`TrajectoryCertificate` does NOT establish `orbit_hits_claim`. The orbit-state-relative claim shape requires a separate proof that for every `x` routed to leaf `l`, the orbit of `x` under `accelerated_orbit` eventually reaches a value satisfying the claim. This is a universal quantification, not a finite dataset.
+
+```lean
+-- Per Q5 PR #4 (integration) — derived from the concrete tree structure
+structure OrbitHitEvidence (t : CoverageTree) (l : CoverageLeaf) (claim : FiniteOrbitClaim) : Type where
+  orbit_hits :
+    ∀ x, descendOrbit t x 0 = some l → ∃ k, claim.Holds (accelerated_orbit x k)
+```
+
+**For `depthTwoTree`**: the concrete tree structure (residue routing at root + depth-one levels) determines which residue classes of `x` route to each leaf. `OrbitHitEvidence depthTwoTree l claim` is a per-leaf proof that for every `x` in `l`'s residue-class preimage, `accelerated_orbit x` eventually reaches a claim-satisfying value. The exact mechanism is established in Q5 PR #4 (integration).
+
+**Important**: `OrbitHitEvidence` is NOT a Python-emitted certificate. It's a Lean-proved theorem derived from the concrete tree structure + the `accelerated_orbit` dynamics. Python can be buggy; `OrbitHitEvidence` is kernel-checked.
 
 ### 4.4 Per-leaf availability pattern (`per_leaf_available`)
 
-Per Codex review feedback #2 on PR #60, avoid the universal shape `∀ x, ∃ l, BoundedOrbitCertificate t l` (one reusable certified leaf could satisfy it for every `x`). Instead, prove per-leaf availability separately:
+Per Codex feedback #2 on PR #60 (avoid universal `∀ x, ∃ l, BoundedOrbitCertificate t l`) + Codex feedback #2 on PR #61 (split obligations into `TrajectoryCertificate` + `OrbitHitEvidence`), `per_leaf_available` takes BOTH proof sources and constructs the full `BoundedOrbitCertificate`:
 
 ```lean
 -- Q5 PR #4 (integration)
-theorem per_leaf_available (t : CoverageTree) [ValidTree t] [IsComplete t]
-    (depthTwoTree : CoverageTree)  -- concrete tree
-    (depthTwoTree_is_target : depthTwoTree = t)  -- or use defeq directly
-    (certs : List Certificate)  -- bounded dataset from Python generator
-    (h_certs_valid : ∀ c ∈ certs, checkTrajectory c = true) :
+theorem per_leaf_available (depthTwoTree : CoverageTree)
+    (trajectory_certs : depthTwoTree.leaves → TrajectoryCertificate)
+    (h_trajectories_valid : ∀ l h, checkTrajectory (trajectory_certs l) = true)
+    (orbit_hits : (l : depthTwoTree.leaves) →
+                   OrbitHitEvidence depthTwoTree l.1 (trajectory_certs l).claim) :
     ∀ l ∈ depthTwoTree.leaves, verified depthTwoTree l →
       BoundedOrbitCertificate depthTwoTree l := by
   sorry  -- Q5 PR #4 (integration) proves this
 ```
 
-The theorem takes the concrete tree + the bounded certificate dataset + a verification proof that all certificates are valid, and produces a `BoundedOrbitCertificate t l` for each verified leaf.
+The theorem takes:
+- The concrete tree (`depthTwoTree`)
+- The trajectory certificate dataset (one `TrajectoryCertificate` per leaf — proves `claim_reaches_one` via `checkTrajectory_sound`)
+- The orbit-hits evidence dataset (one `OrbitHitEvidence` per leaf — proves `orbit_hits_claim`)
+- And produces a `BoundedOrbitCertificate t l` for each verified leaf
+
+**Why both proofs are needed**: `BoundedOrbitCertificate t l` has two obligation fields:
+- `claim_reaches_one : ∀ y, claim.Holds y → ReachesOne y` (provided by `trajectory_certs` via `checkTrajectory_sound`)
+- `orbit_hits_claim : ∀ x, descendOrbit t x 0 = some l → ∃ k, claim.Holds (accelerated_orbit x k)` (provided by `orbit_hits` — the `OrbitHitEvidence` for each leaf)
+
+Either alone is insufficient. Together they construct the full `BoundedOrbitCertificate`.
 
 **Composition**: with `per_leaf_available` in hand, the Q4 companion theorem `coverage_tree_soundness_orbit_cert` applies unchanged (its `hCert` hypothesis is now satisfied by `per_leaf_available`):
 
@@ -152,17 +243,23 @@ The theorem takes the concrete tree + the bounded certificate dataset + a verifi
 example (depthTwoTree : CoverageTree)
     (hv : ValidTree depthTwoTree := by native_decide)
     (hc : IsComplete depthTwoTree := by native_decide)
-    (certs : List Certificate)
-    (h_certs_valid : ∀ c ∈ certs, checkTrajectory c = true)
+    (trajectory_certs : depthTwoTree.leaves → TrajectoryCertificate)
+    (h_trajectories_valid : ∀ l h, checkTrajectory (trajectory_certs l) = true)
+    (orbit_hits : (l : depthTwoTree.leaves) →
+                   OrbitHitEvidence depthTwoTree l.1 (trajectory_certs l).claim)
     (x : Nat) (hx : x > 0) :
     ∃ l, l ∈ depthTwoTree.leaves ∧ verified depthTwoTree l ∧
          descendOrbit depthTwoTree x 0 = some l ∧
          OrbitLeafReachesOne depthTwoTree l := by
-  have hCert := per_leaf_available depthTwoTree certs h_certs_valid
+  have hCert : ∀ l ∈ depthTwoTree.leaves, verified depthTwoTree l →
+                BoundedOrbitCertificate depthTwoTree l := by
+    intro l hl hver
+    exact per_leaf_available depthTwoTree trajectory_certs
+           h_trajectories_valid orbit_hits l hl hver
   exact coverage_tree_soundness_orbit_cert depthTwoTree hv hc hCert x hx
 ```
 
-The Q4 conditional companion theorem now closes for the concrete tree + the verified certificate dataset.
+The Q4 conditional companion theorem now closes for the concrete tree + the verified datasets (trajectory certificates + orbit-hits evidence).
 
 ### 4.5 Scope to concrete tree / bounded certificate dataset (avoid universal acceptance)
 
@@ -276,6 +373,7 @@ Executable spec scenarios:
 
 ## 10. Implementation log
 
-- **THIS DOC (v1)**: initial design. Applies 12 cross-cutting patterns from META lessons-learned + 3 Codex refinement points from PR #60 review.
+- **v1**: initial design. Applies 12 cross-cutting patterns from META lessons-learned + 3 Codex refinement points from PR #60 review.
+- **v2**: BLOCKING design fixes from PR #61 Codex review. Resolves 3 architectural flaws (#1 wrong transition semantics; #2 missing `orbit_hits_claim` proof source; #3 `.bounded K` requires exhaustive coverage). All 3 fixed in § 4.1-4.4. The verifier MUST check the same `acceleratedStep` relation used by `accelerated_orbit` (not the standard Collatz sequence). The two certificate obligations (`claim_reaches_one` + `orbit_hits_claim`) are now modeled separately, and `.bounded K` evidence is genuinely exhaustive (one trajectory per `y ∈ [0, K]`).
 
 **Recommended next move**: apply this spec + open Q5 PR #2 (verifier — Lean-only, kernel-checked). The verifier is the foundation; the Python generator + integration build on top of it.
