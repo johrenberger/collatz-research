@@ -418,26 +418,17 @@ end LeafClaim
     territory (Q3 v4 `LeafCertificate`), not orbit-aware routing
     territory (Q4 v3 `BoundedOrbitCertificate`).
 
-    `Holds` here is a predicate on `Nat` interpreted as an **orbit
-    state** (a value `accelerated_orbit x k` for some `k : Nat`),
-    NOT on the original routing input `x` directly. This is the
-    critical Q4 v2 fix from the v1 spec (which incorrectly asserted
-    the claim about the original input `x` and was uninhabitable on
-    nonempty leaves under residue-only routing). The orbit-state-
-    relative shape is what makes finite claims constructively
-    inhabitable under `descendOrbit`.
+    `Holds y` is interpreted as `y` being an **orbit state** (a value
+    `accelerated_orbit x k` for some `k : Nat`), NOT the original
+    routing input `x` directly. This orbit-state-relative shape is
+    what makes finite claims constructively inhabitable under
+    `descendOrbit`.
 
-    Equality-comparable, serializable. `DecidableEq` provided by
-    `deriving`. Sibling to `LeafClaim` (Q3 v4 data layer); the two
-    types are independent — `FiniteOrbitClaim` excludes `.interval`
-    by construction; `LeafClaim` retains `.interval` for residue-only
+    Equality-comparable, serializable. `DecidableEq` via `deriving`.
+    Sibling to `LeafClaim` (Q3 v4 data layer); the two types are
+    independent — `FiniteOrbitClaim` excludes `.interval` by
+    construction; `LeafClaim` retains `.interval` for residue-only
     routing.
-
-    Placed after `end LeafClaim` so the dual-mechanism (the
-    `IsFiniteClaim` predicate that discriminates finite vs interval
-    `LeafClaim` constructors) has `LeafClaim` in scope; `LeafClaim`
-    is closed before this insertion point so the predicate's
-    structural match elaborates.
 
     (Story Q4 / PR #57.) -/
 inductive FiniteOrbitClaim where
@@ -448,40 +439,28 @@ inductive FiniteOrbitClaim where
 
 namespace FiniteOrbitClaim
 
-/-- The set of orbit states claimed by a `FiniteOrbitClaim`. Pure predicate.
-    `Holds y` is interpreted as "y is an orbit state reachable from some
-    input routed to this leaf, AND y is claimed to reach 1".
+/-- Set-membership predicate on `Nat` for a `FiniteOrbitClaim`.
+    `Holds y` is interpreted as "y is an orbit state reachable from
+    some input routed to this leaf, AND y is claimed to reach 1".
 
-    Note: the `y` here is a `Nat` value that the **caller** interprets
-    as an orbit state (e.g., `accelerated_orbit x k` for some `k`).
-    The predicate itself is just a structural match on the
-    `FiniteOrbitClaim` constructors; the orbit-state interpretation
-    happens at the call site (see `BoundedOrbitCertificate.orbit_hits_claim`,
-    which asserts `claim.Holds (accelerated_orbit x k)` for some `k`).
-
-    Decidability instance per constructor (Q4 v3): `.empty` → `False`,
-    `.singleton n` → `y = n`, `.bounded K` → `y ≤ K`. Mirrors
-    `LeafClaim.Holds` for the three finite constructors. -/
+    Note: `y` is a `Nat` value that the **caller** interprets as an
+    orbit state (e.g., `accelerated_orbit x k` for some `k`); the
+    predicate itself is just a structural match. -/
 def Holds (c : FiniteOrbitClaim) (y : Nat) : Prop :=
   match c with
   | .empty => False
   | .singleton n => y = n
   | .bounded K => y ≤ K
 
-/-- Decidability instance for `FiniteOrbitClaim.Holds`. Cases:
+/-- Decidability instance for `FiniteOrbitClaim.Holds`. Per-
+    constructor dispatch:
     - `.empty` → `Decidable False`
     - `.singleton n` → `Decidable (y = n)` via `Nat.decEq`
     - `.bounded K` → `Decidable (y ≤ K)` via `Nat.decLe`
 
-    Mirrors `LeafClaim.Holds.decidable` for the three finite
-    constructors; `.interval` is structurally excluded by
-    `FiniteOrbitClaim`'s constructor set.
-
-    Uses the explicit `cases c with | empty => ... | singleton n =>
-    ... | bounded K => ...` form (parallel to `LeafClaim.Holds.decidable`)
-    rather than the `cases c <;> first | ... | ... | ...` combinator
-    form from the Q4 v3 spec sketch, for project-style consistency
-    with `LeafClaim.Holds.decidable`. -/
+    Uses `cases c with` form (mirrors `LeafClaim.Holds.decidable`).
+    `.interval` is structurally excluded by `FiniteOrbitClaim`'s
+    constructor set. -/
 instance Holds.decidable (c : FiniteOrbitClaim) (y : Nat) :
     Decidable (c.Holds y) := by
   unfold Holds
@@ -490,35 +469,15 @@ instance Holds.decidable (c : FiniteOrbitClaim) (y : Nat) :
   | singleton n => exact (inferInstance : Decidable (y = n))
   | bounded K => exact (inferInstance : Decidable (y ≤ K))
 
-/-- `IsFiniteClaim : LeafClaim → Prop` predicate, used by external code
-    that needs to distinguish finite vs interval `LeafClaim` values
-    (e.g., parsers, deserializers, code that converts a `LeafClaim` to
-    a `FiniteOrbitClaim`). Returns `True` for the three finite
-    constructors (`.empty`, `.singleton n`, `.bounded K`) and `False`
-    for `.interval`.
+/-- `IsFiniteClaim : LeafClaim → Prop` predicate. Returns `True` for
+    the three finite constructors (`.empty`, `.singleton n`,
+    `.bounded K`) and `False` for `.interval`.
 
-    **Reusable across Q3/Q4 boundaries:** any code that needs to check
+    Reusable across Q3/Q4 boundaries: any code that needs to check
     "is this `LeafClaim` finite-shaped?" can call this predicate
-    without committing to the orbit-routing machinery. The companion
+    without committing to the orbit-routing machinery. Companion
     decidability instance enables `decide` for closed `LeafClaim`
     values.
-
-    **Why this lives in `namespace FiniteOrbitClaim`** (not as a
-    top-level helper): it's the predicate dual to the
-    `FiniteOrbitClaim` type (where `LeafClaim` is the source and
-    `FiniteOrbitClaim` is the target), so colocating the predicate
-    with the type makes the dual-mechanism (type + discriminator
-    predicate) discoverable as a single unit.
-
-    **Not to be confused with a `wellFormed` field.** The Q4 v2.1
-    spec had a `FiniteOrbitClaim.IsFinite : FiniteOrbitClaim → Prop`
-    predicate (always `True` for every constructor) carried as a
-    `wellFormed` field on `BoundedOrbitCertificate`. Codex run-21858
-    P2 explicitly rejected that as a tautological obligation for
-    symmetry. This `IsFiniteClaim` (on `LeafClaim`, not on
-    `FiniteOrbitClaim`) is the survivor — it discriminates between
-    `LeafClaim`'s finite and `.interval` constructors, which is
-    actually non-trivial.
 
     (Story Q4 / PR #57.) -/
 def IsFiniteClaim : LeafClaim → Prop
@@ -549,15 +508,9 @@ def IsFiniteClaim : LeafClaim → Prop
     `(inferInstance : Decidable False)` annotations tell
     `inferInstance` which core instance to look for.
 
-    **Lesson recorded (PR #57 v1→v2):** equations-form for
-    `Decidable` instances requires either explicit type
-    annotations on each branch's `inferInstance` call, or the
-    `cases`-with-explicit-form. Bare `inferInstance` in
-    equations-form fails to resolve when the motive involves a
-    `def` that needs to be unfolded before instance resolution.
-    PR #56's two forward-ref cascades had the same root cause:
-    elaborate-time type resolution didn't see the needed unfold.
-    (Story Q4 / PR #57 v2.) -/
+    Uses `cases c with` + explicit `Decidable True/False`
+    annotations on `inferInstance`, matching
+    `LeafClaim.WellFormed.decidable` style. -/
 instance IsFiniteClaim.decidable (c : LeafClaim) :
     Decidable (IsFiniteClaim c) := by
   cases c with
@@ -646,92 +599,58 @@ structure LeafCertificate (t : CoverageTree) (l : CoverageLeaf) : Type where
     ∀ x, claim.Holds x → ReachesOne x
 
 /-- A structured certificate that a leaf `l` in tree `t` carries to
-    prove `OrbitLeafReachesOne t l` (the orbit-routing leaf-level
-    semantic predicate) for a **finite** `FiniteOrbitClaim` shape
-    (`.empty`, `.singleton n`, `.bounded K`).
+    prove `OrbitLeafReachesOne t l` for a **finite**
+    `FiniteOrbitClaim` shape (`.empty`, `.singleton n`, `.bounded K`).
 
-    Declared as `: Type` (NOT `: Prop`) per Q3 v4 lesson: the
-    `claim : FiniteOrbitClaim` data field requires the structure to
-    live in `Type` (Lean 4 elaboration rejects `Type`-valued fields in
-    `Prop`-valued structures). The two obligation fields are still
-    `Prop`s, so the kernel still verifies them — only the structure's
-    outer sort is `Type`. This makes `BoundedOrbitCertificate t l` a
-    **proof-carrying data bundle**: inspectable data plus kernel-checked
-    proof fields. It is NOT proof-irrelevant evidence and is intended
-    to be constructed, pattern-matched on, and projected through.
+    `: Type`-valued proof-carrying data bundle (NOT `: Prop`): the
+    `claim : FiniteOrbitClaim` data field requires `Type`-valued sort
+    (Lean 4 elaboration rejects `Type`-valued fields in `: Prop`
+    structures). The two obligation fields remain `Prop`s and are
+    kernel-checked.
 
-    **Orbit-state-relative claim shape (Q4 v2 — the v1→v2 fix).**
-    The `orbit_hits_claim` field is the Q4 mechanism: it asserts that
+    **Orbit-state-relative claim shape.** `orbit_hits_claim` asserts
     the routed input's orbit reaches a state satisfying the claim,
-    NOT that the original input satisfies the claim. This is
-    structurally different from Q3 v4's `LeafCertificate`, where
-    `routed_implies_claim` is about the original input `x` directly.
-    The orbit-state-relative shape is what makes finite claims
-    constructively inhabitable under `descendOrbit` (the original
-    input `x` may not be in `.singleton n` or `.bounded K`, but its
-    orbit at some step `k` may be). See `docs/story-q4-bounded-orbit-certificates.md`
-    § "Foundation lemmas — the actual Q4 mechanism" for the full
-    provenance of this design choice.
+    NOT the original input. This is what makes finite claims
+    constructively inhabitable under `descendOrbit`.
 
-    **Two obligation fields** (Q4 v3 — `wellFormed` removed per Codex
-    run-21858 P2 review on PR #55):
+    **Two obligation fields:**
     1. `orbit_hits_claim`: every input routed (orbit-aware) to `l`
-       reaches an orbit state satisfying the claim. (Routing-to-orbit-state
-       obligation.) This is the field where the Q4 mechanism lives.
+       reaches an orbit state satisfying the claim.
     2. `claim_reaches_one`: every orbit state satisfying the claim
-       reaches 1. (Reachability obligation — per-input enumeration
-       for `.bounded K`, single trajectory check for `.singleton n`,
-       vacuous for `.empty`.)
+       reaches 1.
 
-    **NO `wellFormed` field** (Q4 v3 vs Q3 v4's `LeafCertificate`).
-    The finite-shape restriction is enforced at the **type level** by
-    `FiniteOrbitClaim`'s constructor set (which excludes `.interval`).
-    Codex run-21858 P2 explicitly rejected the v2.1 symmetry-by-
-    placeholder `wellFormed : claim.IsFinite` field as a tautological
-    obligation. Q4 v3 uses `IsFiniteClaim : LeafClaim → Prop` as a
-    separate reusable predicate (in `namespace FiniteOrbitClaim`) for
-    code that needs to discriminate between finite vs `.interval`
-    `LeafClaim` values — but that predicate is NOT carried as a
-    certificate field. The certificate itself is data-only.
+    **NO `wellFormed` field.** The finite-shape restriction is
+    enforced at the **type level** by `FiniteOrbitClaim`'s
+    constructor set (which excludes `.interval`).
+    `IsFiniteClaim : LeafClaim → Prop` is a separate reusable
+    predicate (in `namespace FiniteOrbitClaim`) for code that needs
+    to discriminate between finite vs `.interval` `LeafClaim`
+    values, but is NOT carried as a certificate field.
+
+    **Trust boundary.** This is proof-carrying data: a data field
+    plus kernel-checked Lean proof fields. External computation
+    (e.g., Python oracles) may propose witnesses but cannot
+    construct `BoundedOrbitCertificate` as proof authority without
+    Lean-checked proofs or a separately proved checker.
 
     **No `hCert` default, no `by sorry`.** The companion theorem
     `coverage_tree_soundness_orbit_cert` (PR #58 deliverable) takes
     `(hCert : ∀ l ∈ t.leaves, verified t l → BoundedOrbitCertificate t l)`
-    as an **explicit** hypothesis per the project "no new sorry"
+    as an explicit hypothesis per the project "no new sorry"
     discipline (PR #51 P1).
 
     **Companion to `LeafCertificate`.** NO mutual exclusion — a leaf
     can carry both `LeafCertificate t l` (Q3 v4, residue-only routing)
     and `BoundedOrbitCertificate t l` (Q4 v3, orbit-aware routing) as
-    **independent views** of its semantic content. They conclude
-    different leaf-level predicates (`LeafReachesOne t l` vs
-    `OrbitLeafReachesOne t l`) and certify different routing relations
-    (`descend` vs `descendOrbit`). See
-    `docs/story-q4-bounded-orbit-certificates.md` § "Architectural
-    context" for the full parallel-predicate diagram.
+    independent views of its semantic content. They conclude different
+    leaf-level predicates (`LeafReachesOne t l` vs
+    `OrbitLeafReachesOne t l`) and certify different routing
+    relations (`descend` vs `descendOrbit`).
 
-    **Position note.** Inserted after `LeafCertificate` and before
-    `OrbitAlignedAux`. The `orbit_hits_claim` field's type references
-    `descendOrbit` (defined earlier in this file, at the PR #56
-    placement), `accelerated_orbit` (defined earlier), `ReachesOne`
-    (defined earlier), and `FiniteOrbitClaim.Holds` (defined in the
-    namespace block just above `LeafCertificate`). All deps are in
-    scope at this insertion point. The previous forward-reference
-    cascades in PR #56 (v1 `ReachesOne` forward-ref + v2
-    `descendOrbit` forward-ref) are the cautionary tale here — the
-    placement was chosen with the full forward-reference graph in
-    mind, not by skimming the new code alone.
+    Inserted after `LeafCertificate` (all deps in scope).
 
-    Companion API-shape regression: `def boundedCertificateClaim {t l}
-    (c : BoundedOrbitCertificate t l) : FiniteOrbitClaim := c.claim`
-    in `FiniteOrbitClaimTests.lean` scenario 14. This `def` performs a
-    `Prop → Type` elimination by projecting `c.claim : FiniteOrbitClaim`
-    out of a `BoundedOrbitCertificate t l`. A future PR flipping the
-    sort to `: Prop` will fail to typecheck this def (no dependent
-    elimination from `Prop` into `Type`). Mirrors PR #54's
-    `def certificateClaim` in `LeafClaimTests.lean`.
-
-    (Story Q4 / PR #57.) -/
+    API-shape regression: `def boundedCertificateClaim` + polymorphic
+    obligation projections in `FiniteOrbitClaimTests.lean`. -/
 structure BoundedOrbitCertificate (t : CoverageTree) (l : CoverageLeaf) : Type where
   claim : FiniteOrbitClaim
   orbit_hits_claim :
