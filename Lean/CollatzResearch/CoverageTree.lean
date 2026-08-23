@@ -829,67 +829,6 @@ theorem coverage_tree_soundness_cert (t : CoverageTree)
   exact (hCert l hl hver).claim_reaches_one x'
          ((hCert l hl hver).routed_implies_claim x' hdesc')
 
-/-- Bounded-orbit companion theorem for `FiniteOrbitClaim` shapes
-    (`.empty`, `.singleton n`, `.bounded K`) — **parallel** to (NOT a
-    refinement of) `coverage_tree_soundness_full` /
-    `coverage_tree_soundness_cert`.
-
-    Certifies the **orbit-aware routing relation** (`descendOrbit t x 0`)
-    rather than the residue-only routing relation (`descend t x`).
-    Concludes `OrbitLeafReachesOne t l` (NEW Q4 v3 predicate), defined
-    over `descendOrbit`, NOT `LeafReachesOne t l` (defined over `descend`).
-
-    Per Codex run-21848 P1: the previous v2 spec concluded
-    `LeafReachesOne t l` while constructing a proof over `descendOrbit`;
-    the kernel rejected this because `descend t x = some l` and
-    `descendOrbit t x 0 = some l` are different routing relations.
-    v3 introduces `OrbitLeafReachesOne` so the conclusion type matches
-    the routing evidence used in the proof.
-
-    Proof sketch:
-      1. `descend_orbit_complete` provides orbit-aware routing with
-         `OrbitRoute` witness.
-      2. `cert.orbit_hits_claim` lifts the routing to an orbit-state
-         claim (`∃ k, claim.Holds (accelerated_orbit x' k)`).
-      3. `cert.claim_reaches_one` derives
-         `ReachesOne (accelerated_orbit x' k)`.
-      4. `orbit_predecessor_reaches_one` closes: original `x'` reaches 1
-         via the orbit-predecessor closure lemma.
-
-    **Q4 v3 scope:** the theorem is universally quantified over
-    `FiniteOrbitClaim` shapes. For `.interval` claims, use
-    `coverage_tree_soundness_cert` (Q3 v4) instead. The two theorems
-    certify DIFFERENT routing relations and are PARALLEL, not
-    refinements of each other.
-
-    **Hypothesis-bearing.** Does NOT prove any new global or per-leaf
-    Collatz reachability result beyond what `BoundedOrbitCertificate t l`
-    packages. The actual Collatz evidence comes from external sources
-    supplied at certificate construction time.
-
-    **Position note.** Inserted after `coverage_tree_soundness_cert`
-    (Q3 v4 typed-cert variant) and before `coverage_tree_soundness_orbit`
-    (the separate `SatOrbit` workstream with `sorry`). All deps in scope:
-    `descend_orbit_complete` (PR #29), `BoundedOrbitCertificate` (PR #57),
-    `OrbitLeafReachesOne` (PR #56), `orbit_predecessor_reaches_one`
-    (PR #56).
-
-    (Story Q4 / PR #58.) -/
-theorem coverage_tree_soundness_orbit_cert (t : CoverageTree)
-    (hv : ValidTree t) (hic : IsComplete t)
-    (hCert : ∀ l ∈ t.leaves, verified t l → BoundedOrbitCertificate t l)
-    (x : Nat) (hx : x > 0) :
-    ∃ l, l ∈ t.leaves ∧ verified t l ∧
-         descendOrbit t x 0 = some l ∧
-         OrbitLeafReachesOne t l := by
-  obtain ⟨l, hl, hver, hdesc, hroute⟩ := descend_orbit_complete t hv hic x hx
-  obtain cert := hCert l hl hver
-  refine ⟨l, hl, hver, hdesc, ?_⟩
-  intro x' hdesc'
-  obtain ⟨k, hk⟩ := cert.orbit_hits_claim x' hdesc'
-  exact orbit_predecessor_reaches_one x' k (accelerated_orbit x' k) rfl
-         (cert.claim_reaches_one _ hk)
-
 /-- Orbit-aware soundness for `CoverageTree` (Story 07c / round-5, 07c-3).
 
 Strengthens `coverage_tree_soundness` with the orbit-aware `SatOrbit`
@@ -983,6 +922,75 @@ theorem descend_orbit_complete (t : CoverageTree) (hv : ValidTree t) (hc : IsCom
         refine ⟨l, hl, hv', ?_, ?_⟩
         · simpa [descendFromOrbit, hchild_lookup] using hdesc_child
         · exact OrbitRoute.internal hpair_mem hroute_child
+
+/-- Bounded-orbit companion theorem for `FiniteOrbitClaim` shapes
+    (`.empty`, `.singleton n`, `.bounded K`) — **parallel** to (NOT a
+    refinement of) `coverage_tree_soundness_full` /
+    `coverage_tree_soundness_cert`.
+
+    Certifies the **orbit-aware routing relation** (`descendOrbit t x 0`)
+    rather than the residue-only routing relation (`descend t x`).
+    Concludes `OrbitLeafReachesOne t l` (NEW Q4 v3 predicate), defined
+    over `descendOrbit`, NOT `LeafReachesOne t l` (defined over `descend`).
+
+    Per Codex run-21848 P1: the previous v2 spec concluded
+    `LeafReachesOne t l` while constructing a proof over `descendOrbit`;
+    the kernel rejected this because `descend t x = some l` and
+    `descendOrbit t x 0 = some l` are different routing relations.
+    v3 introduces `OrbitLeafReachesOne` so the conclusion type matches
+    the routing evidence used in the proof.
+
+    Proof sketch:
+      1. `descend_orbit_complete` provides orbit-aware routing with
+         `OrbitRoute` witness.
+      2. `cert.orbit_hits_claim` lifts the routing to an orbit-state
+         claim (`∃ k, claim.Holds (accelerated_orbit x' k)`).
+      3. `cert.claim_reaches_one` derives
+         `ReachesOne (accelerated_orbit x' k)`.
+      4. `orbit_predecessor_reaches_one` closes: original `x'` reaches 1
+         via the orbit-predecessor closure lemma.
+
+    **Q4 v3 scope:** the theorem is universally quantified over
+    `FiniteOrbitClaim` shapes. For `.interval` claims, use
+    `coverage_tree_soundness_cert` (Q3 v4) instead. The two theorems
+    certify DIFFERENT routing relations and are PARALLEL, not
+    refinements of each other.
+
+    **Hypothesis-bearing.** Does NOT prove any new global or per-leaf
+    Collatz reachability result beyond what `BoundedOrbitCertificate t l`
+    packages. The actual Collatz evidence comes from external sources
+    supplied at certificate construction time.
+
+    **Position note (v1→v2 evolution).** v1 `b283456` placed this
+    theorem between `coverage_tree_soundness_cert` (line ~820) and
+    `coverage_tree_soundness_orbit` (line ~849). That placement was
+    RED on a forward-reference cascade: the theorem's proof body
+    uses `descend_orbit_complete` (line ~934) which was defined AFTER
+    the misplaced insertion. v2 fix: moved theorem + docstring to
+    AFTER `descend_orbit_complete` (this position) so all deps are
+    in scope. Same root cause as PR #56's two forward-reference
+    cascades (v1 `ReachesOne` forward-ref + v2 `descendOrbit`
+    forward-ref): the editor (me) did not check the file's full
+    forward-reference graph (every consumer after every dep) and
+    just looked at the new code. Lesson reinforced: position-sensitive
+    edits require checking the whole def order, not just the new
+    code's neighbors.
+
+    (Story Q4 / PR #58.) -/
+theorem coverage_tree_soundness_orbit_cert (t : CoverageTree)
+    (hv : ValidTree t) (hic : IsComplete t)
+    (hCert : ∀ l ∈ t.leaves, verified t l → BoundedOrbitCertificate t l)
+    (x : Nat) (hx : x > 0) :
+    ∃ l, l ∈ t.leaves ∧ verified t l ∧
+         descendOrbit t x 0 = some l ∧
+         OrbitLeafReachesOne t l := by
+  obtain ⟨l, hl, hver, hdesc, hroute⟩ := descend_orbit_complete t hv hic x hx
+  obtain cert := hCert l hl hver
+  refine ⟨l, hl, hver, hdesc, ?_⟩
+  intro x' hdesc'
+  obtain ⟨k, hk⟩ := cert.orbit_hits_claim x' hdesc'
+  exact orbit_predecessor_reaches_one x' k (accelerated_orbit x' k) rfl
+         (cert.claim_reaches_one _ hk)
 
 -- Depth-0/1/2 regression examples (per Codex 4922430978).
 example : descendFrom 0 (.leaf { leafId := "L0", leafProperty := "P0" }) 5 = some { leafId := "L0", leafProperty := "P0" } := rfl
