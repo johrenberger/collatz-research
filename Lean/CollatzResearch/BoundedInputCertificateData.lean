@@ -1,80 +1,114 @@
 /-
-Q5 PR #62 v4 — wire/checked split per Codex REVIEW feedback
-(REQUEST CHANGES, 2026-08-24T11:57:44Z, review `PRR_kwDOTuMD788AAAABKnjGrA`)
-on the v3 redesign commit (`a6ea9ad`).
+Q5 PR #62 v5 — re-scope per Codex REVIEW feedback
+(REQUEST CHANGES, 2026-08-24T12:12:18Z, review `PRR_kwDOTuMD788AAAABKnp6Ug`)
+on the v4 wire/checked-split commit (`b8b3687`).
 
-Per the v3 review (johrenberger on `a6ea9ad`):
-- [P1] `witnesses : (i : Fin N) → CertWitness (i.val + 1)` is an
-    excellent INTERNAL checked representation, but it is NOT raw
-    serialized certificate data: a JSON/Python producer cannot
-    directly emit a Lean function/closure. The Q5 trust-boundary
-    contract explicitly requires Python to emit serialized data
-    that Lean parses.
+Per the v4 review (johrenberger on `b8b3687`):
+- [P1] `BoundedInputCertificateWire` is an in-memory Lean record, not
+    a serialized-certificate parser. `decodeBoundedInputCertificateData`
+    accepts an already-constructed Lean value and checks only list
+    length; it never consumes JSON/text, rejects malformed fields/types,
+    or establishes a format/schema-version boundary. Consequently, the
+    module does not yet implement the documented path "Python serialized
+    evidence → Lean wire."
 
-    **v4 fix:** introduce a two-layer representation that
-    explicitly distinguishes the wire payload (what Python emits;
-    plain `List`, no `x` field, no proofs) from the checked
-    bundle (what Lean uses internally; wire + length-equality
-    proof). The canonical-index design is preserved by reconstructing
-    the indexed view via `List.get`:
-      - Wire: `BoundedInputCertificateWire` (NO proof fields)
-                — `N : Nat`, `rawWitnesses : List CertWitnessWire`,
-                  `claim : FiniteOrbitClaim`.
-      - Checked: `BoundedInputCertificateData`
-                — `wire : BoundedInputCertificateWire`,
-                  `length_ok : wire.rawWitnesses.length = wire.N`.
-      - Decoder: `decodeBoundedInputCertificateData` returns
-        `Option` — `none` iff the wire list length does not match
-        `wire.N` (malformed wire rejection).
-      - Indexed view: `BoundedInputCertificateData.certWitness`
-        returns `(i : Fin d.wire.N) → CertWitness (i.val + 1)`,
-        computed from `List.get` with the length proof transporting
-        `i.isLt`. The type-level identity (Codex P0 fix from review
-        `#5003345398`) is preserved.
+    **v5 fix (re-scope, not parser):** the wire/checked split is the
+    right architecture, but this PR is correctly described as
+    "in-memory wire model + structural validation" — NOT a complete
+    parser. The v4 file incorrectly called the records "directly
+    serializable from Python"; that wording is removed in v5. JSON
+    parsing (consuming `String`/`ByteArray` → `BoundedInputCertificateWire`
+    with explicit rejection of malformed JSON, wrong schema version,
+    missing fields, wrong field types, malformed trajectory entries)
+    is deferred to **Q5 PR #3 (Python external generator + Lean JSON
+    parser)**.
 
-    The witness at list index `i` represents canonical input
-    `i + 1` — the canonical-input identity is implicit in list
-    position, not encoded as a field. Python emits a plain list,
-    Lean recovers the type-level identity at the check boundary.
+    Alternative P1 path (NOT taken): add the small JSON-to-
+    `BoundedInputCertificateWire` parser and parser-rejection tests
+    here. Trade-off: makes this PR larger (~100 lines of parser code +
+    tests) but keeps Q5 PR #3 producer-only. Re-scoping was chosen
+    because (a) the Q5 4-PR split already places producer-side work in
+    PR #3, (b) keeping PR #62 small preserves the architectural-review
+    surface (wire/checked split) as the main change, (c) JSON parsing
+    is mechanical plumbing that pairs naturally with the producer
+    (one PR, both sides of the same boundary).
 
-Open gates addressed in v4:
-- v4 diff adds the wire/checked split (P1).
-- v4 diff adds the malformed-length rejection test (Scenario H).
+- [P2] PR body — it still described the removed v3 API and seven
+    scenarios. **v5 fix:** PR body updated to the v4
+    `CertWitnessWire` + `BoundedInputCertificateWire` + checked-bundle
+    API and 8 scenarios (A–G + new H malformed-length rejection). The
+    title was already correctly re-scoped in v3 (`bd3d8b7`).
+
+Open gates addressed in v5:
+- v5 diff updates the in-memory-model wording (P1): the records are
+    no longer called "directly serializable"; JSON parsing is
+    explicitly deferred to Q5 PR #3.
+- v5 diff updates the PR body to match the v4 API + 8 scenarios (P2).
+- Wire/checked split (v4) preserved as-is.
 - Soundness/integration work remains deferred to Q5 PR #4.
 
-Story Q5 / PR #62 v4 (wire/checked split + Indexed view reconstructed
-via `List.get`; soundness theorem deferred to Q5 PR #4 integration). -/
+Story Q5 / PR #62 v5 (in-memory wire model + structural validation;
+JSON parsing deferred to Q5 PR #3; soundness theorem deferred to
+Q5 PR #4). -/
 
 import CollatzResearch.CoverageTree
 
 namespace CollatzResearch
 
-/-! ## Wire format — what Python emits (Q5 PR #3 external generator)
+/-! ## Wire model — IN-MEMORY representation of the wire format
 
-These types are directly serializable (JSON-compatible). NO proof
-fields (Lean proofs are kernel artifacts; Python cannot emit them).
-NO `x` parameter on `CertWitnessWire` — the canonical input is
-encoded by list position (`rawWitnesses[i]` represents input `i + 1`).
+These structures model the wire payload that Python emits and Lean
+checks. They are an IN-MEMORY representation only — JSON parsing
+(consuming a `String`/`ByteArray` and producing one of these values,
+with explicit rejection of malformed JSON, wrong schema version,
+missing fields, wrong field types, malformed trajectory entries) is
+deferred to **Q5 PR #3 (Python external generator + Lean JSON parser)**.
+
+What is established in this PR:
+  * The shape of the payload (`BoundedInputCertificateWire`):
+    `N : Nat` + `rawWitnesses : List CertWitnessWire` + `claim : FiniteOrbitClaim`.
+  * Structural validation: `decodeBoundedInputCertificateData` rejects
+    mismatched list length (returns `none`).
+  * The wire/checked split: `BoundedInputCertificateData` is the
+    checked bundle (wire + `length_ok` proof).
+  * The indexed view: `BoundedInputCertificateData.certWitness`
+    reconstructs `(i : Fin d.wire.N) → CertWitness (i.val + 1)` via
+    `List.get` (type-level canonical-input identity preserved).
+
+What is NOT established in this PR (deferred to Q5 PR #3):
+  * Parsing JSON strings / byte arrays into `BoundedInputCertificateWire`.
+  * Schema versioning (the on-wire `schemaVersion` field).
+  * Rejection of malformed field types, missing fields, malformed
+    trajectory entries, unsupported claim tags.
+  * Producer-side generation (Python trajectory generator emitting JSON).
+
+NO proof fields on the wire model (Lean proofs are kernel artifacts;
+Python cannot emit them). NO `x` parameter on `CertWitnessWire` —
+the canonical input is encoded by list position
+(`rawWitnesses[i]` represents input `i + 1`).
 
 Per the Q5 v5 spec § 4.3.1a, the trust boundary is literal:
-  `Python serialized evidence → Lean wire → Lean checked → Bool verifier
-   → soundness theorem (Q5 PR #4) → BoundedInputOrbitCertificate
-   → coverage_tree_soundness_orbit_cert_bounded`. -/
+  `Python serialized evidence → (Q5 PR #3 JSON parser) →
+   Lean wire → Lean checked → Bool verifier → soundness theorem
+   (Q5 PR #4) → BoundedInputOrbitCertificate →
+   coverage_tree_soundness_orbit_cert_bounded`. -/
 
-/-- Per-input trajectory evidence — wire format. The canonical input
+/-- Per-input trajectory evidence — wire model. The canonical input
     `x` is NOT stored here; it is encoded by the witness's POSITION
     in the list (witness at index `i` carries canonical input `i + 1`).
-    This keeps the wire format directly serializable from Python
-    without requiring the producer to recompute / re-emit canonical
-    indices per witness entry. -/
+    This is an IN-MEMORY model; external serialization (JSON /
+    byte-array encoding) is Q5 PR #3. -/
 structure CertWitnessWire where
   l : CoverageLeaf
   trajectory : List Nat
 
-/-- Wire payload — what Python emits and Lean parses. NO proof
-    fields. The canonical list-position interpretation:
+/-- Wire payload — IN-MEMORY model. NO proof fields. The canonical
+    list-position interpretation:
       witness at list index `i` carries canonical input `i + 1`.
-    Domain: `{1, ..., N}` (uniformly `0 < x ∧ x ≤ N`). -/
+    Domain: `{1, ..., N}` (uniformly `0 < x ∧ x ≤ N`).
+
+    External JSON serialization/parsing is Q5 PR #3 (Python external
+    generator + Lean JSON parser with rejection tests). -/
 structure BoundedInputCertificateWire where
   N : Nat
   rawWitnesses : List CertWitnessWire

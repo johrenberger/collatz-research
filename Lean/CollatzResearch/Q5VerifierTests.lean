@@ -1,42 +1,44 @@
 /-
-Q5 PR #62 v4 — CI-side executable spec for the wire/checked split
-(preparatory PR; no soundness theorem yet).
+Q5 PR #62 v5 — re-scoped to "in-memory wire model + structural
+validation" per Codex REVIEW feedback
+(REQUEST CHANGES, 2026-08-24T12:12:18Z, review
+`PRR_kwDOTuMD788AAAABKnp6Ug`) on the v4 wire/checked-split commit
+(`b8b3687`).
 
-Per the v3 Codex review
-(REQUEST CHANGES, 2026-08-24T11:57:44Z, review
-`PRR_kwDOTuMD788AAAABKnjGrA`) on `a6ea9ad`:
-- v4 redesign (per Codex P1): wire/checked split. The `witnesses`
-    field that was a Lean function `(i : Fin N) → CertWitness (i.val + 1)`
-    is replaced by:
-      * `BoundedInputCertificateWire` — wire payload (plain `List`,
-        NO proof fields, NO `x` field on each witness). What Python
-        emits as JSON.
-      * `BoundedInputCertificateData` — checked bundle (wire +
-        `length_ok : wire.rawWitnesses.length = wire.N`).
-      * `decodeBoundedInputCertificateData` — returns `none` on
-        malformed wire (length mismatch).
-      * `BoundedInputCertificateData.certWitness` — RECONSTRUCTED
-        indexed view `(i : Fin d.wire.N) → CertWitness (i.val + 1)`
-        via `List.get` (with the length proof transporting
-        `i.val < wire.N` to `i.val < wire.rawWitnesses.length`).
+Per the v4 review (johrenberger on `b8b3687`):
+- [P1] `BoundedInputCertificateWire` is an in-memory Lean record, not
+    a serialized-certificate parser. The v4 docstrings incorrectly
+    claimed the records were "directly serializable from Python."
+    **v5 fix (re-scope, not parser):** removed the false "directly
+    serializable" wording. JSON parsing (string → wire) is explicitly
+    deferred to **Q5 PR #3 (Python external generator + Lean JSON
+    parser with rejection tests)**. The wire/checked split itself
+    (v4) is preserved as the architectural innovation; v5 only updates
+    the docstrings + PR body to honestly describe the scope.
 
-Removed in v4:
+- [P2] PR body described the v3 API + 7 scenarios. **v5 fix:** PR
+    body updated to the v4 `CertWitnessWire` + `BoundedInputCertificateWire`
+    + checked-bundle API and 8 scenarios (A–H). Title was already
+    correctly re-scoped in v3 (`bd3d8b7`).
+
+What v5 does NOT change:
+- The wire/checked split (v4) — preserved as-is.
+- The 8 scenarios (A–H) — preserved as-is.
+- The decoder `decodeBoundedInputCertificateData` — preserved as-is.
+- The derived `certWitness` indexed view via `List.get` — preserved
+    as-is.
+
+Removed in v4 (preserved through v5):
 - The structure field `witnesses : (i : Fin N) → CertWitness (i.val + 1)`
     (replaced by derived `certWitness` def + wire `rawWitnesses` field)
 - The structure field `N : Nat` directly on the checked data
     (moved inside `wire.N`)
 
-Tests scope across both wire and checked surfaces:
-- Scenarios A–G: construct via the checked bundle (with the
-    length-equality proof discharged by `rfl` when definitional).
-- Scenario H (NEW per Codex P1): wire-list length mismatch causes
-    `decodeBoundedInputCertificateData` to return `none`.
-
-Removed in earlier cycles:
-- v3 removed `BoundedInputOrbitCertificate` + `checkBoundedCertificate_sound`
+Removed in earlier cycles (v3, before v4):
+- `BoundedInputOrbitCertificate` + `checkBoundedCertificate_sound`
     (v4 in commit sequence, `bd3d8b7`).
-- v3 removed Scenario E (polymorphic apply-the-theorem) — that
-    referenced the now-removed soundness theorem.
+- Scenario E (polymorphic apply-the-theorem) that referenced the
+    removed soundness theorem.
 
 Scenarios (8 total, all compile-checked by `lake build CollatzResearch.Q5VerifierTests` in GitHub CI):
 - A: positive — basic valid (N=1, claim `.singleton 1`, trajectory `[1]`)
@@ -46,8 +48,16 @@ Scenarios (8 total, all compile-checked by `lake build CollatzResearch.Q5Verifie
 - E: positive — N=3 with three canonical witnesses (regression for wire list)
 - F: negative — terminal-claim mismatch, simple (claim `.singleton 2`)
 - G: negative — terminal-claim mismatch, non-degenerate (claim `.singleton 100`)
-- H: NEW per Codex P1 — malformed-length rejection (decoder returns `none`)
--/
+- H: malformed-length rejection (decoder returns `none` on list-length mismatch)
+
+Scope note: the tests construct `BoundedInputCertificateData` directly
+via the structure constructor `⟨wire, rfl⟩` (with the length-equality
+proof discharged definitionally). Q5 PR #3 will add JSON-string
+construction + rejection tests for the untrusted-input boundary.
+
+Story Q5 / PR #62 v5 (in-memory wire model + structural validation;
+JSON parsing deferred to Q5 PR #3; soundness theorem deferred to
+Q5 PR #4). -/
 
 import CollatzResearch.CoverageTree
 import CollatzResearch.BoundedInputCertificateData
@@ -123,7 +133,9 @@ example : ¬ checkBoundedCertificate singleLeafTree
     The witness at list index `i` is reconstructed as
     `CertWitness (i.val + 1)` via `certWitness` (v4 derived view) —
     type-level canonical-input identity preserved (Codex P0 fix).
-    The wire list is plain serializable data (Codex P1 fix). -/
+    The wire list is an IN-MEMORY model; external JSON
+    serialization/parsing is Q5 PR #3 (Codex P1 fix from review
+    `PRR_kwDOTuMD788AAAABKnjGrA`). -/
 example : checkBoundedCertificate singleLeafTree
     { leafId := "L", leafProperty := "0:0-0" }
     (⟨{ N := 2,
