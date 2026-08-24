@@ -1,54 +1,64 @@
 /-
-Q5 PR #62 v2 — preparatory data + checker PR (Q5 PR #2 v2 redesign per
-Codex P0/P1 feedback on v1).
+Q5 PR #62 v3 — applies Codex REVIEW feedback (REQUEST CHANGES,
+2026-08-23T20:53:23Z, review #5003345398) on the v2 redesign
+commit (`bd3d8b7`).
 
-Per the v1 Codex review (REQUEST CHANGES, 2026-08-23T20:05:33Z):
-- P0 #1: v1's `checkBoundedCertificate` validated only N individually
-  well-formed witnesses; didn't enforce total coverage of `0 < x ∧ x ≤ N`
-  or that `trajectory.head? = some w.x`.
-- P0 #2: v1's `checkTrajectory` accepted a singleton `[v]` whenever
-  `claim.Holds v`; nothing proved `ReachesOne v` (the `claim_reaches_one`
-  obligation).
-- P1: v1 was titled "kernel-checked verifier soundness" while the
-  bridge was `sorry`. Don't classify as soundness until the bridge
-  is actually proved.
+Per the v2 review (johrenberger on `bd3d8b7`):
+- [P0] `witnesses : Fin N → CertWitness` did NOT make duplicate/
+    missing/out-of-range witness inputs impossible. `CertWitness.x`
+    was an independent `Nat` field; the function could return
+    `x = 1` at every index, or `x = N + 1`. The implementation also
+    had a dependent-index transport bug: `d.witnesses` is indexed
+    by `Fin d.N`, but the check loop used `i : Fin N` (the external
+    `N` argument); `d.N = N` is a Boolean conjunct that does NOT
+    transport dependent indices.
+    **v3 fix:** parameterize `CertWitness (x : Nat)` (drop the
+    `x` field); `witnesses` is now `(i : Fin N) → CertWitness
+    (i.val + 1)`. The input at index `i` is now type-level
+    `CertWitness (i.val + 1)`, so duplicate/missing/out-of-range
+    witnesses are impossible by construction. The external `N : Nat`
+    parameter is removed from `checkBoundedCertificate` — the bound
+    comes from `d.N` directly, eliminating the dependent-index
+    transport issue entirely.
 
-v2 redesign:
-1. **Data structure enforces total coverage.** Use a function
-   `Fin N → CertWitness` so the witness for input `i + 1` is
-   definitionally `i + 1`. This makes duplicate/missing/out-of-range
-   witnesses impossible by construction.
-2. **Trajectory head check.** `checkCertWitness` requires
-   `trajectory.head? = some x` and verifies each step is
-   `acceleratedStep` of the previous.
-3. **Domain restricted to `0 < x ∧ x ≤ N`** (i.e., `x ∈ {1, ..., N}`).
-4. **No `BoundedInputOrbitCertificate` structure, no
-   `checkBoundedCertificate_sound` theorem.** This PR is preparatory:
-   data + checker only. The soundness theorem (which would require
-   proving `ReachesOne` for the final trajectory value) is deferred
-   to Q5 PR #4 (integration) after the Python generator provides
-   the necessary infrastructure.
-5. **Red tests** added to `Q5VerifierTests.lean`:
-   - duplicate x (e.g., x=1 appears twice, x=2 missing)
-   - out-of-range x (e.g., x=N+1)
-   - trajectory with wrong head (head ≠ w.x)
+- [P1] The checker never used `d.claim`. `checkCertWitness` verified
+    only start + transition relation; it did not require the terminal
+    state to satisfy `claim.Holds`. This contradicted the structure
+    and docstrings' "trajectory … to a claim-satisfying value"
+    contract, and left no checked artifact from which a later
+    integration theorem can derive `orbit_hits_claim`.
+    **v3 fix:** `checkCertWitness` now takes `claim : FiniteOrbitClaim`
+    and requires `decide (claim.Holds last)` (where `last` is the
+    final trajectory value). This restores the documented contract.
 
-Per the v1 review's P1 fix: "After the redesign, either prove the
-soundness theorem in this PR or split this into an explicitly
-preparatory data/checker PR with no soundness or trust-boundary
-claim." This v2 IS the preparatory split.
+- [P2] PR title/body still advertised `BoundedInputOrbitCertificate`,
+    `checkBoundedCertificate_sound`, an admission, and a "kernel-
+    checked verifier + soundness theorem" while the v2 diff
+    deliberately contained neither.
+    **v3 fix:** updated file header + updated PR title/body
+    separately (this file is data + checker only, no soundness claim).
 
-Story Q5 / PR #62 v2. -/
+Open gates addressed in v3:
+- v3 diff corrects the dependent-index mismatch (P0).
+- v3 diff adds the canonical-input and terminal-claim negative tests (P1).
+- Soundness/integration work remains deferred to Q5 PR #4.
+
+Story Q5 / PR #62 v3 (preparatory raw-data + transition + terminal-
+claim checker; soundness theorem deferred to Q5 PR #4 integration). -/
 
 import CollatzResearch.CoverageTree
 
 namespace CollatzResearch
 
-/-- Per-x trajectory evidence for a `BoundedInputCertificateData`. Records
-    the orbit trajectory from input `x` to a claim-satisfying value
-    (verified by `checkCertWitness`). -/
-structure CertWitness where
-  x : Nat
+/-- Per-x trajectory evidence for a `BoundedInputCertificateData`.
+    The input `x` is a **type parameter** (not a field), so duplicate/
+    missing/out-of-range witnesses are impossible by construction:
+    the carriers of `BoundedInputCertificateData.witnesses` are
+    indexed by `Fin N` with each witness carrying the type-level
+    input `i.val + 1`.
+
+    Story Q5 / PR #62 v3 (canonical-input identity per Codex P0 fix). -/
+structure CertWitness (x : Nat) where
   l : CoverageLeaf
   trajectory : List Nat
 
@@ -56,59 +66,76 @@ structure CertWitness where
     (Q5 PR #3). **No proof fields** — Python cannot emit Lean proof
     fields. Lean parses + checks.
 
-    v2 redesign per Codex P0 #1: the witnesses field is a function
-    `Fin N → CertWitness` (not a `List CertWitness`). This makes
-    duplicate/missing/out-of-range witnesses impossible by
-    construction. The input `x` for index `i` is definitionally
-    `i + 1`, so the domain is exactly `{1, ..., N}`.
+    v3 redesign (per Codex P0): `witnesses` is now
+    `(i : Fin N) → CertWitness (i.val + 1)` (function indexed by
+    `Fin N`, with each witness type-parameterized by its canonical
+    input `i.val + 1`). The input identity is canonical by construction:
+    the witness at index `i` is **structurally** for input `i.val + 1`;
+    no separate `x` field needed.
 
-    Per the Q5 spec § 4.3.1a (v5 fix): separates raw verifier input
-    from proof-carrying certificate. Trust boundary made literal:
-    `Python serialized evidence → Lean data → Bool verifier → soundness
-    theorem → BoundedInputOrbitCertificate → coverage_tree_soundness_orbit_cert_bounded`.
+    Domain: `{1, ..., N}` (uniformly `0 < x ∧ x ≤ N`).
 
-    Story Q5 / PR #62 v2 (preparatory data + checker PR; soundness deferred). -/
+    Per the Q5 v5 spec § 4.3.1a, the trust boundary is literal:
+    `Python serialized evidence → Lean data → Bool verifier →
+    soundness theorem → BoundedInputOrbitCertificate →
+    coverage_tree_soundness_orbit_cert_bounded`.
+
+    Story Q5 / PR #62 v3 (preparatory raw-data + transition + terminal-
+    claim checker; soundness theorem deferred to Q5 PR #4 integration). -/
 structure BoundedInputCertificateData where
   claim : FiniteOrbitClaim
   N : Nat
-  witnesses : Fin N → CertWitness
+  witnesses : (i : Fin N) → CertWitness (i.val + 1)
 
-/-- Verify a single witness: the trajectory must start at `w.x` and each
-    step must be `acceleratedStep` of the previous. (Story Q5 / PR #62 v2.) -/
-def checkCertWitness (w : CertWitness) : Bool :=
+/-- Verify a single witness: the trajectory must (1) start at the
+    canonical input `x` (the type parameter), (2) target the leaf `l`,
+    (3) route through `t` to `l`, (4) reach a `claim.Holds`-satisfying
+    value at the terminal step, and (5) have each consecutive pair be
+    an `acceleratedStep` transition.
+
+    v3 redesign (per Codex P1): the `claim` parameter makes the
+    documented "trajectory … to a claim-satisfying value" contract
+    explicit. Without this check, the checker would accept trajectories
+    that end outside the claim, leaving no checked artifact from which
+    a later integration theorem can derive `orbit_hits_claim`.
+
+    Returns `true` iff ALL FIVE conditions hold. -/
+def checkCertWitness (x : Nat) (claim : FiniteOrbitClaim)
+    (t : CoverageTree) (l : CoverageLeaf) (w : CertWitness x) : Bool :=
   match w.trajectory with
   | [] => false
-  | hd :: tl =>
-    hd = w.x ∧
-    match tl with
-    | [] => true
-    | _ =>
-      List.foldl (fun acc pair => acc ∧ pair.snd = acceleratedStep pair.fst)
-                true (List.zip w.trajectory w.trajectory.tail)
-
-/-- Q5 PR #62 v2 — `Bool` checker: checks that the raw
-    `BoundedInputCertificateData` is valid for the given tree + leaf.
-    Returns `true` iff:
-    1. For each index `i : Fin N`, the witness `d.witnesses i`:
-       a. `descendOrbit t (d.witnesses i).x 0 = some (d.witnesses i).l` (routing)
-       b. `(d.witnesses i).l = l` (witness targets the correct leaf)
-       c. `checkCertWitness (d.witnesses i)` (trajectory starts at w.x + valid steps)
-
-    v2 redesign (per Codex P0 #1): the domain is exactly `0 < x ∧ x ≤ N`
-    (since `witnesses : Fin N → CertWitness` and the input at index `i` is
-    `i + 1`). The N + 1 issue from v1 (theorem quantifies `∀ x, x ≤ N`
-    but the checker only verified N witnesses) is gone — there are
-    exactly N witnesses and the domain has N elements.
-
-    Story Q5 / PR #62 v2. -/
-def checkBoundedCertificate
-    (t : CoverageTree) (l : CoverageLeaf) (N : Nat)
-    (d : BoundedInputCertificateData) : Bool :=
-  d.N = N ∧
-  (∀ i : Fin N,
-    let w := d.witnesses i
-    descendOrbit t w.x 0 = some w.l ∧
+  | hd :: _ =>
+    hd = x ∧
     w.l = l ∧
-    checkCertWitness w)
+    descendOrbit t x 0 = some w.l ∧
+    (match w.trajectory.getLast? with
+     | some last => decide (claim.Holds last)
+     | none => false) ∧
+    List.foldl (fun acc pair => acc ∧ pair.snd = acceleratedStep pair.fst)
+              true (List.zip w.trajectory w.trajectory.tail)
+
+/-- Q5 PR #62 v3 — `Bool` checker for the raw
+    `BoundedInputCertificateData`. Returns `true` iff for each
+    `i : Fin d.N`, the witness `d.witnesses i` is valid for input
+    `x = i.val + 1`.
+
+    v3 redesign (per Codex P0): the bound comes from `d.N` directly
+    (no external `N : Nat` parameter); there are no dependent-index
+    transports needed. The witness at index `i` is structurally tied
+    to input `i.val + 1`.
+
+    The full check passes only when EVERY witness satisfies
+    `checkCertWitness (i.val + 1) d.claim t l`.
+
+    Story Q5 / PR #62 v3 (preparatory raw-data + transition + terminal-
+    claim checker; soundness theorem deferred to Q5 PR #4 integration). -/
+def checkBoundedCertificate
+    (t : CoverageTree) (l : CoverageLeaf)
+    (d : BoundedInputCertificateData) : Bool :=
+  List.foldl (fun acc i =>
+    let x := i.val + 1
+    let w := d.witnesses i
+    acc ∧ checkCertWitness x d.claim t l w)
+    true (List.finRange d.N)
 
 end CollatzResearch
