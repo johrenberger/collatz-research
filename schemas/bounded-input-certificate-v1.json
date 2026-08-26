@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/johrenberger/collatz-research/schemas/bounded-input-certificate-v1.json",
+  "title": "BoundedInputCertificateWire v1.0",
+  "description": "Wire format for bounded-input Collatz trajectory certificates emitted by the Q5 PR #3 Python producer and verified by the Lean parser. Schema is immutable. Mirrors the Lean BoundedInputCertificateWire inductive (PR #62 v5): N + rawWitnesses + FiniteOrbitClaim (empty | singleton n | bounded K).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "claim", "N", "rawWitnesses"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version. Immutable. The Lean parser rejects any value other than \"1.0\"."
+    },
+    "claim": {
+      "description": "FiniteOrbitClaim: the claim each witness's terminal value must satisfy.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {"type": {"const": "empty"}},
+          "description": "Empty claim (no orbit states). Terminal check always fails."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "n"],
+          "properties": {
+            "type": {"const": "singleton"},
+            "n": {"type": "integer", "minimum": 1, "description": "Singleton orbit state."}
+          },
+          "description": "Singleton claim (terminal value must equal n)."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "K"],
+          "properties": {
+            "type": {"const": "bounded"},
+            "K": {"type": "integer", "minimum": 1, "description": "Bounded claim (terminal value must be <= K)."}
+          },
+          "description": "Bounded claim (terminal value must be <= K)."
+        }
+      ]
+    },
+    "N": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bound on input domain. Witness at list index i corresponds to canonical input i+1. There must be exactly N witnesses (enforced by the decoder)."
+    },
+    "rawWitnesses": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Per-input trajectory evidence. rawWitnesses[i] carries canonical input i+1.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["l", "trajectory"],
+        "properties": {
+          "l": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["leafId", "leafProperty"],
+            "properties": {
+              "leafId": {"type": "string", "minLength": 1, "description": "Leaf identifier."},
+              "leafProperty": {"type": "string", "description": "Leaf property label."}
+            }
+          },
+          "trajectory": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "integer", "minimum": 1},
+            "description": "Trajectory [start, acceleratedStep(start), ..., terminal]. Each consecutive pair must be an acceleratedStep transition. The terminal value must satisfy claim.Holds."
+          }
+        }
+      }
+    }
+  }
+}
