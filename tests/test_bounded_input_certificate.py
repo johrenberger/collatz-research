@@ -25,8 +25,6 @@ import json
 import pathlib
 
 import pytest
-from jsonschema import Draft202012Validator
-
 from collatz_research.bounded_input_certificate import (
     SCHEMA_VERSION,
     BoundedInputCertificateWire,
@@ -36,7 +34,7 @@ from collatz_research.bounded_input_certificate import (
     build_trajectory,
 )
 from collatz_research.tree import CoverageLeaf
-
+from jsonschema import Draft202012Validator
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMA_PATH = REPO_ROOT / "schemas" / "bounded-input-certificate-v1.json"
@@ -195,7 +193,7 @@ class TestTrajectory:
     @staticmethod
     def _assert_accelerated_steps(traj: list[int]) -> None:
         """Verify each consecutive pair (a, b) satisfies b = (3a+1) / 2^v2(3a+1)."""
-        for a, b in zip(traj, traj[1:]):
+        for a, b in zip(traj, traj[1:], strict=False):
             succ = 3 * a + 1
             v2 = 0
             n = succ
@@ -287,7 +285,7 @@ class TestRoundTrip:
         assert reconstructed.N == original.N
         assert reconstructed.claim == original.claim
         assert len(reconstructed.rawWitnesses) == len(original.rawWitnesses)
-        for a, b in zip(reconstructed.rawWitnesses, original.rawWitnesses):
+        for a, b in zip(reconstructed.rawWitnesses, original.rawWitnesses, strict=False):
             assert a.leaf == b.leaf
             assert a.trajectory == b.trajectory
 

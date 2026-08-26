@@ -31,7 +31,6 @@ from typing import ClassVar
 
 from .tree import CoverageLeaf
 
-
 # Wire format schema version. Immutable.
 SCHEMA_VERSION: str = "1.0"
 
@@ -56,17 +55,17 @@ class FiniteOrbitClaimWire:
     TYPE_BOUNDED: ClassVar[str] = "bounded"
 
     @classmethod
-    def empty(cls) -> "FiniteOrbitClaimWire":
+    def empty(cls) -> FiniteOrbitClaimWire:
         return cls(type=cls.TYPE_EMPTY)
 
     @classmethod
-    def singleton(cls, n: int) -> "FiniteOrbitClaimWire":
+    def singleton(cls, n: int) -> FiniteOrbitClaimWire:
         if n < 1:
             raise ValueError(f"singleton claim requires n >= 1, got {n}")
         return cls(type=cls.TYPE_SINGLETON, n=n)
 
     @classmethod
-    def bounded(cls, K: int) -> "FiniteOrbitClaimWire":
+    def bounded(cls, K: int) -> FiniteOrbitClaimWire:
         if K < 1:
             raise ValueError(f"bounded claim requires K >= 1, got {K}")
         return cls(type=cls.TYPE_BOUNDED, K=K)
