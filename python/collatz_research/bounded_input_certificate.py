@@ -258,9 +258,7 @@ def build_bounded_input_certificate(
     for x in range(1, N + 1):
         trajectory = build_trajectory(x, claim, max_steps=max_steps)
         raw_witnesses.append(CertWitnessWire(leaf=leaf, trajectory=trajectory))
-    return BoundedInputCertificateWire(
-        N=N, rawWitnesses=raw_witnesses, claim=claim
-    )
+    return BoundedInputCertificateWire(N=N, rawWitnesses=raw_witnesses, claim=claim)
 
 
 __all__ = [
