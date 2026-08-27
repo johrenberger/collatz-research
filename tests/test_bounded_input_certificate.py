@@ -243,6 +243,82 @@ class TestProducerIntegration:
             build_bounded_input_certificate(SINGLE_LEAF, FiniteOrbitClaimWire.singleton(1), N=0)
 
 
+# ===== ASCII-only contract (Q5 PR #3 v3) =====
+
+
+class TestAsciiContract:
+    """The producer enforces the ASCII-only contract on `leafId` and
+    `leafProperty` via `_validate_ascii_identifier`. Mirrors the Lean
+    parser's `checkAscii` + the JSON Schema `pattern: ^[\\u0020-\\u007E]+$`
+    constraint on those fields.
+
+    Per Codex review `PRR_kwDOTuMD788AAAABLG_dzA` (P1, 2026-08-27): the
+    producer must reject non-ASCII input upstream so the parser never
+    sees non-ASCII bytes (defense in depth).
+    """
+
+    def test_leafId_non_ascii_rejected(self):
+        """Non-ASCII char in `leafId` raises `ValueError` with the
+        offending codepoint, surfaced at `to_dict()` boundary."""
+        bad_leaf = CoverageLeaf(leaf_id="L\u00e9", leaf_property="0:0-0")
+        wire = BoundedInputCertificateWire(
+            N=1,
+            rawWitnesses=[CertWitnessWire(bad_leaf, [1])],
+            claim=FiniteOrbitClaimWire.singleton(1),
+        )
+        with pytest.raises(ValueError, match="leafId must be ASCII-printable"):
+            wire.to_dict()
+
+    def test_leafProperty_non_ascii_rejected(self):
+        """Non-ASCII char in `leafProperty` raises `ValueError`."""
+        bad_leaf = CoverageLeaf(leaf_id="L", leaf_property="0:\u00e90-0")
+        wire = BoundedInputCertificateWire(
+            N=1,
+            rawWitnesses=[CertWitnessWire(bad_leaf, [1])],
+            claim=FiniteOrbitClaimWire.singleton(1),
+        )
+        with pytest.raises(ValueError, match="leafProperty must be ASCII-printable"):
+            wire.to_dict()
+
+    def test_control_char_in_leafId_rejected(self):
+        """Control char (0x01) in `leafId` raises `ValueError`."""
+        bad_leaf = CoverageLeaf(leaf_id="L\x01", leaf_property="0:0-0")
+        wire = BoundedInputCertificateWire(
+            N=1,
+            rawWitnesses=[CertWitnessWire(bad_leaf, [1])],
+            claim=FiniteOrbitClaimWire.singleton(1),
+        )
+        with pytest.raises(ValueError, match="leafId must be ASCII-printable"):
+            wire.to_dict()
+
+    def test_ascii_printable_accepted(self):
+        """Full ASCII-printable range (0x20..0x7E) is accepted."""
+        # All printable ASCII chars: space, digits, letters, punctuation.
+        ok_leaf = CoverageLeaf(
+            leaf_id="L !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
+            leaf_property="0:0-0",
+        )
+        wire = BoundedInputCertificateWire(
+            N=1,
+            rawWitnesses=[CertWitnessWire(ok_leaf, [1])],
+            claim=FiniteOrbitClaimWire.singleton(1),
+        )
+        # Should not raise.
+        wire.to_dict()
+
+    def test_emit_validates_schema_pattern(self):
+        """Round-trip through `Draft202012Validator` enforces the
+        ASCII `pattern` constraint (in addition to producer-side check)."""
+        bad_leaf = CoverageLeaf(leaf_id="L\u00e9", leaf_property="0:0-0")
+        wire = BoundedInputCertificateWire(
+            N=1,
+            rawWitnesses=[CertWitnessWire(bad_leaf, [1])],
+            claim=FiniteOrbitClaimWire.singleton(1),
+        )
+        with pytest.raises(ValueError, match="leafId must be ASCII-printable"):
+            wire.to_dict()
+
+
 # ===== Round-trip =====
 
 

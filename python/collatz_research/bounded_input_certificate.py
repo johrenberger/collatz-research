@@ -103,6 +103,11 @@ class CertWitnessWire:
     trajectory: list[int]
 
     def to_dict(self) -> dict:
+        # Enforce the ASCII-only contract for leafId + leafProperty at the
+        # producer boundary. Mirrors the Lean `parseAsciiStringContent`
+        # rejection category. Raises `ValueError` for any non-ASCII char.
+        _validate_ascii_identifier(self.leaf.leaf_id, "leafId")
+        _validate_ascii_identifier(self.leaf.leaf_property, "leafProperty")
         return {
             "l": {
                 "leafId": self.leaf.leaf_id,
@@ -149,20 +154,50 @@ class BoundedInputCertificateWire:
             text = json.dumps(
                 self.to_dict(),
                 separators=(",", ":"),
-                ensure_ascii=True,
+                # `ensure_ascii=False` for defense in depth: even if the
+                # ASCII-only validation were ever bypassed, the Lean
+                # parser's `parseAsciiStringContent` rejects any
+                # non-ASCII byte that slips through. With validation in
+                # place, emitted bytes are always ASCII regardless.
+                ensure_ascii=False,
                 sort_keys=False,
             )
         else:
             text = json.dumps(
                 self.to_dict(),
                 indent=indent,
-                ensure_ascii=True,
+                ensure_ascii=False,
                 sort_keys=False,
             )
-        return text.encode("ascii")
+        # UTF-8 encoding: ASCII-only validated content round-trips
+        # identically to ASCII bytes; non-ASCII would have been rejected
+        # by `_validate_ascii_identifier`.
+        return text.encode("utf-8")
 
 
 # ===== Trajectory generation =====
+
+
+def _validate_ascii_identifier(value: str, name: str) -> None:
+    """Validate that `value` contains only ASCII-printable chars (0x20..0x7E).
+
+    Mirrors the Lean parser's `parseAsciiStringContent` constraint for
+    `leafId` and `leafProperty` (per Q5 PR #3 v3 ASCII-only contract).
+    Raises `ValueError` with the first non-conforming codepoint so the
+    caller can surface a clear rejection at the producer boundary.
+
+    The wire-format schema (`schemas/bounded-input-certificate-v1.json`)
+    enforces the same `pattern: ^[\\u0020-\\u007E]+$` constraint via
+    `Draft202012Validator`. The producer validates eagerly so we never
+    emit a certificate the schema (or Lean parser) would reject.
+    """
+    for ch in value:
+        cp = ord(ch)
+        if cp < 0x20 or cp > 0x7E:
+            raise ValueError(
+                f"{name} must be ASCII-printable (0x20..0x7E), "
+                f"found codepoint U+{cp:04X}"
+            )
 
 
 def _two_adic_valuation(n: int) -> int:

@@ -63,8 +63,8 @@
             "additionalProperties": false,
             "required": ["leafId", "leafProperty"],
             "properties": {
-              "leafId": {"type": "string", "minLength": 1, "description": "Leaf identifier."},
-              "leafProperty": {"type": "string", "description": "Leaf property label."}
+              "leafId": {"type": "string", "minLength": 1, "pattern": "^[\\u0020-\\u007E]+$", "description": "Leaf identifier. ASCII-printable only (0x20-0x7E; no escape sequences). Mirrors Lean `parseAsciiString` + producer `_validate_ascii_identifier`."},
+              "leafProperty": {"type": "string", "pattern": "^[\\u0020-\\u007E]+$", "description": "Leaf property label. ASCII-printable only (0x20-0x7E; no escape sequences). Mirrors Lean `parseAsciiString` + producer `_validate_ascii_identifier`."}
             }
           },
           "trajectory": {

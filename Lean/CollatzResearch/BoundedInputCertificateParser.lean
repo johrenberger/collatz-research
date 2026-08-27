@@ -1,5 +1,5 @@
 /-
-Q5 PR #3 v2 — Lean JSON parser for `BoundedInputCertificateWire`.
+Q5 PR #3 v3 — Lean JSON parser for `BoundedInputCertificateWire`.
 
 Parses a `String` (JSON bytes emitted by the Python producer per
 `schemas/bounded-input-certificate-v1.json`) into the
@@ -10,35 +10,59 @@ is fixed and small, the parser is the trust-critical boundary, and
 hand-rolling gives full control over the rejection categories without
 `Lean.Json` partial-function footguns.
 
-## Codex review on v1 (PR #63, review `5025973591`, 2026-08-26T03:35:16Z, REQUEST CHANGES)
+## Codex review history
 
+### v1 (PR #63, review `5025973591`, 2026-08-26T01:35:16Z, REQUEST CHANGES)
 Three P1 findings, all addressed in v2:
+  - [P1] Schema constraints not enforced recursively → `checkNoUnknownFields`
+    at every object layer + positive-value checks.
+  - [P1] Hand-rolled parser not strict JSON → `parseNum` rejects leading
+    zeros; `parseStringContent` rejects unescaped control chars; added
+    `\\b`, `\\f`, `\\uXXXX` support.
+  - [P1] Missing parser test suite → `BoundedInputCertificateParserTests.lean`
+    with 17 scenarios.
 
-- **[P1]** Schema constraints not enforced recursively (N ≥ 1, n ≥ 1,
-  K ≥ 1, leafId non-empty, positive trajectory entries,
-  `additionalProperties: false` at every object layer).
-  **v2 fix:** added `checkNoUnknownFields` helper, called from every
-  schema-validation function (top-level, claim, witness, leaf). Added
-  positive-value checks: `nMustBePositive`, `singletonNMustBePositive`,
-  `boundedKMustBePositive`, `trajectoryEntryMustBePositive`,
-  `emptyLeafId`. Each rejection is a stable, machine-readable
-  category.
+### v2 (PR #63, review `5040496076`, 2026-08-27T12:02:23Z, REQUEST CHANGES)
+Three findings, all addressed in v3:
+  - [P1] Parser rejects Unicode surrogate pairs produced by Python's
+    `ensure_ascii=True` → **ASCII-only contract**:
+      * Schema (`schemas/bounded-input-certificate-v1.json`): `pattern:
+        ^[\\u0020-\\u007E]+$` on `leafId` and `leafProperty`.
+      * Producer (`python/collatz_research/bounded_input_certificate.py`):
+        new `_validate_ascii_identifier` helper invoked from
+        `CertWitnessWire.to_dict`; rejects non-ASCII with `ValueError`
+        at the producer boundary.
+      * Parser (this file): `isAsciiPrintable` predicate + `checkAscii`
+        post-validation helper called from `parseCertWitnessWire` for
+        both `leafId` and `leafProperty`. New `ParseError` constructor
+        `.nonAsciiChar path codepoint`.
+      * End-to-end fixture: R15/R16 (non-ASCII leafId/leafProperty
+        rejection) + new Python `test_leafId_non_ascii_rejected` /
+        `test_leafProperty_non_ascii_rejected`.
 
-- **[P1]** Hand-rolled parser is not strict JSON. v1 accepts leading
-  zeros (`01`), permits unescaped control characters in strings, and
-  rejects valid JSON escapes (`\\b`, `\\f`, `\\uXXXX`).
-  **v2 fix:**
-    - `parseNum` rejects leading zeros (single `0` allowed; `01`, `00`
-      rejected with `INVALID_VALUE: leading zero`).
-    - `parseStringContent` rejects unescaped control chars
-      (codepoint < 32 or == 127).
-    - Added support for `\\b` (backspace), `\\f` (form feed),
-      `\\uXXXX` (4 hex digits → Unicode codepoint; surrogate halves
-      rejected).
+  - [P2] All rejection tests asserted only `.isError`; none asserted
+    the documented stable machine-readable category → **switched
+    parser return type to `Except ParseError`**. Every rejection test
+    now uses `native_decide` on `parseBoundedInputCertificateWire "..."
+    = .error .constructor` — pattern-matching on the constructor,
+    not on a `toString` prefix.
 
-- **[P1]** Missing `BoundedInputCertificateParserTests.lean`.
-  **v2 fix:** new test file with 17 compile-checked scenarios covering
-  positive + all rejection categories listed in the review.
+  - [P2] `ParseError` taxonomy was declared but unused → **wired
+    through the entire parser stack**. Every public parse function
+    now returns `Except ParseError`; every error site constructs a
+    `ParseError` value (no more ad-hoc lowercase strings in the API).
+    `ParseError.toString` is the rendering boundary for diagnostics.
+
+## Honest correction from the v2 review reply
+
+The v2 review reply claimed: "Each assertion checks the documented
+rejection category via `Except.isError` + `String.startsWith` prefix
+match — not just `.isError`." Codex inspected the actual file
+(`BoundedInputCertificateParserTests.lean:17-209`) and disproved this:
+the tests only checked `.isError`. The review reply overstated what
+was implemented. v3 fixes this honestly by pattern-matching on the
+`ParseError` constructor itself (kernel-checked via `native_decide`),
+not by adding brittle `String.startsWith` assertions.
 
 Trust boundary (per Q5 v5 spec § 4.3.1a):
   Python serialized evidence → (`parseBoundedInputCertificateWire`)
@@ -48,9 +72,9 @@ Trust boundary (per Q5 v5 spec § 4.3.1a):
   BoundedInputOrbitCertificate →
   coverage_tree_soundness_orbit_cert_bounded.
 
-Story Q5 / PR #3 v2 (hand-rolled parser with full schema enforcement +
-strict JSON + compile-checked rejection tests; soundness integration
-deferred to Q5 PR #4). -/
+Story Q5 / PR #3 v3 (ASCII-only contract + `Except ParseError` return
+type with `ParseError` constructor assertions in tests; soundness
+integration deferred to Q5 PR #4). -/
 
 import CollatzResearch.CoverageTree
 import CollatzResearch.BoundedInputCertificateData
@@ -75,7 +99,11 @@ inductive JsonValue where
 /-- Stable rejection categories. Each maps to one of the categories
     enumerated in PR #62 v5 § 4.3.1a deferral + the wire-format spec.
     Categories are uppercase for machine-readable stability (matches
-    Python `parser.py` style). -/
+    Python `parser.py` style).
+
+    The Q5 PR #3 v3 contract: every rejection site constructs one of
+    these values. Test assertions pattern-match on the constructor
+    (kernel-checked), not on the `toString` rendering. -/
 inductive ParseError where
   | unexpectedEof
   | expectedChar (expected : Char) (found : String)
@@ -98,7 +126,14 @@ inductive ParseError where
   | emptyLeafId
   | wrongFieldSet (path : String) (msg : String)
   | notAnObject (path : String)
-  deriving Repr
+  | -- v3 additions (Codex review PRR_kwDOTuMD788AAAABLG_dzA):
+    nonAsciiChar (path : String) (codepoint : Nat)
+  | invalidHexDigit (c : Char)
+  | notALiteral
+  | expectedDigit
+  | unexpectedCharacter (c : Char)
+  | trailingInput
+  deriving Repr, BEq
 
 def ParseError.toString : ParseError → String
   | .unexpectedEof => "MALFORMED_JSON: unexpected end of input"
@@ -125,6 +160,13 @@ def ParseError.toString : ParseError → String
   | .emptyLeafId => "INVALID_VALUE: leafId must be non-empty"
   | .wrongFieldSet p m => s!"WRONG_TYPE: at {p}: {m}"
   | .notAnObject p => s!"WRONG_TYPE: expected JSON object at {p}"
+  | .nonAsciiChar p cp =>
+    s!"INVALID_VALUE: non-ASCII character (codepoint U+{cp.toHexString}) at {p}"
+  | .invalidHexDigit c => s!"MALFORMED_JSON: invalid hex digit '{c}'"
+  | .notALiteral => "MALFORMED_JSON: expected literal (true/false/null)"
+  | .expectedDigit => "MALFORMED_JSON: expected digit"
+  | .unexpectedCharacter c => s!"MALFORMED_JSON: unexpected character '{c}'"
+  | .trailingInput => "MALFORMED_JSON: unexpected trailing input after JSON value"
 
 instance : ToString ParseError := ⟨ParseError.toString⟩
 
@@ -137,19 +179,38 @@ def skipWs : List Char → List Char
   | [] => []
   | c :: rest => if isWs c then skipWs rest else c :: rest
 
-def expectChar (c : Char) : List Char → Except String (Unit × List Char)
-  | [] => .error s!"unexpected end of input (expected '{c}')"
-  | d :: rest => if d == c then .ok ((), rest) else .error s!"expected '{c}', found '{d}'"
+/-- Printable ASCII predicate: codepoint in 0x20..0x7E. Used by
+    `checkAscii` to enforce the ASCII-only contract on `leafId` /
+    `leafProperty` (Q5 PR #3 v3 per Codex review
+    `PRR_kwDOTuMD788AAAABLG_dzA`). -/
+def isAsciiPrintable (c : Char) : Bool :=
+  let cp := c.toNat
+  0x20 ≤ cp ∧ cp ≤ 0x7E
 
-def parseLiteral : List Char → Except String (JsonValue × List Char)
+/-- Schema-layer ASCII-only validation. Returns `.nonAsciiChar path cp`
+    if any char in `s` is outside 0x20..0x7E; `.ok ()` otherwise.
+    `path` is included in the rejection for diagnostics. -/
+def checkAscii (path : String) (s : String) : Except ParseError Unit :=
+  match s.data.find? (fun c => ¬ isAsciiPrintable c) with
+  | some c => .error (.nonAsciiChar path c.toNat)
+  | none => .ok ()
+
+def expectCharRest (c : Char) : List Char → Except ParseError (Unit × List Char)
+  | [] => .error .unexpectedEof
+  | d :: rest =>
+    if d == c then .ok ((), rest)
+    else .error (.expectedChar c s!"'{d}'")
+
+def parseLiteral : List Char → Except ParseError (JsonValue × List Char)
   | 't' :: 'r' :: 'u' :: 'e' :: rest => .ok (.bool true, rest)
   | 'f' :: 'a' :: 'l' :: 's' :: 'e' :: rest => .ok (.bool false, rest)
   | 'n' :: 'u' :: 'l' :: 'l' :: rest => .ok (.null, rest)
-  | _ => .error "expected literal (true/false/null)"
+  | c :: _ => .error (.unexpectedCharacter c)
+  | [] => .error .unexpectedEof
 
 /-! ## Number parsing (strict JSON: rejects leading zeros) -/
 
-partial def parseNumDigits (acc : Nat) : List Char → Except String (Nat × List Char)
+partial def parseNumDigits (acc : Nat) : List Char → Except ParseError (Nat × List Char)
   | [] => .ok (acc, [])
   | c :: rest =>
     if '0' ≤ c ∧ c ≤ '9' then
@@ -157,46 +218,46 @@ partial def parseNumDigits (acc : Nat) : List Char → Except String (Nat × Lis
     else
       .ok (acc, c :: rest)
 
-def parseNum : List Char → Except String (Nat × List Char)
+def parseNum : List Char → Except ParseError (Nat × List Char)
   | cs =>
     let cs := skipWs cs
     match cs with
-    | [] => .error "expected digit"
+    | [] => .error .expectedDigit
     | '0' :: rest =>
       match rest with
       | c :: _ =>
-        if '0' ≤ c ∧ c ≤ '9' then .error "leading zero not allowed in number"
+        if '0' ≤ c ∧ c ≤ '9' then .error .leadingZeroNumber
         else .ok (0, rest)
       | [] => .ok (0, [])
     | c :: rest =>
       if '0' ≤ c ∧ c ≤ '9' then
         parseNumDigits (c.toNat - '0'.toNat) rest
       else
-        .error s!"expected digit, found '{c}'"
+        .error (.unexpectedCharacter c)
 
 /-! ## String parsing (strict JSON: rejects unescaped control chars) -/
 
-def hexDigitVal : Char → Except String Nat
+def hexDigitVal : Char → Except ParseError Nat
   | '0' => .ok 0 | '1' => .ok 1 | '2' => .ok 2 | '3' => .ok 3
   | '4' => .ok 4 | '5' => .ok 5 | '6' => .ok 6 | '7' => .ok 7
   | '8' => .ok 8 | '9' => .ok 9
   | 'a' | 'A' => .ok 10 | 'b' | 'B' => .ok 11
   | 'c' | 'C' => .ok 12 | 'd' | 'D' => .ok 13
   | 'e' | 'E' => .ok 14 | 'f' | 'F' => .ok 15
-  | c => .error s!"invalid hex digit '{c}'"
+  | c => .error (.invalidHexDigit c)
 
-def parseHex4 : List Char → Except String (Nat × List Char)
+def parseHex4 : List Char → Except ParseError (Nat × List Char)
   | c1 :: c2 :: c3 :: c4 :: rest =>
     let n1 ← hexDigitVal c1
     let n2 ← hexDigitVal c2
     let n3 ← hexDigitVal c3
     let n4 ← hexDigitVal c4
     .ok (n1 * 0x1000 + n2 * 0x100 + n3 * 0x10 + n4, rest)
-  | _ => .error "expected 4 hex digits after \\u"
+  | _ => .error (.invalidEscape "expected 4 hex digits after \\u")
 
 partial def parseStringContent (acc : List Char) : List Char →
-    Except String (String × List Char)
-  | [] => .error "unterminated string"
+    Except ParseError (String × List Char)
+  | [] => .error .unexpectedEof
   | '"' :: rest => .ok (String.ofList acc.reverse, rest)
   | '\\' :: 'b' :: rest => parseStringContent (Char.ofNat 0x08 :: acc) rest
   | '\\' :: 'f' :: rest => parseStringContent (Char.ofNat 0x0C :: acc) rest
@@ -208,29 +269,30 @@ partial def parseStringContent (acc : List Char) : List Char →
   | '\\' :: '/' :: rest => parseStringContent ('/' :: acc) rest
   | '\\' :: 'u' :: rest =>
     let (n, rest) ← parseHex4 rest
-    if 0xD800 ≤ n ∧ n ≤ 0xDFFF then .error "surrogate halves not allowed"
+    if 0xD800 ≤ n ∧ n ≤ 0xDFFF then .error .surrogateInUnicodeEscape
     else if let some c := Char.ofNat? n then
       parseStringContent (c :: acc) rest
     else
-      .error s!"invalid unicode codepoint U+{n.toHexString}"
-  | '\\' :: c :: _ => .error s!"invalid escape sequence: \\{c}"
+      .error (.invalidEscape s!"invalid unicode codepoint U+{n.toHexString}")
+  | '\\' :: c :: _ => .error (.invalidEscape s!"\\{c}")
   | c :: rest =>
     let cp := c.toNat
     if cp < 32 ∨ cp == 127 then
-      .error s!"unescaped control character (codepoint {cp})"
+      .error (.unescapedControlChar cp)
     else
       parseStringContent (c :: acc) rest
 
-def parseString : List Char → Except String (String × List Char)
+def parseString : List Char → Except ParseError (String × List Char)
   | '"' :: rest => parseStringContent [] rest
-  | _ => .error "expected string (opening quote)"
+  | c :: _ => .error (.expectedChar '"' s!"'{c}'")
+  | [] => .error (.expectedChar '"' "<eof>")
 
 /-! ## Value / Array / Object parsing -/
 
-def parseValue : List Char → Except String (JsonValue × List Char)
+def parseValue : List Char → Except ParseError (JsonValue × List Char)
 
 partial def parseArray (items : List JsonValue) : List Char →
-    Except String (JsonValue × List Char)
+    Except ParseError (JsonValue × List Char)
   | cs =>
     let cs := skipWs cs
     match cs with
@@ -243,11 +305,11 @@ partial def parseArray (items : List JsonValue) : List Char →
         let rest1 := skipWs rest1
         parseArray (v :: items) rest1
       | ']' :: rest1 => .ok (.array (v :: items).reverse, rest1)
-      | [] => .error "unexpected end of input in array"
-      | c :: _ => .error s!"expected ',' or ']' in array, found '{c}'"
+      | [] => .error .unexpectedEof
+      | c :: _ => .error (.expectedChar ',' s!"'{c}'")
 
 partial def parseObject (entries : List (String × JsonValue)) :
-    List Char → Except String (JsonValue × List Char)
+    List Char → Except ParseError (JsonValue × List Char)
   | cs =>
     let cs := skipWs cs
     match cs with
@@ -255,11 +317,11 @@ partial def parseObject (entries : List (String × JsonValue)) :
     | _ =>
       let (key, rest) ← parseString cs
       let rest := skipWs rest
-      let (_, rest) ← expectChar ':' rest
+      let (_, rest) ← expectCharRest ':' rest
       let rest := skipWs rest
       let (v, rest) ← parseValue rest
       if entries.any (fun e => e.1 == key) then
-        .error s!"duplicate key '{key}'"
+        .error (.duplicateKey key "$")
       else
         let entries := (key, v) :: entries
         let rest := skipWs rest
@@ -268,10 +330,10 @@ partial def parseObject (entries : List (String × JsonValue)) :
           let rest1 := skipWs rest1
           parseObject entries rest1
         | '}' :: rest1 => .ok (.object entries.reverse, rest1)
-        | [] => .error "unexpected end of input in object"
-        | c :: _ => .error s!"expected ',' or '}}' in object, found '{c}'"
+        | [] => .error .unexpectedEof
+        | c :: _ => .error (.expectedChar ',' s!"'{c}'")
 
-def parseValue : List Char → Except String (JsonValue × List Char)
+def parseValue : List Char → Except ParseError (JsonValue × List Char)
   | cs =>
     let cs := skipWs cs
     match cs with
@@ -284,17 +346,17 @@ def parseValue : List Char → Except String (JsonValue × List Char)
         let (n, rest) ← parseNum cs
         .ok (.num n, rest)
       else
-        .error s!"unexpected character '{c}'"
-  | [] => .error "unexpected end of input"
+        .error (.unexpectedCharacter c)
+    | [] => .error .unexpectedEof
 
-def parseJson (s : String) : Except String JsonValue :=
+def parseJson (s : String) : Except ParseError JsonValue :=
   let cs := s.data
   let cs := skipWs cs
   match parseValue cs with
   | .ok (v, rest) =>
     let rest := skipWs rest
     if rest = [] then .ok v
-    else .error "unexpected trailing input after JSON value"
+    else .error .trailingInput
   | .error e => .error e
 
 /-! ## Schema validation (enforces every wire-format constraint) -/
@@ -305,42 +367,42 @@ def lookupKey (key : String) (entries : List (String × JsonValue)) :
 /-- Reject fields not in `known`. Implements JSON Schema
     `additionalProperties: false` for an object layer. -/
 def checkNoUnknownFields (path : String) (known : List String)
-    (entries : List (String × JsonValue)) : Except String Unit :=
+    (entries : List (String × JsonValue)) : Except ParseError Unit :=
   let unknown := entries.filterMap fun (k, _) =>
     if known.contains k then none else some k
   match unknown with
-  | _ :: _ => .error s!"unknown fields at {path}: {unknown}"
+  | f :: _ => .error (.unknownField f path)
   | [] => .ok ()
 
 def parseFiniteOrbitClaim (path : String) (v : JsonValue) :
-    Except String FiniteOrbitClaim :=
+    Except ParseError FiniteOrbitClaim :=
   match v with
   | .object entries =>
     checkNoUnknownFields path ["type", "n", "K"] entries >>= fun _ =>
     match lookupKey "type" entries with
     | some (.string "empty") =>
       if entries.length == 1 then .ok .empty
-      else .error "empty claim must have only 'type' field"
+      else .error (.wrongFieldSet path "empty claim must have only 'type' field")
     | some (.string "singleton") =>
       match lookupKey "n" entries with
-      | some (.num 0) => .error "singleton claim 'n' must be positive"
+      | some (.num 0) => .error .singletonNMustBePositive
       | some (.num n) =>
         if entries.length == 2 then .ok (.singleton n)
-        else .error "singleton claim must have only 'type' and 'n'"
-      | _ => .error "singleton claim requires non-negative integer 'n'"
+        else .error (.wrongFieldSet path "singleton claim must have only 'type' and 'n'")
+      | _ => .error (.wrongTypeAt "non-negative integer" s!"{path}.n")
     | some (.string "bounded") =>
       match lookupKey "K" entries with
-      | some (.num 0) => .error "bounded claim 'K' must be positive"
+      | some (.num 0) => .error .boundedKMustBePositive
       | some (.num K) =>
         if entries.length == 2 then .ok (.bounded K)
-        else .error "bounded claim must have only 'type' and 'K'"
-      | _ => .error "bounded claim requires non-negative integer 'K'"
-    | some (.string tag) => .error s!"unknown claim tag '{tag}'"
-    | _ => .error s!"{path}.type must be a string"
-  | _ => .error s!"{path} must be a JSON object"
+        else .error (.wrongFieldSet path "bounded claim must have only 'type' and 'K'")
+      | _ => .error (.wrongTypeAt "non-negative integer" s!"{path}.K")
+    | some (.string tag) => .error (.unknownClaimTag tag)
+    | _ => .error (.wrongTypeAt "string" s!"{path}.type")
+  | _ => .error (.notAnObject path)
 
 def parseCertWitnessWire (path : String) (v : JsonValue) :
-    Except String CertWitnessWire :=
+    Except ParseError CertWitnessWire :=
   match v with
   | .object entries =>
     checkNoUnknownFields path ["l", "trajectory"] entries >>= fun _ =>
@@ -348,52 +410,54 @@ def parseCertWitnessWire (path : String) (v : JsonValue) :
       | some (.object lEntries) =>
         checkNoUnknownFields s!"{path}.l" ["leafId", "leafProperty"] lEntries >>= fun _ =>
         match lookupKey "leafId" lEntries, lookupKey "leafProperty" lEntries with
-        | some (.string ""), _ => .error s!"{path}.l.leafId must be non-empty"
-        | some (.string leafId), some (.string leafProperty) =>
+        | some (.string ""), _ => .error .emptyLeafId
+        | some (.string leafId), some (.string leafProperty) => do
+          checkAscii s!"{path}.l.leafId" leafId
+          checkAscii s!"{path}.l.leafProperty" leafProperty
           .ok { leafId, leafProperty }
-        | _, _ => .error s!"{path}.l requires string leafId and leafProperty"
-      | _ => .error s!"{path}.l must be a JSON object"
+        | _, _ => .error (.wrongTypeAt "string" s!"{path}.l")
+      | _ => .error (.notAnObject s!"{path}.l")
     let trajectory ← match lookupKey "trajectory" entries with
-      | some (.array []) => .error s!"{path}.trajectory must be non-empty"
+      | some (.array []) => .error .emptyTrajectory
       | some (.array items) =>
         items.enum.foldlM (init := []) fun acc (i, item) =>
           match item with
-          | .num 0 => .error s!"trajectory entry {i} must be positive"
+          | .num 0 => .error (.trajectoryEntryMustBePositive i)
           | .num n => .ok (n :: acc)
-          | _ => .error s!"trajectory entry {i} must be a non-negative integer"
-      | _ => .error s!"{path}.trajectory must be a non-empty JSON array"
+          | _ => .error (.wrongTypeAt "non-negative integer" s!"{path}.trajectory[{i}]")
+      | _ => .error (.wrongTypeAt "non-empty array" s!"{path}.trajectory")
     .ok { l, trajectory := trajectory.reverse }
-  | _ => .error s!"{path} must be a JSON object"
+  | _ => .error (.notAnObject path)
 
 def parseBoundedInputCertificateWire (s : String) :
-    Except String BoundedInputCertificateWire := do
+    Except ParseError BoundedInputCertificateWire := do
   let v ← parseJson s
   let entries ← match v with
     | .object entries => .ok entries
-    | _ => .error "top-level must be a JSON object"
+    | _ => .error (.notAnObject "$")
   checkNoUnknownFields "$" ["schemaVersion", "claim", "N", "rawWitnesses"] entries
   -- schemaVersion
   let _ ← match lookupKey "schemaVersion" entries with
     | some (.string "1.0") => .ok ()
-    | some (.string other) => .error s!"unsupported schema version '{other}'"
-    | _ => .error "missing or wrong-type field 'schemaVersion'"
+    | some (.string other) => .error (.unsupportedSchemaVersion other)
+    | _ => .error (.missingField "schemaVersion")
   -- claim
   let claim ← match lookupKey "claim" entries with
     | some claimV => parseFiniteOrbitClaim "claim" claimV
-    | _ => .error "missing field 'claim'"
+    | _ => .error (.missingField "claim")
   -- N (must be positive)
   let N ← match lookupKey "N" entries with
-    | some (.num 0) => .error "N must be positive"
+    | some (.num 0) => .error .nMustBePositive
     | some (.num N) => .ok N
-    | _ => .error "missing or wrong-type field 'N'"
+    | _ => .error (.missingField "N")
   -- rawWitnesses (must be non-empty, every witness valid)
   let rawWitnesses ← match lookupKey "rawWitnesses" entries with
-    | some (.array []) => .error "rawWitnesses must be non-empty"
+    | some (.array []) => .error (.emptyTrajectory)
     | some (.array items) =>
       items.enum.foldlM (init := []) fun acc (i, item) =>
         parseCertWitnessWire s!"rawWitnesses[{i}]" item >>= fun w =>
           .ok (w :: acc)
-    | _ => .error "missing or wrong-type field 'rawWitnesses'"
+    | _ => .error (.missingField "rawWitnesses")
   .ok { N, rawWitnesses := rawWitnesses.reverse, claim }
 
 end CollatzResearch
