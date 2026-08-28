@@ -294,8 +294,13 @@ class TestAsciiContract:
     def test_ascii_printable_accepted(self):
         """Full ASCII-printable range (0x20..0x7E) is accepted."""
         # All printable ASCII chars: space, digits, letters, punctuation.
+        # Adjacent string literals (Python auto-concatenates) keep the
+        # line under the E501 column limit (100 cols; ruff E501).
         ok_leaf = CoverageLeaf(
-            leaf_id="L !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
+            leaf_id=(
+                "L !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+            ),
             leaf_property="0:0-0",
         )
         wire = BoundedInputCertificateWire(
