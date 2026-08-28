@@ -53,6 +53,29 @@ Three findings, all addressed in v3:
     `ParseError` value (no more ad-hoc lowercase strings in the API).
     `ParseError.toString` is the rendering boundary for diagnostics.
 
+### v3 (PR #63, review `PRR_kwDOTuMD788AAAABLVa5sw`, 2026-08-28T22:46:03Z, REQUEST CHANGES)
+Two findings, addressed in v4:
+  - [P1] Python CI red on `ruff format --check .` →
+    `ruff format python/collatz_research/bounded_input_certificate.py`
+    (formatting-only change; test file already formatted).
+  - [P2] Typed error API still conflated an absent field with a
+    present field of the wrong type — R6 supplied numeric
+    `schemaVersion: 42` yet expected `.missingField "schemaVersion"`,
+    contradicting the documented `WRONG_TYPE` category. **Split every
+    field-lookup wildcard into separate `none` and `some _` arms**
+    via the new `requireKey` helper; callers now emit
+    `.missingField key` on absent and `.wrongTypeAt expected path`
+    on wrong type. Applied at: `schemaVersion`, `N`, `claim`,
+    `rawWitnesses`, `l`, `leafId`, `leafProperty`, `trajectory` (in
+    `parseCertWitnessWire`), and `type`/`n`/`K` (in
+    `parseFiniteOrbitClaim`) for uniformity. R6 updated to assert
+    `.wrongTypeAt "string" "$.schemaVersion"`; six new scenarios
+    R6b–R6g cover wrong-type rejection for `N`, `claim`,
+    `rawWitnesses`, `leafId`, `leafProperty`, and `trajectory`.
+    Four new scenarios R5b/R5c/R5e/R5h cover the matching missing-
+    field rejection (top-level `schemaVersion`/`N`/`rawWitnesses`
+    and witness-level `l`/`trajectory`).
+
 ## Honest correction from the v2 review reply
 
 The v2 review reply claimed: "Each assertion checks the documented
@@ -364,6 +387,19 @@ def parseJson (s : String) : Except ParseError JsonValue :=
 def lookupKey (key : String) (entries : List (String × JsonValue)) :
     Option JsonValue := entries.lookup key
 
+/-- Distinguish "absent" from "present with wrong type". Returns
+    `.missingField key` if absent; otherwise returns `.ok v` so the
+    caller can do its own type check and return `.wrongTypeAt`
+    on a type mismatch. v4 per Codex review
+    `PRR_kwDOTuMD788AAAABLVa5sw` — fixes R6 (which used to conflate
+    "key absent" with "key present but wrong type" via a wildcard
+    catch-all returning `.missingField`). -/
+def requireKey (key : String) (entries : List (String × JsonValue)) :
+    Except ParseError JsonValue :=
+  match lookupKey key entries with
+  | none => .error (.missingField key)
+  | some v => .ok v
+
 /-- Reject fields not in `known`. Implements JSON Schema
     `additionalProperties: false` for an object layer. -/
 def checkNoUnknownFields (path : String) (known : List String)
@@ -375,48 +411,58 @@ def checkNoUnknownFields (path : String) (known : List String)
   | [] => .ok ()
 
 def parseFiniteOrbitClaim (path : String) (v : JsonValue) :
-    Except ParseError FiniteOrbitClaim :=
-  match v with
-  | .object entries =>
-    checkNoUnknownFields path ["type", "n", "K"] entries >>= fun _ =>
-    match lookupKey "type" entries with
-    | some (.string "empty") =>
-      if entries.length == 1 then .ok .empty
-      else .error (.wrongFieldSet path "empty claim must have only 'type' field")
-    | some (.string "singleton") =>
-      match lookupKey "n" entries with
+    Except ParseError FiniteOrbitClaim := do
+  let entries ← match v with
+    | .object es => .ok es
+    | _ => .error (.notAnObject path)
+  checkNoUnknownFields path ["type", "n", "K"] entries
+  match lookupKey "type" entries with
+  | some (.string "empty") =>
+    if entries.length == 1 then .ok .empty
+    else .error (.wrongFieldSet path "empty claim must have only 'type' field")
+  | some (.string "singleton") => do
+    let n ← match lookupKey "n" entries with
       | some (.num 0) => .error .singletonNMustBePositive
-      | some (.num n) =>
-        if entries.length == 2 then .ok (.singleton n)
-        else .error (.wrongFieldSet path "singleton claim must have only 'type' and 'n'")
-      | _ => .error (.wrongTypeAt "non-negative integer" s!"{path}.n")
-    | some (.string "bounded") =>
-      match lookupKey "K" entries with
+      | some (.num n) => .ok n
+      | some _ => .error (.wrongTypeAt "non-negative integer" s!"{path}.n")
+      | none => .error (.missingField "n")
+    if entries.length == 2 then .ok (.singleton n)
+    else .error (.wrongFieldSet path "singleton claim must have only 'type' and 'n'")
+  | some (.string "bounded") => do
+    let K ← match lookupKey "K" entries with
       | some (.num 0) => .error .boundedKMustBePositive
-      | some (.num K) =>
-        if entries.length == 2 then .ok (.bounded K)
-        else .error (.wrongFieldSet path "bounded claim must have only 'type' and 'K'")
-      | _ => .error (.wrongTypeAt "non-negative integer" s!"{path}.K")
-    | some (.string tag) => .error (.unknownClaimTag tag)
-    | _ => .error (.wrongTypeAt "string" s!"{path}.type")
-  | _ => .error (.notAnObject path)
+      | some (.num K) => .ok K
+      | some _ => .error (.wrongTypeAt "non-negative integer" s!"{path}.K")
+      | none => .error (.missingField "K")
+    if entries.length == 2 then .ok (.bounded K)
+    else .error (.wrongFieldSet path "bounded claim must have only 'type' and 'K'")
+  | some (.string tag) => .error (.unknownClaimTag tag)
+  | some _ => .error (.wrongTypeAt "string" s!"{path}.type")
+  | none => .error (.missingField "type")
 
 def parseCertWitnessWire (path : String) (v : JsonValue) :
     Except ParseError CertWitnessWire :=
   match v with
-  | .object entries =>
-    checkNoUnknownFields path ["l", "trajectory"] entries >>= fun _ =>
-    let l ← match lookupKey "l" entries with
-      | some (.object lEntries) =>
-        checkNoUnknownFields s!"{path}.l" ["leafId", "leafProperty"] lEntries >>= fun _ =>
-        match lookupKey "leafId" lEntries, lookupKey "leafProperty" lEntries with
-        | some (.string ""), _ => .error .emptyLeafId
-        | some (.string leafId), some (.string leafProperty) => do
-          checkAscii s!"{path}.l.leafId" leafId
-          checkAscii s!"{path}.l.leafProperty" leafProperty
-          .ok { leafId, leafProperty }
-        | _, _ => .error (.wrongTypeAt "string" s!"{path}.l")
-      | _ => .error (.notAnObject s!"{path}.l")
+  | .object entries => do
+    checkNoUnknownFields path ["l", "trajectory"] entries
+    let lObj ← match lookupKey "l" entries with
+      | some (.object lEntries) => .ok lEntries
+      | some _ => .error (.notAnObject s!"{path}.l")
+      | none => .error (.missingField "l")
+    checkNoUnknownFields s!"{path}.l" ["leafId", "leafProperty"] lObj
+    let leafId ← match lookupKey "leafId" lObj with
+      | some (.string "") => .error .emptyLeafId
+      | some (.string s) => do
+        checkAscii s!"{path}.l.leafId" s
+        pure s
+      | some _ => .error (.wrongTypeAt "string" s!"{path}.l.leafId")
+      | none => .error (.missingField "leafId")
+    let leafProperty ← match lookupKey "leafProperty" lObj with
+      | some (.string s) => do
+        checkAscii s!"{path}.l.leafProperty" s
+        pure s
+      | some _ => .error (.wrongTypeAt "string" s!"{path}.l.leafProperty")
+      | none => .error (.missingField "leafProperty")
     let trajectory ← match lookupKey "trajectory" entries with
       | some (.array []) => .error .emptyTrajectory
       | some (.array items) =>
@@ -425,8 +471,9 @@ def parseCertWitnessWire (path : String) (v : JsonValue) :
           | .num 0 => .error (.trajectoryEntryMustBePositive i)
           | .num n => .ok (n :: acc)
           | _ => .error (.wrongTypeAt "non-negative integer" s!"{path}.trajectory[{i}]")
-      | _ => .error (.wrongTypeAt "non-empty array" s!"{path}.trajectory")
-    .ok { l, trajectory := trajectory.reverse }
+      | some _ => .error (.wrongTypeAt "non-empty array" s!"{path}.trajectory")
+      | none => .error (.missingField "trajectory")
+    pure { l := { leafId, leafProperty }, trajectory := trajectory.reverse }
   | _ => .error (.notAnObject path)
 
 def parseBoundedInputCertificateWire (s : String) :
@@ -436,28 +483,30 @@ def parseBoundedInputCertificateWire (s : String) :
     | .object entries => .ok entries
     | _ => .error (.notAnObject "$")
   checkNoUnknownFields "$" ["schemaVersion", "claim", "N", "rawWitnesses"] entries
-  -- schemaVersion
-  let _ ← match lookupKey "schemaVersion" entries with
-    | some (.string "1.0") => .ok ()
-    | some (.string other) => .error (.unsupportedSchemaVersion other)
-    | _ => .error (.missingField "schemaVersion")
-  -- claim
-  let claim ← match lookupKey "claim" entries with
-    | some claimV => parseFiniteOrbitClaim "claim" claimV
-    | _ => .error (.missingField "claim")
-  -- N (must be positive)
-  let N ← match lookupKey "N" entries with
-    | some (.num 0) => .error .nMustBePositive
-    | some (.num N) => .ok N
-    | _ => .error (.missingField "N")
-  -- rawWitnesses (must be non-empty, every witness valid)
-  let rawWitnesses ← match lookupKey "rawWitnesses" entries with
-    | some (.array []) => .error (.emptyTrajectory)
-    | some (.array items) =>
+  -- schemaVersion (must be the supported string)
+  let sv ← requireKey "schemaVersion" entries
+  match sv with
+  | .string "1.0" => pure ()
+  | .string other => .error (.unsupportedSchemaVersion other)
+  | _ => .error (.wrongTypeAt "string" "$.schemaVersion")
+  -- claim (must be a JSON object parseable as FiniteOrbitClaim)
+  let claimV ← requireKey "claim" entries
+  let claim ← parseFiniteOrbitClaim "claim" claimV
+  -- N (must be a positive integer)
+  let Nv ← requireKey "N" entries
+  let N ← match Nv with
+    | .num 0 => .error .nMustBePositive
+    | .num n => .ok n
+    | _ => .error (.wrongTypeAt "non-negative integer" "$.N")
+  -- rawWitnesses (must be a non-empty array of valid witnesses)
+  let rawV ← requireKey "rawWitnesses" entries
+  let rawWitnesses ← match rawV with
+    | .array [] => .error .emptyTrajectory
+    | .array items =>
       items.enum.foldlM (init := []) fun acc (i, item) =>
         parseCertWitnessWire s!"rawWitnesses[{i}]" item >>= fun w =>
           .ok (w :: acc)
-    | _ => .error (.missingField "rawWitnesses")
+    | _ => .error (.wrongTypeAt "non-empty array" "$.rawWitnesses")
   .ok { N, rawWitnesses := rawWitnesses.reverse, claim }
 
 end CollatzResearch

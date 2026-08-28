@@ -29,6 +29,24 @@ v3 contract:
   - The positive test asserts `.isOk = true` (no need to name the
     specific `FiniteOrbitClaim` constructor in the test).
 
+### v4 (PR #63, review `PRR_kwDOTuMD788AAAABLVa5sw`, 2026-08-28T22:46:03Z)
+
+Two findings from v3 review, addressed in v4:
+
+  - [P1] Python CI red on `ruff format --check .` — handled in
+    `python/collatz_research/bounded_input_certificate.py` (formatting-
+    only); this test file already formatted.
+  - [P2] Typed error API still conflated an absent field with a
+    present field of the wrong type — R6 supplied numeric
+    `schemaVersion: 42` yet expected `.missingField "schemaVersion"`,
+    contradicting the documented `WRONG_TYPE` category. **R6 now
+    asserts `.wrongTypeAt "string" "$.schemaVersion"`.** New scenarios
+    R6b–R6g assert wrong-type rejection for `N`, `claim`,
+    `rawWitnesses`, `leafId`, `leafProperty`, and `trajectory` (the
+    field-level split that the v4 parser enforces). New scenarios
+    R5b/R5c/R5e/R5h assert the matching missing-field rejection (the
+    complementary half of the absent-vs-wrong-type split).
+
 Q5 PR #3 v3 also adds R15/R16 (non-ASCII leafId / leafProperty) + R17
 (surrogate half in `\uXXXX` escape) for the ASCII-only contract
 required by Codex P1 (`PRR_kwDOTuMD788AAAABLG_dzA`).
@@ -115,14 +133,149 @@ example : parseBoundedInputCertificateWire
     "\"trajectory\":[1]}]}" = .error (.missingField "claim") := by
   native_decide
 
-/-- R6 — wrong type for `schemaVersion` (int instead of string). -/
+/-- R6 — wrong type for `schemaVersion` (int instead of string).
+    v4: changed from `.missingField "schemaVersion"` (v3, which conflated
+    absent with wrong type) to `.wrongTypeAt "string" "$.schemaVersion"`.
+    Per Codex review `PRR_kwDOTuMD788AAAABLVa5sw` P2. -/
 example : parseBoundedInputCertificateWire
     "{\"schemaVersion\":42," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
+    "\"trajectory\":[1]}]}" = .error (.wrongTypeAt "string" "$.schemaVersion") := by
+  native_decide
+
+/-- R5b — missing required field `schemaVersion`. Complements R6:
+    R6 covers wrong-type (key present, wrong JSON type); R5b covers
+    missing (key absent). v4 per Codex review
+    `PRR_kwDOTuMD788AAAABLVa5sw` P2 (split absent from wrong type). -/
+example : parseBoundedInputCertificateWire
+    "{\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
     "\"trajectory\":[1]}]}" = .error (.missingField "schemaVersion") := by
+  native_decide
+
+/-- R5c — missing required field `N`. Complements R8 (zero value). -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
+    "\"trajectory\":[1]}]}" = .error (.missingField "N") := by
+  native_decide
+
+/-- R5d — missing required field `rawWitnesses`. -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1}" = .error (.missingField "rawWitnesses") := by
+  native_decide
+
+/-- R5e — missing required field `l` inside a witness. -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":[" ++
+    "{\"trajectory\":[1]}]}" = .error (.missingField "l") := by
+  native_decide
+
+/-- R5f — missing required field `leafId` inside `l`. -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafProperty\":\"p\"}," ++
+    "\"trajectory\":[1]}]}" = .error (.missingField "leafId") := by
+  native_decide
+
+/-- R5g — missing required field `leafProperty` inside `l`. -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafId\":\"L\"}," ++
+    "\"trajectory\":[1]}]}" = .error (.missingField "leafProperty") := by
+  native_decide
+
+/-- R5h — missing required field `trajectory` inside a witness. -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}}]}" =
+    .error (.missingField "trajectory") := by
+  native_decide
+
+/-- R6b — wrong type for `N` (string instead of non-negative integer).
+    v4 per Codex review `PRR_kwDOTuMD788AAAABLVa5sw` P2. -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":\"x\"," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
+    "\"trajectory\":[1]}]}" = .error (.wrongTypeAt "non-negative integer" "$.N") := by
+  native_decide
+
+/-- R6c — wrong type for `claim` (number instead of object).
+    `parseFiniteOrbitClaim` delegates the wrong-type case to
+    `.notAnObject "claim"`, which is in the WRONG_TYPE category
+    (consistent with `.wrongTypeAt` for top-level scalar fields). -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":42," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
+    "\"trajectory\":[1]}]}" = .error (.notAnObject "claim") := by
+  native_decide
+
+/-- R6d — wrong type for `rawWitnesses` (string instead of array). -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":\"x\"}" = .error (.wrongTypeAt "non-empty array" "$.rawWitnesses") := by
+  native_decide
+
+/-- R6e — wrong type for `leafId` (number instead of string). -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafId\":42,\"leafProperty\":\"p\"}," ++
+    "\"trajectory\":[1]}]}" =
+    .error (.wrongTypeAt "string" "rawWitnesses[0].l.leafId") := by
+  native_decide
+
+/-- R6f — wrong type for `leafProperty` (number instead of string). -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafId\":\"L\",\"leafProperty\":42}," ++
+    "\"trajectory\":[1]}]}" =
+    .error (.wrongTypeAt "string" "rawWitnesses[0].l.leafProperty") := by
+  native_decide
+
+/-- R6g — wrong type for `trajectory` (string instead of array). -/
+example : parseBoundedInputCertificateWire
+    "{\"schemaVersion\":\"1.0\"," ++
+    "\"claim\":{\"type\":\"empty\"}," ++
+    "\"N\":1," ++
+    "\"rawWitnesses\":[" ++
+    "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
+    "\"trajectory\":\"x\"}]}" =
+    .error (.wrongTypeAt "non-empty array" "rawWitnesses[0].trajectory") := by
   native_decide
 
 /-- R7 — unknown nested field inside `claim` (`extra` not in schema). -/

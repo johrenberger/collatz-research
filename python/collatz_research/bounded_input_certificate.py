@@ -195,8 +195,7 @@ def _validate_ascii_identifier(value: str, name: str) -> None:
         cp = ord(ch)
         if cp < 0x20 or cp > 0x7E:
             raise ValueError(
-                f"{name} must be ASCII-printable (0x20..0x7E), "
-                f"found codepoint U+{cp:04X}"
+                f"{name} must be ASCII-printable (0x20..0x7E), found codepoint U+{cp:04X}"
             )
 
 
@@ -261,8 +260,7 @@ def build_trajectory(
         current = _accelerated_step_all(current)
         trajectory.append(current)
     raise RuntimeError(
-        f"trajectory did not satisfy claim within {max_steps} steps: "
-        f"start={start}, claim={claim}"
+        f"trajectory did not satisfy claim within {max_steps} steps: start={start}, claim={claim}"
     )
 
 
