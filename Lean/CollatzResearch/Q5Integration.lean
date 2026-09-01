@@ -20,36 +20,54 @@ Python serialized evidence → (PR #63 parser)
                             → decodeBoundedInputCertificateData (PR #62)
                             → BoundedInputCertificateData
                             → checkBoundedCertificate (PR #62)
-                            → Bool verifier (PR #4 soundness — v2)
+                            → Bool verifier (PR #4 soundness — v2b)
                             → BoundedInputOrbitCertificate (this PR)
                             → coverage_tree_soundness_orbit_cert_bounded (this PR)
-                            → ∀ x ≤ N, ReachesOne x
+                            → ∀ x, 0 < x → x ≤ N → ReachesOne x
 ```
 
 Producer + parser are UNTRUSTED. Only the Lean verifier + soundness
 theorem + companion theorem enter the TCB.
 
-## v1 scope (this PR)
+## v2a scope (this commit — Q1 + P1 + P2 review fixes)
 
 - `BoundedInputOrbitCertificate` structure (mirror of Q4 v3
   `BoundedOrbitCertificate` with explicit `N : Nat` input bound).
 - `coverage_tree_soundness_orbit_cert_bounded` (parallel bounded
   companion theorem mirroring PR #58's unbounded
   `coverage_tree_soundness_orbit_cert`).
-- `per_leaf_available_bounded` (per-leaf availability pattern;
-  hypothesis-based for v1, taking the per-leaf certificates as
-  input — to be wired to the verifier soundness theorem in v2).
-- Closed-form example for `depthTwoTree` (the concrete tree scope
-  per Q5 spec § 4.5).
-- Tests in `Q5IntegrationTests.lean`.
+- `per_leaf_available_bounded_of_hCert` (hypothesis-eliminator form
+  of the per-leaf availability pattern; renamed from v1's
+  `per_leaf_available_bounded` per Codex P2 — the `_of_hCert` suffix
+  makes the eliminator nature explicit at the call site).
+- Conditional type-check example for `depthTwoTree` (renamed from v1's
+  "closed-form example" per Codex P2 — the example does NOT construct
+  a closed-form certificate; it only confirms the bounded companion
+  theorem type-checks against a hypothetical per-leaf certificate
+  dataset).
+- Tests in `Q5IntegrationTests.lean` (updated to match the new
+  `0 < x` API shape + new theorem names).
 
-## v2 scope (deferred)
+**Q1 P1 fix (Codex review on v1 `1209cdb`):** `orbit_hits_claim`
+premise now includes `0 < x →` (matching PR #58's
+`coverage_tree_soundness_orbit_cert` convention). The certificate's
+input domain is `{1, ..., N}`, not `{0, ..., N}`. For `x = 0`, the
+premise `0 < x` is `False`, so the certificate is silent.
+
+## v2b scope (deferred — next commit in this PR)
 
 - `checkBoundedCertificate_sound` (the verifier soundness theorem).
-  Connects `checkBoundedCertificate = true` to
-  `BoundedInputOrbitCertificate`. Substantial proof (extracts per-witness
-  check from `List.foldl`, applies the trajectory-indexing lemma, etc.).
-  Will be PR #4 v2 in a follow-up commit.
+  Connects `checkBoundedCertificate = true` (plus an external
+  `claim_reaches_one` hypothesis) to
+  `BoundedInputOrbitCertificate`. Substantial proof — extracts per-
+  witness check from `List.foldl`, applies the trajectory-indexing
+  lemma to bridge `trajectory.last = claim.Holds` to
+  `claim.Holds (accelerated_orbit x (trajectory.length - 1))`.
+- `per_leaf_available_bounded_of_check` (constructive availability
+  theorem per Codex Q5 verdict — takes `BoundedInputCertificateData`
+  per verified leaf + the per-leaf `check = true` evidence + the
+  per-leaf `claim_reaches_one` hypothesis, returns the per-leaf
+  certificate constructively).
 
 ## Lessons applied (Q3 v4 + Q4 v3 + META)
 
@@ -58,15 +76,19 @@ theorem + companion theorem enter the TCB.
 - **Q4 lessons (`: Type` sort)**: `BoundedInputOrbitCertificate` is
   `: Type`-valued (data + proof fields). NO `Prop`-valued sort
   conflict.
-- **META § 3.2** (per-leaf availability): `per_leaf_available_bounded`
-  implements the per-leaf pattern explicitly.
-- **META § 3.3** (avoid universal acceptance): the closed-form
-  example is scoped to `depthTwoTree` + bounded `N`; the
-  universal-`∀ t` claim stays conditional.
+- **META § 3.2** (per-leaf availability): `per_leaf_available_bounded_of_hCert`
+  (hypothesis-eliminator form) is the v2a placeholder. The v2b
+  constructive form `per_leaf_available_bounded_of_check` supersedes
+  it once the verifier soundness theorem lands.
+- **META § 3.3** (avoid universal acceptance): the conditional
+  type-check example is scoped to `depthTwoTree` + bounded `N`; the
+  universal-`∀ t` claim stays conditional on `hv + hc + hCert`.
 
-Story Q5 / PR #4 v1 (integration — bounded-input certificate type +
-bounded companion theorem + per-leaf availability + closed-form example
-for `depthTwoTree`; verifier soundness theorem deferred to v2). -/
+Story Q5 / PR #4 v2a (Q1 + P1 + P2 review fixes: `0 < x` premise
+on `orbit_hits_claim`, re-scoped docstrings, renamed
+`per_leaf_available_bounded_of_hCert`, reworded `depthTwoTree`
+example as conditional type-check). Verifier soundness theorem
+deferred to v2b in a follow-up commit. -/
 
 import CollatzResearch.CoverageTree
 import CollatzResearch.BoundedInputCertificateData
@@ -94,12 +116,19 @@ no conversion to unbounded `BoundedOrbitCertificate`). -/
     `t`, with explicit `N : Nat` bound on the input domain.
 
     Two obligation fields, both `Prop`-valued (kernel-checked):
-    1. `orbit_hits_claim : ∀ x, x ≤ N → descendOrbit t x 0 = some l →
-       ∃ k, claim.Holds (accelerated_orbit x k)` — every input
-       `x ≤ N` routed (orbit-aware) to `l` reaches a claim.Holds
-       orbit state.
+    1. `orbit_hits_claim : ∀ x, 0 < x → x ≤ N → descendOrbit t x 0 =
+       some l → ∃ k, claim.Holds (accelerated_orbit x k)` — every
+       positive input `x ≤ N` routed (orbit-aware) to `l` reaches a
+       claim.Holds orbit state.
     2. `claim_reaches_one : ∀ y, claim.Holds y → ReachesOne y` —
        every claim-target state reaches 1.
+
+    The `0 < x →` premise in `orbit_hits_claim` matches PR #58's
+    `coverage_tree_soundness_orbit_cert` convention (Q1 P1 fix from
+    Codex review on v1 `1209cdb`): the certificate's input domain
+    is `{1, ..., N}`, not `{0, ..., N}`. For `x = 0`, the premise
+    `0 < x` is `False`, so the certificate is silent (matches the
+    Collatz convention — the conjecture is for positive integers).
 
     `: Type`-valued proof-carrying data bundle (NOT `: Prop`): the
     `claim : FiniteOrbitClaim` data field requires `Type`-valued
@@ -117,14 +146,14 @@ no conversion to unbounded `BoundedOrbitCertificate`). -/
     Inserted after `BoundedOrbitCertificate` (Q4 v3, PR #57) so the
     two can be compared side-by-side.
 
-    API-shape regression: `def boundedInputOrbitCertShape` at the
+    API-shape regression: `boundedInputOrbitCertShape` at the
     end of `Q5IntegrationTests.lean` (mirrors PR #57's
     `boundedCertificateClaim`). -/
 structure BoundedInputOrbitCertificate (t : CoverageTree) (l : CoverageLeaf)
     (N : Nat) : Type where
   claim : FiniteOrbitClaim
   orbit_hits_claim :
-    ∀ x, x ≤ N → descendOrbit t x 0 = some l →
+    ∀ x, 0 < x → x ≤ N → descendOrbit t x 0 = some l →
       ∃ k, claim.Holds (accelerated_orbit x k)
   claim_reaches_one :
     ∀ y, claim.Holds y → ReachesOne y
@@ -179,30 +208,34 @@ theorem coverage_tree_soundness_orbit_cert_bounded
     orbit_predecessor_reaches_one x k (accelerated_orbit x k) rfl
       (cert.claim_reaches_one (accelerated_orbit x k) hk)⟩
 
-/-! ## Per-leaf availability pattern (Q5 v5 spec § 4.4)
+/-! ## Per-leaf availability pattern — hypothesis-eliminator form (Q5 v5 spec § 4.4)
 
-`per_leaf_available_bounded` is the per-leaf availability pattern
-that connects per-leaf `BoundedInputCertificateData` to per-leaf
-`BoundedInputOrbitCertificate`. For v1, this is stated with the
-per-leaf certificate as a HYPOTHESIS (parallel to PR #58's `hCert`
-pattern). The v2 soundness theorem
-(`checkBoundedCertificate_sound`) will provide a constructive
-implementation that closes `per_leaf_available_bounded` from
-verifier evidence.
+`per_leaf_available_bounded_of_hCert` is the v2a hypothesis-eliminator
+form of the per-leaf availability pattern. It takes the per-leaf
+certificate hypothesis `hCert` (parallel to PR #58's `hCert` pattern)
+and projects it to a specific leaf.
 
-For PR #4 v1, the closed-form example (next) uses `hCert` directly.
-The v2 soundness theorem will enable the dataset-to-certificate
-construction. -/
+**This is NOT a constructive availability theorem** — it does not
+construct the per-leaf certificate from verifier evidence. It is a
+trivial wrapper that surfaces a hypothesis already in scope. The v2b
+constructive form `per_leaf_available_bounded_of_check` supersedes
+it once the verifier soundness theorem lands.
 
-/-- Per-leaf availability pattern: for each verified leaf `l`, the
-    per-leaf certificate (`BoundedInputOrbitCertificate t l N`) is
-    available.
+Renamed from v1's `per_leaf_available_bounded` per Codex P2 (P2
+finding on v1 `1209cdb`) to avoid implying that the hypothesis form
+is the canonical per-leaf availability pattern. The suffix
+`_of_hCert` makes the eliminator nature explicit at the call site. -/
 
-    **v1 form**: takes the per-leaf certificate as a hypothesis
-    (mirrors the Q4 v3 `coverage_tree_soundness_orbit_cert` `hCert`
-    pattern). v2 will replace the hypothesis with constructive
-    verifier-soundness-derivation. -/
-theorem per_leaf_available_bounded
+/-- Per-leaf availability pattern — HYPOTHESIS-ELIMINATOR form (v2a).
+    For each verified leaf `l`, the per-leaf certificate
+    (`BoundedInputOrbitCertificate t l N`) is available from the
+    `hCert` hypothesis (parallel to PR #58's `hCert` pattern).
+
+    Renamed from v1's `per_leaf_available_bounded` per Codex P2.
+    This is NOT a constructive availability theorem — see the v2b
+    `per_leaf_available_bounded_of_check` (deferred) for the
+    constructive form. -/
+theorem per_leaf_available_bounded_of_hCert
     (t : CoverageTree)
     (N : Nat)
     (hCert : ∀ l ∈ t.leaves, verified t l →
@@ -213,28 +246,45 @@ theorem per_leaf_available_bounded
     BoundedInputOrbitCertificate t l N :=
   hCert l hl hver
 
-/-! ## Closed-form example for `depthTwoTree`
+/-! ## Conditional type-check example for `depthTwoTree`
 
 The concrete tree scope per Q5 v5 spec § 4.5. Composes the bounded
 companion theorem with the per-leaf availability pattern.
 
-For PR #4 v1, the example takes `hCert` as a hypothesis (per Q4 v3
-pattern). v2 will provide a constructive example using the verifier
-soundness theorem. -/
+**v1 framing was misleading** — the example does NOT construct a
+closed-form certificate. It confirms that the bounded companion
+theorem type-checks against `depthTwoTree` + a hypothetical
+per-leaf certificate dataset (per Codex P2 on v1 `1209cdb`).
 
-/-- Closed-form example for `depthTwoTree` + bounded input domain.
+The v2b constructive form would require supplying
+`BoundedInputCertificateData` per leaf + the per-leaf verifier
+result + the per-leaf reachability hypothesis. That scenario is
+not constructed here — the per-leaf `checkBoundedCertificate = true`
+evidence is NOT closed in this example (the verifier would need to
+actually run on `depthTwoTree` for `1 ≤ x ≤ N` to produce it).
 
-    Demonstrates the type-check that
-    `coverage_tree_soundness_orbit_cert_bounded` closes for the
+**The example remains type-only.** It defends the bounded companion
+theorem's signature against accidental changes — no semantic claim
+about `depthTwoTree` is made. -/
+
+/-- Conditional type-check example for `depthTwoTree` + bounded input
+    domain. Confirms the bounded companion theorem closes for the
     concrete tree + a hypothetical per-leaf certificate dataset.
+
+    Renamed from v1's "closed-form example" per Codex P2 — the
+    example does NOT construct a closed-form certificate. It only
+    confirms the bounded companion theorem type-checks.
 
     `hv : ValidTree depthTwoTree` and `hc : IsComplete depthTwoTree`
     are discharged via `native_decide` (the standard depthTwoTree
     structural invariants; see `CoverageTreeOrbitTests.lean` for
     the underlying defs).
 
-    `hCert` is the per-leaf certificate dataset (hypothesis for v1;
-    will be constructed from the verifier soundness theorem in v2).
+    `hCert` is the per-leaf certificate dataset (hypothesis for v2a;
+    will be replaced by a constructive construction via
+    `per_leaf_available_bounded_of_check` in v2b once the per-leaf
+    `checkBoundedCertificate = true` evidence is available for
+    `depthTwoTree`).
 
     The conclusion: for each positive `x ≤ N`, `x` reaches 1.
     Bounded end-to-end per Q5 v5 spec. -/
