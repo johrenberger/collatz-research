@@ -58,3 +58,26 @@ jobs:
           if [ -f Lean/CollatzResearch/CoverageTreeOrbitTests.lean ]; then
             lake build CollatzResearch.CoverageTreeOrbitTests
           fi
+
+      # The Q5 integration module (bounded-input certificate +
+      # bounded companion theorem + per-leaf availability) is
+      # permitted only within Story Q5 PR #4. If it exists, it
+      # must elaborate at the PR head; intentionally failing Lean
+      # source is never silently excluded from CI.
+      #
+      # Added per Codex P1 review `PRR_kwDOTuMD788AAAABL71GQA`
+      # (2026-09-02): the previous CI workflow only built
+      # CoverageTree targets and did NOT build Q5Integration or
+      # Q5IntegrationTests, so any Lean errors in the new Q5
+      # files were silently invisible to CI.
+      - name: Build Q5Integration target when present
+        run: |
+          if [ -f Lean/CollatzResearch/Q5Integration.lean ]; then
+            lake build CollatzResearch.Q5Integration
+          fi
+
+      - name: Build Q5Integration tests when present
+        run: |
+          if [ -f Lean/CollatzResearch/Q5IntegrationTests.lean ]; then
+            lake build CollatzResearch.Q5IntegrationTests
+          fi
