@@ -575,4 +575,75 @@ theorem trajectory_index (x : Nat) (w : CertWitness x) (k : Nat)
     -- Need: `(w.trajectory)[k + 1]! = acceleratedStep ((w.trajectory)[k]!)`.
     exact transitionOk_implies_step x w k hTrans hkl
 
+/-! ## v2b.3 — Lemma 4 (terminal-claim transport)
+
+Per `docs/story-q5-pr4-v2b-proof-decomposition.md` § 4, Lemma 4
+bridges the witness trajectory's terminal value to
+`accelerated_orbit x (length - 1)`, which is what
+`BoundedInputOrbitCertificate.orbit_hits_claim` requires for the
+`claim.Holds` goal.
+
+**Type.** Cleaned up from the v2b plan (which had a typo on
+`.getLast`). The clean form uses `trajectory[length - 1]!`
+(explicit index with `length - 1 < length` proof) rather than
+`getLast` (which requires a non-emptiness default):
+
+```lean
+terminal_claim_transport : ∀ (x : Nat) (w : CertWitness x)
+    (claim : FiniteOrbitClaim),
+    claim.Holds ((w.trajectory)[(w.trajectory).length - 1]') →
+    claim.Holds (accelerated_orbit x ((w.trajectory).length - 1))
+```
+
+The `'` notation requires `length - 1 < length`, established
+from `anchorOk = true` (non-empty trajectory).
+
+**Strategy.** Apply Lemma 3 with `k = length - 1` to get
+`trajectory[length - 1]! = accelerated_orbit x (length - 1)`,
+then substitute into the `claim.Holds` hypothesis. The
+substitution goes through `Eq.mp` / `Eq.mpr` (Lean's `rw`
+tactic handles this).
+
+Lesson applied (Q4 v3 Pattern 2.10): explicit hypothesis
+preservation — `terminal_claim_transport` takes `hAnchor`,
+`hTrans` as explicit arguments (no `by sorry`). -/
+
+/-- **Lemma 4 (terminal-claim transport).** If `claim.Holds`
+    holds at the trajectory's last element (index `length - 1`),
+    then it also holds at `accelerated_orbit x (length - 1)`.
+
+    The proof is a direct application of Lemma 3 with
+    `k = length - 1`, then rewriting the `claim.Holds`
+    hypothesis.
+
+    Plan dependency: feeds Lemma 5 (soundness assembly) which
+    uses this to transport the `terminalClaimOk`-supplied
+    `claim.Holds` to the `accelerated_orbit x k` form required
+    by `BoundedInputOrbitCertificate.orbit_hits_claim`. -/
+theorem terminal_claim_transport (x : Nat) (w : CertWitness x)
+    (claim : FiniteOrbitClaim)
+    (hAnchor : anchorOk x w = true)
+    (hTrans : transitionOk w = true)
+    (hLast : claim.Holds ((w.trajectory)[(w.trajectory).length - 1]'
+             (Nat.pred_lt length_pos)))
+    : claim.Holds (accelerated_orbit x ((w.trajectory).length - 1)) := by
+  -- Establish `length > 0` from `anchorOk = true` (non-empty).
+  have hne : 0 < (w.trajectory).length := by
+    unfold anchorOk at hAnchor
+    cases htr : w.trajectory with
+    | nil =>
+      -- `match [] with | [] => false | _ => _` is `false`; contradicts `hAnchor : true`.
+      simp [htr] at hAnchor
+    | cons hd tl =>
+      -- `(hd :: tl).length = tl.length + 1 > 0`.
+      rw [htr, List.length]
+      exact Nat.succ_pos _
+  -- `length - 1 < length` from `length > 0`.
+  have hbound : (w.trajectory).length - 1 < (w.trajectory).length :=
+      Nat.pred_lt hne
+  -- Apply Lemma 3 with `k = length - 1`.
+  rw [trajectory_index x w ((w.trajectory).length - 1) hbound hAnchor hTrans]
+  -- `hLast : claim.Holds (accelerated_orbit x (length - 1))` after rewrite.
+  exact hLast
+
 end CollatzResearch
