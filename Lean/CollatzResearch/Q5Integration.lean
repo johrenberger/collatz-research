@@ -769,4 +769,74 @@ theorem checkBoundedCertificate_sound (t : CoverageTree) (l : CoverageLeaf)
     -- The witness `k` for `orbit_hits_claim` is `trajectory.length - 1`.
     exact ⟨(d.certWitness ix).trajectory.length - 1, hLast⟩
 
+/-! ## v2b.5 — Lemma 6 (constructive per-leaf availability)
+
+Per `docs/story-q5-pr4-v2b-proof-decomposition.md` § 6, v2b.5
+lands Lemma 6 — the constructive per-leaf availability theorem
+that supersedes the v2a hypothesis-eliminator form
+`per_leaf_available_bounded_of_hCert`.
+
+**Type** (adapted from plan; uses per-leaf data's `wire.N` rather
+than a free `N` parameter — the plan's free `N` was a typo;
+the per-leaf bound is determined by the data):
+
+```lean
+per_leaf_available_bounded_of_check : ∀ (t : CoverageTree)
+    (dataPerLeaf : ∀ l ∈ t.leaves, verified t l → BoundedInputCertificateData)
+    (hv : ValidTree t) (hc : IsComplete t)
+    (hcr : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
+            ∀ y, (dataPerLeaf l hl hver).wire.claim.Holds y → ReachesOne y)
+    (hcheck : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
+              checkBoundedCertificate t l (dataPerLeaf l hl hver) = true)
+    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l)
+    : BoundedInputOrbitCertificate t l ((dataPerLeaf l hl hver).wire.N)
+```
+
+**Strategy.** Direct application of Lemma 5 to the per-leaf
+`dataPerLeaf l hl hver` with all hypotheses threaded through.
+
+**Supersedes** `per_leaf_available_bounded_of_hCert` (v2a
+hypothesis-eliminator form, trivial wrapper around the `hCert`
+hypothesis). The constructive form here is the actual
+verifier-soundness derivation: per-leaf `check = true`
+IMPLIES `BoundedInputOrbitCertificate` exists for that leaf.
+
+**Lesson applied (META § 3.2 — per-leaf availability pattern):**
+Lemma 6 takes `dataPerLeaf` as an explicit input (mirrors Q4 v3's
+`hCert` pattern).
+
+**No new `sorry`/`admit`/`axiom`** — the proof is a one-line
+application of Lemma 5. -/
+
+/-- **Lemma 6 (constructive per-leaf availability).** For each
+    verified leaf `l`, the per-leaf
+    `BoundedInputOrbitCertificate t l ((dataPerLeaf l ...).wire.N)`
+    is constructible from:
+      - per-leaf `dataPerLeaf` (the per-leaf witness bundle),
+      - per-leaf `hcr` (the per-leaf claim reachability hypothesis),
+      - per-leaf `hcheck` (the per-leaf verifier soundness hypothesis).
+
+    The proof is a direct application of Lemma 5 to the per-leaf
+    data with all hypotheses threaded through.
+
+    Supersedes the v2a hypothesis-eliminator form
+    `per_leaf_available_bounded_of_hCert`.
+
+    Plan dependency: closes the Q5 v2 chain. Once Codex approves
+    v2b.6 (tests), PR #64 can be retitled from "v2a —
+    bounded-input integration infrastructure (DRAFT; soundness
+    deferred to v2b)" to "v2 — bounded-input integration
+    (closes Q5 4-PR split)". -/
+theorem per_leaf_available_bounded_of_check (t : CoverageTree)
+    (dataPerLeaf : ∀ l ∈ t.leaves, verified t l → BoundedInputCertificateData)
+    (hv : ValidTree t) (hc : IsComplete t)
+    (hcr : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
+            ∀ y, (dataPerLeaf l hl hver).wire.claim.Holds y → ReachesOne y)
+    (hcheck : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
+              checkBoundedCertificate t l (dataPerLeaf l hl hver) = true)
+    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l)
+    : BoundedInputOrbitCertificate t l ((dataPerLeaf l hl hver).wire.N) :=
+  checkBoundedCertificate_sound t l (dataPerLeaf l hl hver) hv hc hver
+    (hcr l hl hver) (hcheck l hl hver)
+
 end CollatzResearch
