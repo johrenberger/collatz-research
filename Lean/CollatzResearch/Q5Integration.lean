@@ -449,40 +449,48 @@ theorem checkCertWitness_decompose (x : Nat) (claim : FiniteOrbitClaim)
 
 /-! ## v2b.2 — Lemma 3 (trajectory indexing)
 
-The trajectory-indexing lemma is the risk-bearing piece of the
-v2b chain: it bridges the witness's `List Nat` trajectory to the
-`accelerated_orbit` index used by `BoundedInputOrbitCertificate.orbit_hits_claim`.
+The trajectory-indexing lemma bridges the witness's `List Nat`
+trajectory to the `accelerated_orbit` index used by
+`BoundedInputOrbitCertificate.orbit_hits_claim`.
 
 Per `docs/story-q5-pr4-v2b-proof-decomposition.md` § 3, the proof
 relies on:
   - `accelerated_orbit_zero` + `accelerated_orbit_succ` (PR #56) for
     `accelerated_orbit` unfolding,
-  - Lemma 1 (`foldl_and_extract`) to lift per-pair checks from the
-    `transitionOk` foldl,
-  - Lemma 2 (`checkCertWitness_decompose`) for the conjunct
-    extraction (anchor + transition).
+  - `anchorOk_implies_get_zero` (bridging lemma, kernel-clean) for
+    the base case.
 
-**Bridging lemmas.** Two lemmas bridge the gap between the
-high-level predicate interface (`anchorOk` / `transitionOk`)
-and the low-level list indexing (`List.get`, `[i]!`):
-  - `anchorOk_implies_get_zero` — from `anchorOk x w = true` to
-    `trajectory[0]! = x`,
-  - `transitionOk_implies_step` — from `transitionOk w = true` and
-    `i + 1 < length` to `trajectory[i + 1]! = acceleratedStep trajectory[i]!`
-    (uses Lemma 1 + `List.get_zip`).
+**v2b.2 Codex P0 fix (2026-09-02):** the original Lemma 3 took
+`hTrans : transitionOk w = true` and used a bridging lemma
+`transitionOk_implies_step` that required 2 `sorry` placeholders
+for Mathlib list indexing (`List.length_zip`, `List.get_zip`).
+Per Codex review `PRR_kwDOTuMD788AAAABL71GQA`, the `sorry` budget
+must not be raised; the admitted theorem/proof skeleton must be
+removed.
+
+**Restructured Lemma 3:** takes the per-pair `acceleratedStep`
+check directly as a hypothesis (not via `transitionOk`). The
+proof is now fully kernel-checked — no `sorry`, no `admit`, no
+`axiom`. The trade-off: callers must provide the per-pair check
+explicitly (which is morally equivalent to `transitionOk = true`
+but skips the list-zip extraction).
+
+**Bridging lemma:** `anchorOk_implies_get_zero` (kernel-clean)
+gives `trajectory[0]! = x` from `anchorOk x w = true`.
 
 **Risk (per plan).** The Lean 4 indexing notation `[i]!` may
 need re-expression as `List.get` with explicit `i < length`
-proofs depending on Lean 4 version compatibility. The bridging
-lemmas handle this.
+proofs depending on Lean 4 version compatibility.
 
-Lesson applied (Q4 v3 Pattern 2.10): explicit hypothesis preservation
-throughout — `trajectory_index` takes `hAnchor` and `hTrans` as
-explicit arguments (no `by sorry`, no default acceptance). -/
+Lesson applied (Q4 v3 Pattern 2.10): explicit hypothesis
+preservation throughout — `trajectory_index` takes `hAnchor` and
+`hTrans` as explicit arguments. -/
 
 /-- Bridging lemma: `anchorOk x w = true` implies the witness
     trajectory is non-empty with `head = x`. Then
-    `(w.trajectory)[0]! = x` follows by list definition. -/
+    `(w.trajectory)[0]! = x` follows by list definition.
+
+    Kernel-clean (no `sorry`/`admit`/`axiom`). -/
 lemma anchorOk_implies_get_zero (x : Nat) (w : CertWitness x)
     (hAnchor : anchorOk x w = true)
     : (w.trajectory)[0]! = x := by
@@ -499,51 +507,18 @@ lemma anchorOk_implies_get_zero (x : Nat) (w : CertWitness x)
     -- `(hd :: tl)[0]! = hd` by `List.get` definition for index 0.
     rfl
 
-/-- Bridging lemma: from `transitionOk w = true` (the `foldl`
-    result), the per-pair check at index `i` (for `i + 1 < length`)
-    is satisfied.
+/-- **Lemma 3 (trajectory indexing, restructured v2b.2 Codex P0
+    fix).** For a witness `w` with `anchorOk` true and a
+    per-pair `acceleratedStep` check, the trajectory at index
+    `k` equals `accelerated_orbit x k`.
 
-    Uses Lemma 1 (`foldl_and_extract`) to lift the per-pair check,
-    then `List.get_zip` to convert `(zip w.trajectory w.trajectory.tail)[i]`
-    to `(w.trajectory[i], w.trajectory[i + 1])`. -/
-lemma transitionOk_implies_step (x : Nat) (w : CertWitness x) (i : Nat)
-    (hTrans : transitionOk w = true)
-    (hBound : i + 1 < (w.trajectory).length)
-    : (w.trajectory)[i + 1]! = acceleratedStep ((w.trajectory)[i]!) := by
-  unfold transitionOk at hTrans
-  -- `hTrans : List.foldl (fun acc pair => acc && pair.snd == acceleratedStep pair.fst)
-  --                  true (List.zip w.trajectory w.trajectory.tail) = true`
-  -- Apply Lemma 1 with `p := fun pair => pair.snd == acceleratedStep pair.fst`.
-  have hPair := foldl_and_extract (List.zip w.trajectory w.trajectory.tail)
-    (fun p => p.snd == acceleratedStep p.fst) hTrans
-  -- `hPair : ∀ pair, pair ∈ zip → p pair = true`
-  -- We want to apply `hPair` to the `i`-th element of the zip.
-  -- The `i`-th element of `zip w.trajectory w.trajectory.tail` is
-  -- `(w.trajectory[i]!, w.trajectory[i + 1]!)` by `List.get_zip` + `List.get_drop`.
-  have hi_bound : i < (List.zip w.trajectory w.trajectory.tail).length := by
-    rw [List.length_zip]
-    -- `length (zip as bs) = min as.length bs.length`.
-    -- `w.trajectory.tail.length = w.trajectory.length - 1` (when length > 0).
-    -- We have `i + 1 < w.trajectory.length`, so `i < w.trajectory.length - 1`.
-    -- Min is `w.trajectory.length - 1` (the smaller of the two).
-    sorry
-  have hGet : (List.zip w.trajectory w.trajectory.tail)[i]! =
-              ((w.trajectory)[i]!, (w.trajectory)[i + 1]!) := by
-    sorry
-  have hmem : (List.zip w.trajectory w.trajectory.tail)[i]! ∈
-              List.zip w.trajectory w.trajectory.tail :=
-    List.get_mem _ _
-  specialize hPair _ hmem
-  rw [hGet] at hPair
-  -- `hPair : ((w.trajectory)[i]!, (w.trajectory)[i + 1]!).snd ==
-  --          acceleratedStep ((w.trajectory)[i]!, (w.trajectory)[i + 1]!).fst`
-  -- After simplification: `(w.trajectory)[i + 1]! == acceleratedStep ((w.trajectory)[i]!)`
-  simp [Prod.fst, Prod.snd] at hPair
-  exact hPair
-
-/-- **Lemma 3 (trajectory indexing).** For a witness `w` with
-    `anchorOk` and `transitionOk` both true, the trajectory at
-    index `k` equals `accelerated_orbit x k`.
+    **Type change (v2b.2 Codex P0 fix):** previously took
+    `hTrans : transitionOk w = true`; now takes the per-pair
+    check directly:
+    `hTrans : ∀ i, i + 1 < length → trajectory[i+1]! = acceleratedStep trajectory[i]!`
+    This drops the dependency on `transitionOk_implies_step`
+    (which had 2 `sorry`s for Mathlib list indexing). The proof
+    is now fully kernel-checked.
 
     Proof by induction on `k`:
     - **Base** (`k = 0`): `accelerated_orbit_zero` gives
@@ -552,7 +527,7 @@ lemma transitionOk_implies_step (x : Nat) (w : CertWitness x) (i : Nat)
     - **Step** (`k + 1`): `accelerated_orbit_succ` gives
       `accelerated_orbit x (k + 1) = acceleratedStep (accelerated_orbit x k)`;
       IH gives `trajectory[k]! = accelerated_orbit x k`;
-      `transitionOk_implies_step` closes
+      `hTrans` closes
       `trajectory[k + 1]! = acceleratedStep trajectory[k]!`.
 
     Plan dependency: feeds Lemma 4 (terminal-claim transport)
@@ -561,7 +536,8 @@ lemma transitionOk_implies_step (x : Nat) (w : CertWitness x) (i : Nat)
 theorem trajectory_index (x : Nat) (w : CertWitness x) (k : Nat)
     (hkl : k < (w.trajectory).length)
     (hAnchor : anchorOk x w = true)
-    (hTrans : transitionOk w = true)
+    (hTrans : ∀ i, i + 1 < (w.trajectory).length →
+                 (w.trajectory)[i + 1]! = acceleratedStep ((w.trajectory)[i]!))
     : (w.trajectory)[k]! = accelerated_orbit x k := by
   induction k with
   | zero =>
@@ -573,7 +549,8 @@ theorem trajectory_index (x : Nat) (w : CertWitness x) (k : Nat)
     have hk : k < (w.trajectory).length := Nat.lt_of_succ_lt hkl
     rw [ih hk]
     -- Need: `(w.trajectory)[k + 1]! = acceleratedStep ((w.trajectory)[k]!)`.
-    exact transitionOk_implies_step x w k hTrans hkl
+    -- `hTrans` with `i := k` and `k + 1 < length := Nat.lt_succ_of_lt hk`.
+    exact hTrans k (Nat.lt_succ_of_lt hk)
 
 /-! ## v2b.3 — Lemma 4 (terminal-claim transport)
 
@@ -608,22 +585,27 @@ Lesson applied (Q4 v3 Pattern 2.10): explicit hypothesis
 preservation — `terminal_claim_transport` takes `hAnchor`,
 `hTrans` as explicit arguments (no `by sorry`). -/
 
-/-- **Lemma 4 (terminal-claim transport).** If `claim.Holds`
-    holds at the trajectory's last element (index `length - 1`),
-    then it also holds at `accelerated_orbit x (length - 1)`.
+/-- **Lemma 4 (terminal-claim transport, restructured v2b.2
+    Codex P0 fix).** If `claim.Holds` holds at the trajectory's
+    last element (index `length - 1`), then it also holds at
+    `accelerated_orbit x (length - 1)`.
+
+    **Type change (v2b.2 Codex P0 fix):** `hTrans` now takes the
+    per-pair `acceleratedStep` check directly (matching the
+    restructured Lemma 3 signature) instead of `transitionOk = true`.
 
     The proof is a direct application of Lemma 3 with
     `k = length - 1`, then rewriting the `claim.Holds`
-    hypothesis.
+    hypothesis. Fully kernel-checked.
 
-    Plan dependency: feeds Lemma 5 (soundness assembly) which
-    uses this to transport the `terminalClaimOk`-supplied
-    `claim.Holds` to the `accelerated_orbit x k` form required
-    by `BoundedInputOrbitCertificate.orbit_hits_claim`. -/
+    Plan dependency: was intended to feed Lemma 5 (soundness
+    assembly), but Lemma 5 is removed per the v2b.2 Codex P0
+    fix. Lemma 4 stays as a standalone kernel-checked lemma. -/
 theorem terminal_claim_transport (x : Nat) (w : CertWitness x)
     (claim : FiniteOrbitClaim)
     (hAnchor : anchorOk x w = true)
-    (hTrans : transitionOk w = true)
+    (hTrans : ∀ i, i + 1 < (w.trajectory).length →
+                 (w.trajectory)[i + 1]! = acceleratedStep ((w.trajectory)[i]!))
     (hLast : claim.Holds ((w.trajectory)[(w.trajectory).length - 1]'
              (Nat.pred_lt length_pos)))
     : claim.Holds (accelerated_orbit x ((w.trajectory).length - 1)) := by
@@ -641,202 +623,78 @@ theorem terminal_claim_transport (x : Nat) (w : CertWitness x)
   -- `length - 1 < length` from `length > 0`.
   have hbound : (w.trajectory).length - 1 < (w.trajectory).length :=
       Nat.pred_lt hne
-  -- Apply Lemma 3 with `k = length - 1`.
+  -- Apply Lemma 3 (restructured) with `k = length - 1`.
   rw [trajectory_index x w ((w.trajectory).length - 1) hbound hAnchor hTrans]
   -- `hLast : claim.Holds (accelerated_orbit x (length - 1))` after rewrite.
   exact hLast
 
-/-! ## v2b.4 — Lemma 5 (soundness assembly)
+/-! ## v2b.4 — v2b.5 Lemmas 5-6 — REMOVED per Codex P0 (2026-09-02)
 
-Per `docs/story-q5-pr4-v2b-proof-decomposition.md` § 5, v2b.4
-lands Lemma 5 — the soundness assembly that connects
-`checkBoundedCertificate = true` to
-`BoundedInputOrbitCertificate`. This is the central lemma of the
-v2b chain.
+**REMOVAL NOTE** (Codex review `PRR_kwDOTuMD788AAAABL71GQA`,
+2026-09-02T22:39:09Z):
 
-**Type** (adapted from plan to v4 API which folds over
-`List.finRange d.wire.N` instead of `List CertWitness`):
+> [P0] `docs/lean-sorry-budget.json` and
+> `Lean/CollatzResearch/Q5Integration.lean:529,532,743,755,758,768`
+> — this PR raises the admission budget to permit six new
+> `sorry`s, including four in `checkBoundedCertificate_sound`. That
+> turns the checker-to-certificate bridge into an untrusted axiom
+> while making CI appear green. **Do not extend the budget for this
+> path. Remove the admitted theorem/proof skeleton from the Lean
+> module (retain the decomposition in the planning document if
+> useful) and land only fully checked helper lemmas.** The
+> soundness theorem and constructive availability theorem must
+> remain absent until proved.
 
-```lean
-checkBoundedCertificate_sound : ∀ (t : CoverageTree) (l : CoverageLeaf)
-    (d : BoundedInputCertificateData)
-    (hv : ValidTree t) (hc : IsComplete t)
-    (hver : verified t l)
-    (hcr : ∀ y, d.wire.claim.Holds y → ReachesOne y),
-    checkBoundedCertificate t l d = true →
-    BoundedInputOrbitCertificate t l d.wire.N
-```
+**Removed theorems:**
+  - `checkBoundedCertificate_sound` (Lemma 5, 4 explicit sorries):
+    the central soundness theorem connecting
+    `checkBoundedCertificate = true` to
+    `BoundedInputOrbitCertificate`. The decomposition strategy is
+    retained in `docs/story-q5-pr4-v2b-proof-decomposition.md`
+    § 5 but the implementation is removed.
+  - `per_leaf_available_bounded_of_check` (Lemma 6): depended on
+    Lemma 5 and inherited the same sorry-laden status.
 
-**Strategy.** Compose Lemmas 1 → 2 → 4 in sequence:
+**Why removed (not closed):** the v2b.2 Codex P0 fix restructured
+Lemma 3 to drop the `transitionOk_implies_step` bridging lemma
+(which had 2 sorries for `List.length_zip` and `List.get_zip`).
+Lemma 5's 4 remaining sorries (nested `Bool.and_eq_true`
+destructuring, `ix ∈ List.finRange`, terminal claim extraction)
+require substantial Lean 4 Mathlib knowledge beyond the scope of
+the current PR.
 
-1. `c.check = true` unfolds to `foldl ... true (List.finRange N) = true`.
-2. Lemma 1 (`foldl_and_extract`) lifts to
-   `∀ i ∈ List.finRange N, checkCertWitness (i.val + 1) ... = true`.
-3. Lemma 2 (`checkCertWitness_decompose`) decomposes each witness
-   check into the 5 conjuncts; `anchorOk` and `transitionOk` are
-   `true`.
-4. Lemma 4 (`terminal_claim_transport`) bridges
-   `trajectory[length - 1]! = accelerated_orbit x (length - 1)`
-   into `claim.Holds`.
-5. `hcr` closes `ReachesOne (accelerated_orbit x (length - 1))`
-   but actually `claim_reaches_one` only needs `hcr` directly
-   (it's the `claim.Holds y → ReachesOne y` field).
-6. Construct `BoundedInputOrbitCertificate` with:
-   - `claim := d.wire.claim`,
-   - `claim_reaches_one := hcr`,
-   - `orbit_hits_claim := ...` (constructed via step 4).
+**Re-attempt gates** (for any future v2b work to re-introduce
+Lemma 5):
+  1. The 4 remaining sorries closed without budget increase.
+  2. Architectural decision (per-leaf vs single-leaf, see below)
+     made.
+  3. Codex review re-opened on the new proofs.
 
-**Lesson applied (Q3 v4 + Q4 v3 + META § 3.3):**
-- `BoundedInputOrbitCertificate` is `: Type`-valued
-  (data + proof fields).
-- `checkBoundedCertificate_sound` is conditional on explicit
-  hypotheses (`hv`, `hc`, `hver`, `hcr`).
-- The construction uses `where` block syntax (mirrors PR #54 +
-  PR #57 + PR #58 patterns).
+**Architectural note (Codex P1, 2nd finding):** the per-leaf vs
+single-leaf quantification mismatch must also be resolved before
+Lemma 6 can be re-attempted. The `dataPerLeaf` family does not
+match the existing `checkBoundedCertificate t l d` (which
+validates all inputs against ONE FIXED leaf `l`). Future work
+must either:
+  - (a) scope the verifier/integration to single-leaf trees, OR
+  - (b) redesign the wire/checker/certificate interface around
+    an input-to-leaf routing partition.
 
-**`sorry` placeholders.** The proof body contains explicit
-`sorry`s for parts requiring detailed Lean 4 Mathlib knowledge
-(`List.mem_finRange`, nested `Bool.and_eq_true` destructuring).
-These are intended for the broader review at the end of the v2b
-arc. The proof structure is complete; only the Mathlib lemma
-invocation needs closing. -/
+**What remains kernel-checked** in this PR:
+  - Lemma 1 (`foldl_and_extract`, fully polymorphic)
+  - Lemma 2 (`checkCertWitness_decompose`, biconditional)
+  - Lemma 3 (`trajectory_index`, restructured v2b.2 Codex P0 fix
+    to take per-pair check directly)
+  - Lemma 4 (`terminal_claim_transport`, restructured v2b.2
+    Codex P0 fix)
+  - 5 helper predicates (`anchorOk`, `leafMatchOk`, `routingOk`,
+    `terminalClaimOk`, `transitionOk`)
+  - `anchorOk_implies_get_zero` bridging lemma
+  - `BoundedInputOrbitCertificate` structure + v2a companion
+    theorem + v2a per-leaf availability
+  - `depthTwoTree` conditional type-check example
 
-/-- **Lemma 5 (soundness assembly).** `checkBoundedCertificate = true`
-    implies `BoundedInputOrbitCertificate t l d.wire.N`.
-
-    Constructs the `BoundedInputOrbitCertificate` bundle:
-      - `claim := d.wire.claim`
-      - `claim_reaches_one := hcr` (external hypothesis)
-      - `orbit_hits_claim := by ...` (constructed via
-        Lemmas 1, 2, 4 applied to `hcheck`)
-
-    The proof of `orbit_hits_claim` is the substantive work:
-    for each `x > 0` with `x ≤ N` and `descendOrbit t x 0 = some l`,
-    construct `i := \x - 1, _\ : Fin N` (since `0 < x ≤ N → x - 1 < N`)
-    and apply the per-witness check at `i` (Lemma 1) → decompose
-    (Lemma 2) → transport terminal claim (Lemma 4) to get
-    `claim.Holds (accelerated_orbit x ((d.certWitness i).trajectory.length - 1))`.
-
-    Plan dependency: feeds Lemma 6 (per-leaf availability) which
-    applies this lemma per-leaf. -/
-theorem checkBoundedCertificate_sound (t : CoverageTree) (l : CoverageLeaf)
-    (d : BoundedInputCertificateData)
-    (hv : ValidTree t) (hc : IsComplete t)
-    (hver : verified t l)
-    (hcr : ∀ y, d.wire.claim.Holds y → ReachesOne y)
-    (hcheck : checkBoundedCertificate t l d = true)
-    : BoundedInputOrbitCertificate t l d.wire.N where
-  claim := d.wire.claim
-  claim_reaches_one := hcr
-  orbit_hits_claim := by
-    intro x hx hN hroute
-    -- Construct `i := \x - 1, _\ : Fin d.wire.N` (since `0 < x ≤ N → x - 1 < N`).
-    have ix : Fin d.wire.N := ⟨x - 1, by rw [Nat.sub_lt_iff_lt_add] at *; omega⟩
-    -- From `hcheck = true`, extract per-witness check via Lemma 1.
-    have hOk : checkCertWitness (ix.val + 1) d.wire.claim t l (d.certWitness ix) = true := by
-      unfold checkBoundedCertificate at hcheck
-      -- Apply Lemma 1: `foldl_and_extract (List.finRange N) p hcheck : ∀ i, i ∈ List.finRange N → p i = true`
-      have hFold := foldl_and_extract (List.finRange d.wire.N)
-        (fun j : Fin d.wire.N => checkCertWitness (j.val + 1) d.wire.claim t l (d.certWitness j))
-        hcheck
-      -- Need: `ix ∈ List.finRange d.wire.N`. Standard Lean 4 Mathlib lemma.
-      sorry
-    -- Apply Lemma 2 to decompose hOk into 5 conjuncts.
-    have hdecomp := (checkCertWitness_decompose.mp hOk)
-    -- Iteratively decompose the 5-fold `Bool.and` into separate `= true`s.
-    -- Each step uses `Bool.and_eq_true : a ∧ b = true ↔ a = true ∧ b = true`.
-    rw [Bool.and_eq_true] at hdecomp
-    -- The destructuring pattern `obtain ⟨hA, _, _, _, hE⟩ := hdecomp` requires
-    -- `Prop` conjunction; `Bool.and_eq_true` returns `Prop ∧`. Iteratively
-    -- decompose to extract the 5 components.
-    -- For now, extract `anchorOk` and `transitionOk` via nested projections.
-    have hAnchor : anchorOk (ix.val + 1) (d.certWitness ix) = true := by
-      -- 1st conjunct from `(Bool.and_eq_true ...).1.1.1.1`
-      sorry
-    have hTrans : transitionOk (d.certWitness ix) = true := by
-      -- 5th conjunct from `(Bool.and_eq_true ...).2.2.2.2`
-      sorry
-    -- Apply Lemma 4 to bridge the terminal claim.
-    -- `terminal_claim_transport` needs `claim.Holds (trajectory[length - 1]')`.
-    -- From Lemma 2's `terminalClaimOk = true`, the terminal claim holds at the
-    -- last element; Lemma 3 (`trajectory_index`) bridges to `accelerated_orbit x k`.
-    -- The chain Lemma 2 → Lemma 4 → use `k = trajectory.length - 1`.
-    have hLast : d.wire.claim.Holds (accelerated_orbit (ix.val + 1) 
-                ((d.certWitness ix).trajectory.length - 1)) := by
-      apply terminal_claim_transport (ix.val + 1) (d.certWitness ix) d.wire.claim hAnchor hTrans
-      -- Need: `claim.Holds (trajectory[length - 1]')` from Lemma 2's `terminalClaimOk = true`.
-      sorry
-    -- The witness `k` for `orbit_hits_claim` is `trajectory.length - 1`.
-    exact ⟨(d.certWitness ix).trajectory.length - 1, hLast⟩
-
-/-! ## v2b.5 — Lemma 6 (constructive per-leaf availability)
-
-Per `docs/story-q5-pr4-v2b-proof-decomposition.md` § 6, v2b.5
-lands Lemma 6 — the constructive per-leaf availability theorem
-that supersedes the v2a hypothesis-eliminator form
-`per_leaf_available_bounded_of_hCert`.
-
-**Type** (adapted from plan; uses per-leaf data's `wire.N` rather
-than a free `N` parameter — the plan's free `N` was a typo;
-the per-leaf bound is determined by the data):
-
-```lean
-per_leaf_available_bounded_of_check : ∀ (t : CoverageTree)
-    (dataPerLeaf : ∀ l ∈ t.leaves, verified t l → BoundedInputCertificateData)
-    (hv : ValidTree t) (hc : IsComplete t)
-    (hcr : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
-            ∀ y, (dataPerLeaf l hl hver).wire.claim.Holds y → ReachesOne y)
-    (hcheck : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
-              checkBoundedCertificate t l (dataPerLeaf l hl hver) = true)
-    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l)
-    : BoundedInputOrbitCertificate t l ((dataPerLeaf l hl hver).wire.N)
-```
-
-**Strategy.** Direct application of Lemma 5 to the per-leaf
-`dataPerLeaf l hl hver` with all hypotheses threaded through.
-
-**Supersedes** `per_leaf_available_bounded_of_hCert` (v2a
-hypothesis-eliminator form, trivial wrapper around the `hCert`
-hypothesis). The constructive form here is the actual
-verifier-soundness derivation: per-leaf `check = true`
-IMPLIES `BoundedInputOrbitCertificate` exists for that leaf.
-
-**Lesson applied (META § 3.2 — per-leaf availability pattern):**
-Lemma 6 takes `dataPerLeaf` as an explicit input (mirrors Q4 v3's
-`hCert` pattern).
-
-**No new `sorry`/`admit`/`axiom`** — the proof is a one-line
-application of Lemma 5. -/
-
-/-- **Lemma 6 (constructive per-leaf availability).** For each
-    verified leaf `l`, the per-leaf
-    `BoundedInputOrbitCertificate t l ((dataPerLeaf l ...).wire.N)`
-    is constructible from:
-      - per-leaf `dataPerLeaf` (the per-leaf witness bundle),
-      - per-leaf `hcr` (the per-leaf claim reachability hypothesis),
-      - per-leaf `hcheck` (the per-leaf verifier soundness hypothesis).
-
-    The proof is a direct application of Lemma 5 to the per-leaf
-    data with all hypotheses threaded through.
-
-    Supersedes the v2a hypothesis-eliminator form
-    `per_leaf_available_bounded_of_hCert`.
-
-    Plan dependency: closes the Q5 v2 chain. Once Codex approves
-    v2b.6 (tests), PR #64 can be retitled from "v2a —
-    bounded-input integration infrastructure (DRAFT; soundness
-    deferred to v2b)" to "v2 — bounded-input integration
-    (closes Q5 4-PR split)". -/
-theorem per_leaf_available_bounded_of_check (t : CoverageTree)
-    (dataPerLeaf : ∀ l ∈ t.leaves, verified t l → BoundedInputCertificateData)
-    (hv : ValidTree t) (hc : IsComplete t)
-    (hcr : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
-            ∀ y, (dataPerLeaf l hl hver).wire.claim.Holds y → ReachesOne y)
-    (hcheck : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
-              checkBoundedCertificate t l (dataPerLeaf l hl hver) = true)
-    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l)
-    : BoundedInputOrbitCertificate t l ((dataPerLeaf l hl hver).wire.N) :=
-  checkBoundedCertificate_sound t l (dataPerLeaf l hl hver) hv hc hver
-    (hcr l hl hver) (hcheck l hl hver)
+The PR's "soundness theorem" claim is withdrawn. PR #64 remains
+DRAFT until a future PR re-attempts Lemma 5 with closed proofs.
 
 end CollatzResearch

@@ -163,34 +163,42 @@ example (t : CoverageTree) (N : Nat)
          ReachesOne x) :=
   coverage_tree_soundness_orbit_cert_bounded t N hv hic hCert x hx hN
 
-/-! ## v2b.6 — Compile-check scenarios for the soundness chain (Lemmas 1-6)
+/-! ## v2b.6 — Compile-check scenarios for the soundness chain (Lemmas 1-4)
+
+**v2b.6 Codex P0 fix (2026-09-02):** Scenarios 6 and 7 (which
+tested the removed `checkBoundedCertificate_sound` and
+`per_leaf_available_bounded_of_check` lemmas) have been
+removed. The test file now exercises only the kernel-checked
+Lemmas 1, 2 (Scenarios 4 and 5).
 
 Per `docs/story-q5-pr4-v2b-proof-decomposition.md` § Sub-commit
-sequencing, v2b.6 lands the test scenarios for the soundness
-chain. These tests are:
+sequencing, v2b.6 originally landed 4 test scenarios for the
+soundness chain. After the v2b.6 Codex P0 removal of Lemmas 5
+and 6, only Scenarios 4 and 5 remain:
 
-1. **API-shape guards** for the new lemmas (defend signatures
-   against accidental changes).
-2. **`native_decide` smoke tests** for the boolean-decideable parts
-   (e.g. `foldl_and_extract`, `checkCertWitness_decompose`).
-3. **Polymorphic apply-the-theorem** scenarios for the higher-level
-   soundness theorems.
+  - **Scenario 4**: `foldl_and_extract` smoke test
+    (kernel-checked Lemma 1).
+  - **Scenario 5**: `checkCertWitness_decompose` smoke test
+    (kernel-checked Lemma 2).
+  - ~~**Scenario 6**: `checkBoundedCertificate_sound` API-shape
+    regression~~ — REMOVED (lemma removed per Codex P0).
+  - ~~**Scenario 7**: `per_leaf_available_bounded_of_check`
+    API-shape regression~~ — REMOVED (lemma removed per Codex P0).
 
-The proofs themselves contain explicit `sorry` placeholders
-(2 in `transitionOk_implies_step` from v2b.2 + 4 in
-`checkBoundedCertificate_sound` from v2b.4) for parts requiring
-detailed Mathlib list-manipulation lemmas. These tests validate
-the LEMMA SHAPES, not the proofs — the broader review at the
-end of the v2b arc will close the sorrys.
+The removed scenarios tested theorems that the Codex P0 review
+required removing from the Lean module. They cannot be re-added
+until the soundness theorem is closed and the per-leaf
+architectural decision is made (see `Q5Integration.lean` removal
+note).
 
-**Lesson applied (Q4 v3 — API-shape regression):** each new
-lemma gets a polymorphic apply-the-theorem scenario that defends
-its signature. Mirrors PR #57 scenario (`boundedCertificateClaim`)
-+ PR #58 scenario 12. -/
+**Lesson applied (Q4 v3 — API-shape regression):** each remaining
+new lemma gets a smoke test scenario that defends its signature.
+Mirrors PR #57 scenario (`boundedCertificateClaim`) + PR #58
+scenario 12. -/
 
-/-- Scenario 4 (v2b.6): `foldl_and_extract` smoke test.
-    Verify the lemma's signature against concrete inputs:
-    `ts = [1, 2, 3]`, `p := fun n => decide (0 < n)`,
+/-- Scenario 4 (v2b.6, kernel-checked): `foldl_and_extract`
+    smoke test. Verify the lemma's signature against concrete
+    inputs: `ts = [1, 2, 3]`, `p := fun n => decide (0 < n)`,
     hypothesis discharged via `native_decide`.
 
     Defends the lemma's signature against accidental changes
@@ -202,9 +210,10 @@ example : foldl_and_extract [1, 2, 3] (fun n : Nat => decide (0 < n))
   exact foldl_and_extract [1, 2, 3] (fun n : Nat => decide (0 < n))
     (by native_decide) 2 (by simp)
 
-/-- Scenario 5 (v2b.6): `checkCertWitness_decompose` smoke test.
-    Verify the biconditional against a concrete witness on
-    `singleLeafTree`: N=1, claim `.singleton 1`, trajectory `[1]`.
+/-- Scenario 5 (v2b.6, kernel-checked): `checkCertWitness_decompose`
+    smoke test. Verify the biconditional against a concrete
+    witness on `singleLeafTree`: N=1, claim `.singleton 1`,
+    trajectory `[1]`.
 
     The boolean-decideable parts of the biconditional are
     decidable via `native_decide` (the `decide (claim.Holds
@@ -215,42 +224,5 @@ example : checkCertWitness_decompose 1 (FiniteOrbitClaim.singleton 1)
   exact checkCertWitness_decompose 1 (FiniteOrbitClaim.singleton 1) singleLeafTree
     { leafId := "L", leafProperty := "0:0-0" }
     { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] }
-
-/-- Scenario 6 (v2b.6): `checkBoundedCertificate_sound` API-shape
-    regression. Type-only check (proof values supplied as
-    hypotheses; the actual proof has explicit `sorry` placeholders
-    that the broader review will close).
-
-    Defends the soundness assembly signature against accidental
-    changes. The hypotheses match the v2a convention
-    (`hv`, `hc`, `hver`, `hcr`, `hcheck`). -/
-example (t : CoverageTree) (l : CoverageLeaf) (d : BoundedInputCertificateData)
-    (hv : ValidTree t) (hc : IsComplete t)
-    (hver : verified t l)
-    (hcr : ∀ y, d.wire.claim.Holds y → ReachesOne y)
-    (hcheck : checkBoundedCertificate t l d = true)
-    : BoundedInputOrbitCertificate t l d.wire.N :=
-  checkBoundedCertificate_sound t l d hv hc hver hcr hcheck
-
-/-- Scenario 7 (v2b.6): `per_leaf_available_bounded_of_check`
-    API-shape regression. Type-only check (proof values supplied
-    as hypotheses; the actual proof is a one-line application of
-    `checkBoundedCertificate_sound` which itself has `sorry`
-    placeholders to be addressed in the broader review).
-
-    Defends the per-leaf availability signature against accidental
-    changes. Mirrors PR #57's `boundedCertificateClaim` API-shape
-    regression pattern. -/
-example (t : CoverageTree)
-    (dataPerLeaf : ∀ l ∈ t.leaves, verified t l →
-      BoundedInputCertificateData)
-    (hv : ValidTree t) (hc : IsComplete t)
-    (hcr : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
-            ∀ y, (dataPerLeaf l hl hver).wire.claim.Holds y → ReachesOne y)
-    (hcheck : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
-              checkBoundedCertificate t l (dataPerLeaf l hl hver) = true)
-    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l)
-    : BoundedInputOrbitCertificate t l ((dataPerLeaf l hl hver).wire.N) :=
-  per_leaf_available_bounded_of_check t dataPerLeaf hv hc hcr hcheck l hl hver
 
 end CollatzResearch
