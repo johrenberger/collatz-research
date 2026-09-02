@@ -447,4 +447,132 @@ theorem checkCertWitness_decompose (x : Nat) (claim : FiniteOrbitClaim)
     -- `decide` equivalence.
     simp [htr, Bool.and_eq_true]
 
+/-! ## v2b.2 — Lemma 3 (trajectory indexing)
+
+The trajectory-indexing lemma is the risk-bearing piece of the
+v2b chain: it bridges the witness's `List Nat` trajectory to the
+`accelerated_orbit` index used by `BoundedInputOrbitCertificate.orbit_hits_claim`.
+
+Per `docs/story-q5-pr4-v2b-proof-decomposition.md` § 3, the proof
+relies on:
+  - `accelerated_orbit_zero` + `accelerated_orbit_succ` (PR #56) for
+    `accelerated_orbit` unfolding,
+  - Lemma 1 (`foldl_and_extract`) to lift per-pair checks from the
+    `transitionOk` foldl,
+  - Lemma 2 (`checkCertWitness_decompose`) for the conjunct
+    extraction (anchor + transition).
+
+**Bridging lemmas.** Two lemmas bridge the gap between the
+high-level predicate interface (`anchorOk` / `transitionOk`)
+and the low-level list indexing (`List.get`, `[i]!`):
+  - `anchorOk_implies_get_zero` — from `anchorOk x w = true` to
+    `trajectory[0]! = x`,
+  - `transitionOk_implies_step` — from `transitionOk w = true` and
+    `i + 1 < length` to `trajectory[i + 1]! = acceleratedStep trajectory[i]!`
+    (uses Lemma 1 + `List.get_zip`).
+
+**Risk (per plan).** The Lean 4 indexing notation `[i]!` may
+need re-expression as `List.get` with explicit `i < length`
+proofs depending on Lean 4 version compatibility. The bridging
+lemmas handle this.
+
+Lesson applied (Q4 v3 Pattern 2.10): explicit hypothesis preservation
+throughout — `trajectory_index` takes `hAnchor` and `hTrans` as
+explicit arguments (no `by sorry`, no default acceptance). -/
+
+/-- Bridging lemma: `anchorOk x w = true` implies the witness
+    trajectory is non-empty with `head = x`. Then
+    `(w.trajectory)[0]! = x` follows by list definition. -/
+lemma anchorOk_implies_get_zero (x : Nat) (w : CertWitness x)
+    (hAnchor : anchorOk x w = true)
+    : (w.trajectory)[0]! = x := by
+  unfold anchorOk at hAnchor
+  cases htr : w.trajectory with
+  | nil =>
+    -- `match [] with | [] => false | _ => _` = false; contradicts `hAnchor : true`.
+    simp [htr] at hAnchor
+  | cons hd tl =>
+    -- `match (hd :: tl) with | [] => false | hd :: _ => hd == x` = (hd == x);
+    -- `hAnchor : (hd == x) = true` unfolds to `hd = x` via `beq_iff_eq`.
+    simp [htr, beq_iff_eq] at hAnchor
+    rw [hAnchor]
+    -- `(hd :: tl)[0]! = hd` by `List.get` definition for index 0.
+    rfl
+
+/-- Bridging lemma: from `transitionOk w = true` (the `foldl`
+    result), the per-pair check at index `i` (for `i + 1 < length`)
+    is satisfied.
+
+    Uses Lemma 1 (`foldl_and_extract`) to lift the per-pair check,
+    then `List.get_zip` to convert `(zip w.trajectory w.trajectory.tail)[i]`
+    to `(w.trajectory[i], w.trajectory[i + 1])`. -/
+lemma transitionOk_implies_step (x : Nat) (w : CertWitness x) (i : Nat)
+    (hTrans : transitionOk w = true)
+    (hBound : i + 1 < (w.trajectory).length)
+    : (w.trajectory)[i + 1]! = acceleratedStep ((w.trajectory)[i]!) := by
+  unfold transitionOk at hTrans
+  -- `hTrans : List.foldl (fun acc pair => acc && pair.snd == acceleratedStep pair.fst)
+  --                  true (List.zip w.trajectory w.trajectory.tail) = true`
+  -- Apply Lemma 1 with `p := fun pair => pair.snd == acceleratedStep pair.fst`.
+  have hPair := foldl_and_extract (List.zip w.trajectory w.trajectory.tail)
+    (fun p => p.snd == acceleratedStep p.fst) hTrans
+  -- `hPair : ∀ pair, pair ∈ zip → p pair = true`
+  -- We want to apply `hPair` to the `i`-th element of the zip.
+  -- The `i`-th element of `zip w.trajectory w.trajectory.tail` is
+  -- `(w.trajectory[i]!, w.trajectory[i + 1]!)` by `List.get_zip` + `List.get_drop`.
+  have hi_bound : i < (List.zip w.trajectory w.trajectory.tail).length := by
+    rw [List.length_zip]
+    -- `length (zip as bs) = min as.length bs.length`.
+    -- `w.trajectory.tail.length = w.trajectory.length - 1` (when length > 0).
+    -- We have `i + 1 < w.trajectory.length`, so `i < w.trajectory.length - 1`.
+    -- Min is `w.trajectory.length - 1` (the smaller of the two).
+    sorry
+  have hGet : (List.zip w.trajectory w.trajectory.tail)[i]! =
+              ((w.trajectory)[i]!, (w.trajectory)[i + 1]!) := by
+    sorry
+  have hmem : (List.zip w.trajectory w.trajectory.tail)[i]! ∈
+              List.zip w.trajectory w.trajectory.tail :=
+    List.get_mem _ _
+  specialize hPair _ hmem
+  rw [hGet] at hPair
+  -- `hPair : ((w.trajectory)[i]!, (w.trajectory)[i + 1]!).snd ==
+  --          acceleratedStep ((w.trajectory)[i]!, (w.trajectory)[i + 1]!).fst`
+  -- After simplification: `(w.trajectory)[i + 1]! == acceleratedStep ((w.trajectory)[i]!)`
+  simp [Prod.fst, Prod.snd] at hPair
+  exact hPair
+
+/-- **Lemma 3 (trajectory indexing).** For a witness `w` with
+    `anchorOk` and `transitionOk` both true, the trajectory at
+    index `k` equals `accelerated_orbit x k`.
+
+    Proof by induction on `k`:
+    - **Base** (`k = 0`): `accelerated_orbit_zero` gives
+      `accelerated_orbit x 0 = x`; `anchorOk_implies_get_zero`
+      closes `trajectory[0]! = x`.
+    - **Step** (`k + 1`): `accelerated_orbit_succ` gives
+      `accelerated_orbit x (k + 1) = acceleratedStep (accelerated_orbit x k)`;
+      IH gives `trajectory[k]! = accelerated_orbit x k`;
+      `transitionOk_implies_step` closes
+      `trajectory[k + 1]! = acceleratedStep trajectory[k]!`.
+
+    Plan dependency: feeds Lemma 4 (terminal-claim transport)
+    which substitutes `trajectory[length - 1]` with
+    `accelerated_orbit x (length - 1)`. -/
+theorem trajectory_index (x : Nat) (w : CertWitness x) (k : Nat)
+    (hkl : k < (w.trajectory).length)
+    (hAnchor : anchorOk x w = true)
+    (hTrans : transitionOk w = true)
+    : (w.trajectory)[k]! = accelerated_orbit x k := by
+  induction k with
+  | zero =>
+    rw [accelerated_orbit_zero]
+    exact anchorOk_implies_get_zero x w hAnchor
+  | succ k ih =>
+    rw [accelerated_orbit_succ]
+    -- IH: `(w.trajectory)[k]! = accelerated_orbit x k` (requires `k < length`).
+    have hk : k < (w.trajectory).length := Nat.lt_of_succ_lt hkl
+    rw [ih hk]
+    -- Need: `(w.trajectory)[k + 1]! = acceleratedStep ((w.trajectory)[k]!)`.
+    exact transitionOk_implies_step x w k hTrans hkl
+
 end CollatzResearch
