@@ -163,4 +163,94 @@ example (t : CoverageTree) (N : Nat)
          ReachesOne x) :=
   coverage_tree_soundness_orbit_cert_bounded t N hv hic hCert x hx hN
 
+/-! ## v2b.6 — Compile-check scenarios for the soundness chain (Lemmas 1-6)
+
+Per `docs/story-q5-pr4-v2b-proof-decomposition.md` § Sub-commit
+sequencing, v2b.6 lands the test scenarios for the soundness
+chain. These tests are:
+
+1. **API-shape guards** for the new lemmas (defend signatures
+   against accidental changes).
+2. **`native_decide` smoke tests** for the boolean-decideable parts
+   (e.g. `foldl_and_extract`, `checkCertWitness_decompose`).
+3. **Polymorphic apply-the-theorem** scenarios for the higher-level
+   soundness theorems.
+
+The proofs themselves contain explicit `sorry` placeholders
+(2 in `transitionOk_implies_step` from v2b.2 + 4 in
+`checkBoundedCertificate_sound` from v2b.4) for parts requiring
+detailed Mathlib list-manipulation lemmas. These tests validate
+the LEMMA SHAPES, not the proofs — the broader review at the
+end of the v2b arc will close the sorrys.
+
+**Lesson applied (Q4 v3 — API-shape regression):** each new
+lemma gets a polymorphic apply-the-theorem scenario that defends
+its signature. Mirrors PR #57 scenario (`boundedCertificateClaim`)
++ PR #58 scenario 12. -/
+
+/-- Scenario 4 (v2b.6): `foldl_and_extract` smoke test.
+    Verify the lemma's signature against concrete inputs:
+    `ts = [1, 2, 3]`, `p := fun n => decide (0 < n)`,
+    hypothesis discharged via `native_decide`.
+
+    Defends the lemma's signature against accidental changes
+    and confirms the `true && p a = p a` identity is exercised. -/
+example : foldl_and_extract [1, 2, 3] (fun n : Nat => decide (0 < n))
+    (by native_decide : List.foldl
+      (fun acc x => acc && decide (0 < x)) true [1, 2, 3] = true)
+    2 (by simp : 2 ∈ [1, 2, 3]) = true := by
+  exact foldl_and_extract [1, 2, 3] (fun n : Nat => decide (0 < n))
+    (by native_decide) 2 (by simp)
+
+/-- Scenario 5 (v2b.6): `checkCertWitness_decompose` smoke test.
+    Verify the biconditional against a concrete witness on
+    `singleLeafTree`: N=1, claim `.singleton 1`, trajectory `[1]`.
+
+    The boolean-decideable parts of the biconditional are
+    decidable via `native_decide` (the `decide (claim.Holds
+    last)` bridge + `List.getLast?` etc. are all reducible). -/
+example : checkCertWitness_decompose 1 (FiniteOrbitClaim.singleton 1)
+    singleLeafTree { leafId := "L", leafProperty := "0:0-0" }
+    { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] } = true := by
+  exact checkCertWitness_decompose 1 (FiniteOrbitClaim.singleton 1) singleLeafTree
+    { leafId := "L", leafProperty := "0:0-0" }
+    { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] }
+
+/-- Scenario 6 (v2b.6): `checkBoundedCertificate_sound` API-shape
+    regression. Type-only check (proof values supplied as
+    hypotheses; the actual proof has explicit `sorry` placeholders
+    that the broader review will close).
+
+    Defends the soundness assembly signature against accidental
+    changes. The hypotheses match the v2a convention
+    (`hv`, `hc`, `hver`, `hcr`, `hcheck`). -/
+example (t : CoverageTree) (l : CoverageLeaf) (d : BoundedInputCertificateData)
+    (hv : ValidTree t) (hc : IsComplete t)
+    (hver : verified t l)
+    (hcr : ∀ y, d.wire.claim.Holds y → ReachesOne y)
+    (hcheck : checkBoundedCertificate t l d = true)
+    : BoundedInputOrbitCertificate t l d.wire.N :=
+  checkBoundedCertificate_sound t l d hv hc hver hcr hcheck
+
+/-- Scenario 7 (v2b.6): `per_leaf_available_bounded_of_check`
+    API-shape regression. Type-only check (proof values supplied
+    as hypotheses; the actual proof is a one-line application of
+    `checkBoundedCertificate_sound` which itself has `sorry`
+    placeholders to be addressed in the broader review).
+
+    Defends the per-leaf availability signature against accidental
+    changes. Mirrors PR #57's `boundedCertificateClaim` API-shape
+    regression pattern. -/
+example (t : CoverageTree)
+    (dataPerLeaf : ∀ l ∈ t.leaves, verified t l →
+      BoundedInputCertificateData)
+    (hv : ValidTree t) (hc : IsComplete t)
+    (hcr : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
+            ∀ y, (dataPerLeaf l hl hver).wire.claim.Holds y → ReachesOne y)
+    (hcheck : ∀ l ∈ t.leaves, ∀ (hl : l ∈ t.leaves) (hver : verified t l),
+              checkBoundedCertificate t l (dataPerLeaf l hl hver) = true)
+    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l)
+    : BoundedInputOrbitCertificate t l ((dataPerLeaf l hl hver).wire.N) :=
+  per_leaf_available_bounded_of_check t dataPerLeaf hv hc hcr hcheck l hl hver
+
 end CollatzResearch
