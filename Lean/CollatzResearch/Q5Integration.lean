@@ -299,4 +299,152 @@ example (N : Nat)
          ReachesOne x :=
   coverage_tree_soundness_orbit_cert_bounded depthTwoTree N hv hc hCert x hx hN
 
+/-! ## v2b soundness helpers — Lemmas 1 & 2 (Q5 PR #4 v2b proof decomposition)
+
+The Q5 PR #4 v2 soundness theorem (`checkBoundedCertificate_sound`,
+deferred to v2b.4) needs a chain of helper lemmas per
+`docs/story-q5-pr4-v2b-proof-decomposition.md`. Lemmas 1 and 2 are
+the mechanical extractions that all later lemmas build on:
+
+  * **Lemma 1** (`foldl_and_extract`): pure `List`/`Bool` reasoning
+    that lifts `foldl ... true ts = true` to per-element truth.
+    Fully polymorphic over the list element type — no commitment
+    to `CertWitness`.
+  * **Lemma 2** (`checkCertWitness_decompose`): biconditional
+    between `checkCertWitness = true` and the 5-fold conjunction of
+    named conjuncts (`anchorOk` ∧ `leafMatchOk` ∧ `routingOk` ∧
+    `terminalClaimOk` ∧ `transitionOk`).
+
+**Lessons applied (META § 3.3 — avoid universal acceptance):** both
+lemmas stay conditional on explicit hypotheses; no `by sorry`, no
+default acceptance.
+
+**Lesson applied (Q3 v4 — :Type sort):** the 5 helper predicates are
+`Bool`-valued (NOT `Prop`); they are predicates of the WITNESS, not
+proofs. The decomposition is a *boolean* identity. -/
+
+/-- Anchor check (witness predicate): the witness trajectory is
+    non-empty AND its head matches the type-level input `x`.
+    Returns `false` on empty trajectory (mirrors the early-reject
+    in `checkCertWitness`). -/
+def anchorOk (x : Nat) (w : CertWitness x) : Bool :=
+  match w.trajectory with
+  | [] => false
+  | hd :: _ => hd == x
+
+/-- Leaf match check (witness predicate): the witness's leaf
+    `w.l` matches the expected leaf `l`. -/
+def leafMatchOk (w : CertWitness x) (l : CoverageLeaf) : Bool :=
+  w.l == l
+
+/-- Routing check (witness predicate): `descendOrbit t x 0` returns
+    `some w.l` (the witness's leaf). -/
+def routingOk (t : CoverageTree) (x : Nat) (w : CertWitness x) : Bool :=
+  descendOrbit t x 0 == some w.l
+
+/-- Terminal-claim check (witness predicate): the last trajectory
+    value satisfies `claim.Holds`. Returns `false` on empty
+    trajectory (mirrors the `getLast?` early-reject in
+    `checkCertWitness`). -/
+def terminalClaimOk (claim : FiniteOrbitClaim) (w : CertWitness x) : Bool :=
+  match w.trajectory.getLast? with
+  | some last => decide (claim.Holds last)
+  | none => false
+
+/-- Transition check (witness predicate): every consecutive pair
+    `(w.trajectory[i], w.trajectory[i+1])` satisfies
+    `snd = acceleratedStep fst`. Folded via `List.zip`. -/
+def transitionOk (w : CertWitness x) : Bool :=
+  List.foldl (fun acc pair => acc && pair.snd == acceleratedStep pair.fst)
+            true (List.zip w.trajectory w.trajectory.tail)
+
+/-- **Lemma 1 (foldl extraction).** If
+    `List.foldl (fun acc x => acc ∧ p x) true ts = true`, then every
+    `x ∈ ts` satisfies `p x = true`.
+
+    Pure `List`/`Bool` reasoning. Standard induction on `ts`. The
+    `true` seed + `&&` makes the extraction clean — there is no
+    special case for the first element; `(true && p a) = p a` by
+    `Bool.and` identity.
+
+    **Fully polymorphic** over `α : Type u`. The application to
+    `checkBoundedCertificate` (which folds over `Fin d.wire.N`
+    inside `List.finRange d.wire.N`) happens in Lemma 5 — a
+    one-line corollary of this lemma applied to the right
+    predicate.
+
+    Plan dependency: feeds Lemma 5 (soundness assembly) via the
+    per-witness `checkCertWitness` extraction. -/
+theorem foldl_and_extract {α : Type u} (ts : List α) (p : α → Bool)
+    (h : List.foldl (fun acc x => acc ∧ p x) true ts = true)
+    : ∀ x, x ∈ ts → p x = true := by
+  induction ts with
+  | nil =>
+    intros _ hx
+    -- `x ∈ []` is contradictory; eliminated.
+    cases hx
+  | cons a rest ih =>
+    intros x hx
+    cases hx with
+    | inl hxa =>
+      -- `x = a`: prove `p a = true` directly from `h`.
+      subst hxa
+      -- `(true && p a) = p a` by Bool identity (case-split on `p a`).
+      have hp_eq : (true && p a) = p a := by
+        cases hp : p a <;> simp [hp]
+      rw [hp_eq] at h
+      -- `h : (p a ∧ List.foldl (fun acc x => acc ∧ p x) (p a) rest) = true`
+      rw [Bool.and_eq_true] at h
+      exact h.1
+    | inr hxr =>
+      -- `x ∈ rest`: apply induction hypothesis to `h`.
+      have hp_eq : (true && p a) = p a := by
+        cases hp : p a <;> simp [hp]
+      rw [hp_eq] at h
+      rw [Bool.and_eq_true] at h
+      -- `h.2 : List.foldl (fun acc x => acc ∧ p x) true rest = true`
+      exact ih h.2 x hxr
+
+/-- **Lemma 2 (witness-check decomposition).** `checkCertWitness`
+    is true iff all 5 named conjuncts (anchor, leaf, routing,
+    terminal claim, transition) hold.
+
+    The biconditional follows by unfolding `checkCertWitness` and
+    the 5 helpers, then observing that both sides reduce to the
+    same boolean expression (modulo `Bool.and` associativity).
+
+    The `match w.trajectory` patterns in `checkCertWitness` and
+    `anchorOk` / `terminalClaimOk` coincide; the `match ... getLast?`
+    patterns also coincide. After unfolding, both sides are
+    syntactically equal boolean expressions, so the biconditional
+    reduces to `True`.
+
+    Plan dependency: feeds Lemma 3 (trajectory indexing — uses
+    `anchorOk` + `transitionOk`) and Lemma 4 (terminal-claim
+    transport — uses `terminalClaimOk`). Each conjunct is
+    independently consumed by a different later lemma. -/
+theorem checkCertWitness_decompose (x : Nat) (claim : FiniteOrbitClaim)
+    (t : CoverageTree) (l : CoverageLeaf) (w : CertWitness x) :
+    checkCertWitness x claim t l w = true ↔
+    (anchorOk x w ∧ leafMatchOk w l ∧ routingOk t x w ∧
+     terminalClaimOk claim w ∧ transitionOk w) := by
+  -- Unfold both sides. After unfolding, both sides have the same
+  -- `match w.trajectory` structure and the same nested
+  -- `match ... getLast?` structure.
+  unfold checkCertWitness anchorOk leafMatchOk routingOk
+    terminalClaimOk transitionOk
+  -- Case-split on the trajectory; both `checkCertWitness` and the
+  -- helper `match`es share the same pattern.
+  cases htr : w.trajectory with
+  | nil =>
+    -- Both sides reduce to `false`: `checkCertWitness []` is
+    -- `false`; the RHS has `anchorOk [] = false` and
+    -- `false ∧ ... = false`.
+    simp [htr]
+  | cons hd tl =>
+    -- Both sides reduce to the same 5-fold conjunction; `simp`
+    -- closes the biconditional via `Bool.and_eq_true` +
+    -- `decide` equivalence.
+    simp [htr, Bool.and_eq_true]
+
 end CollatzResearch
