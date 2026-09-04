@@ -30,4 +30,29 @@ example : ∃ claim,
     routingPartitionRegistry (twoLeafRoutingPartition.routingWitness ⟨0, by decide⟩).val
     (by native_decide)
 
+/-- The RP-5 composition theorem closes a singleton terminal claim under its
+explicit reachability obligation.  This exercises no global acceptance or
+legacy certificate construction. -/
+example : ReachesOne 1 := by
+  let w : CertWitness 1 :=
+    { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] }
+  apply routing_trajectory_reaches_one 1 w (FiniteOrbitClaim.singleton 1)
+  · native_decide
+  · intro i hi
+    simp [w] at hi
+  · simp [w, FiniteOrbitClaim.Holds]
+  · intro y hy
+    simp [FiniteOrbitClaim.Holds] at hy
+    subst y
+    exact ⟨0, by simp⟩
+
+/-- Global acceptance composes with an explicit registry-wide reachability
+assumption; this remains conditional and does not assert convergence of an
+untrusted claim registry. -/
+example (hClaimReachesOne : ∀ entry ∈ routingPartitionRegistry, ∀ y,
+    entry.claim.Holds y → ReachesOne y) : ReachesOne 1 :=
+  routing_partition_certificate_slot_reaches_one routingPartitionTwoLeafTree
+    twoLeafRoutingPartition (by native_decide) hClaimReachesOne
+    ⟨0, by decide⟩
+
 end CollatzResearch

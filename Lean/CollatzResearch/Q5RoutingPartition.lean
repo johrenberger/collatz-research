@@ -8,7 +8,7 @@ It deliberately does not compose a claim with `ReachesOne`, and does not
 construct a legacy single-leaf certificate.  Those are Q5-RP-5 work.
 -/
 
-import CollatzResearch.BoundedInputCertificateData
+import CollatzResearch.Q5Integration
 
 namespace CollatzResearch
 
@@ -95,5 +95,122 @@ theorem checkRoutingPartitionWitness_accepts
         have hhead' : hd = x := by simpa using hhead
         exact ⟨hd, rest, rfl, hhead', hroutes, hterminal,
           htransitions⟩
+
+/-! ## Conditional reachability composition -/
+
+/-- A checked trajectory reaches one when its terminal claim is explicitly
+known to reach one.  The transition relation and claim-reachability premise
+remain explicit: this theorem performs only the kernel-checked composition,
+and does not construct a legacy single-leaf certificate. -/
+theorem routing_trajectory_reaches_one
+    (x : Nat) (w : CertWitness x) (claim : FiniteOrbitClaim)
+    (hAnchor : anchorOk x w = true)
+    (hTrans : ∀ i, i + 1 < w.trajectory.length →
+      w.trajectory[i + 1]! = acceleratedStep w.trajectory[i]!)
+    (hLast : claim.Holds (w.trajectory[w.trajectory.length - 1]!))
+    (hClaimReachesOne : ∀ y, claim.Holds y → ReachesOne y) :
+    ReachesOne x := by
+  have hOrbitClaim :
+      claim.Holds (accelerated_orbit x (w.trajectory.length - 1)) :=
+    terminal_claim_transport x w claim hAnchor hTrans hLast
+  exact orbit_predecessor_reaches_one x (w.trajectory.length - 1)
+    (accelerated_orbit x (w.trajectory.length - 1)) rfl
+    (hClaimReachesOne _ hOrbitClaim)
+
+/-- An accepted transition fold supplies the adjacent accelerated-step
+relation at every in-bounds trajectory index.  This uses indexed access to
+the zipped trajectory and its tail, avoiding a fragile membership induction
+over the implementation of `List.zip`. -/
+theorem routing_transition_fold_step (xs : List Nat)
+    (hfold : List.foldl (fun acc pair =>
+      acc && pair.snd == acceleratedStep pair.fst) true
+      (List.zip xs xs.tail) = true)
+    (i : Nat) (hi : i + 1 < xs.length) :
+    xs[i + 1]! = acceleratedStep xs[i]! := by
+  have hzip : i < (List.zip xs xs.tail).length := by
+    simp only [List.length_zip, List.length_tail]
+    omega
+  have hpair := routing_foldl_and_extract (List.zip xs xs.tail)
+    (fun pair => pair.snd == acceleratedStep pair.fst) hfold
+    (List.zip xs xs.tail)[i] (List.getElem_mem hzip)
+  have hpair' : (List.zip xs xs.tail)[i].snd =
+      acceleratedStep (List.zip xs xs.tail)[i].fst := by
+    simpa using hpair
+  rw [List.getElem_zip] at hpair'
+  rw [List.getElem_tail] at hpair'
+  simpa only [getElem!_pos xs (i + 1) hi,
+    getElem!_pos xs i (Nat.lt_of_succ_lt hi)] using hpair'
+
+/-- A successful registry lookup is backed by a concrete registry entry with
+the returned claim. -/
+theorem findRoutingLeafClaim_some (registry : List LeafClaimWire)
+    (leaf : CoverageLeaf) (claim : FiniteOrbitClaim)
+    (hfind : findRoutingLeafClaim registry leaf = some claim) :
+    ∃ entry ∈ registry, entry.claim = claim ∧
+      sameCoverageLeaf entry.leaf leaf = true := by
+  induction registry with
+  | nil => simp [findRoutingLeafClaim] at hfind
+  | cons entry rest ih =>
+      unfold findRoutingLeafClaim at hfind
+      split at hfind
+      · rename_i hsame
+        simp at hfind
+        subst claim
+        exact ⟨entry, by simp, rfl, hsame⟩
+      · rcases ih hfind with ⟨entry', hmem, hclaim, hsame⟩
+        exact ⟨entry', List.mem_cons_of_mem _ hmem, hclaim, hsame⟩
+
+/-- A Boolean-accepted routing witness reaches one when every registered
+claim is explicitly known to reach one.  The theorem is conditional: it
+does not assert convergence for unverified claims or unchecked witnesses. -/
+theorem routing_partition_witness_reaches_one
+    (t : CoverageTree) (x : Nat) (registry : List LeafClaimWire)
+    (w : RoutingWitnessWire)
+    (hcheck : checkRoutingPartitionWitness t x registry w = true)
+    (hClaimReachesOne : ∀ entry ∈ registry, ∀ y,
+      entry.claim.Holds y → ReachesOne y) :
+    ReachesOne x := by
+  rcases checkRoutingPartitionWitness_accepts t x registry w hcheck with
+    ⟨claim, hfind, hd, rest, htraj, hhead, hroutes, hterminal, hfold⟩
+  rcases findRoutingLeafClaim_some registry w.leaf claim hfind with
+    ⟨entry, hentry, hclaim, _⟩
+  let checked : CertWitness x := { l := w.leaf, trajectory := w.trajectory }
+  have hAnchor : anchorOk x checked = true := by
+    simp [anchorOk, checked, htraj, hhead]
+  have hTrans : ∀ i, i + 1 < checked.trajectory.length →
+      checked.trajectory[i + 1]! = acceleratedStep checked.trajectory[i]! := by
+    intro i hi
+    dsimp [checked] at hi ⊢
+    rw [htraj] at hi ⊢
+    exact routing_transition_fold_step (hd :: rest) hfold i hi
+  have hne : hd :: rest ≠ [] := by simp
+  have hlast : claim.Holds ((hd :: rest)[(hd :: rest).length - 1]!) := by
+    have hidx : (hd :: rest).length - 1 < (hd :: rest).length := by
+      simp
+    rw [getElem!_pos (hd :: rest) ((hd :: rest).length - 1) hidx]
+    rw [← List.getLast_eq_getElem hne]
+    have hterm' : decide (claim.Holds ((hd :: rest).getLast hne)) = true := by
+      simpa [List.getLast?_eq_some_getLast hne] using hterminal
+    exact of_decide_eq_true hterm'
+  have hClaim : ∀ y, claim.Holds y → ReachesOne y := by
+    intro y hy
+    apply hClaimReachesOne entry hentry y
+    simpa [hclaim] using hy
+  exact routing_trajectory_reaches_one x checked claim hAnchor hTrans
+    (by simpa [checked, htraj] using hlast) hClaim
+
+/-- Global checker acceptance yields conditional reachability for each
+canonical input slot, provided every registered terminal claim is explicitly
+known to reach one. -/
+theorem routing_partition_certificate_slot_reaches_one
+    (t : CoverageTree) (d : RoutingPartitionCertificateData)
+    (hcheck : checkRoutingPartitionCertificate t d = true)
+    (hClaimReachesOne : ∀ entry ∈ d.wire.claimRegistry, ∀ y,
+      entry.claim.Holds y → ReachesOne y)
+    (i : Fin d.wire.N) : ReachesOne (i.val + 1) :=
+  routing_partition_witness_reaches_one t (i.val + 1)
+    d.wire.claimRegistry (d.routingWitness i).val
+    (checkRoutingPartitionCertificate_accepts_slot t d hcheck i)
+    hClaimReachesOne
 
 end CollatzResearch
