@@ -543,13 +543,14 @@ theorem trajectory_index (x : Nat) (w : CertWitness x) (k : Nat)
     rw [accelerated_orbit_zero]
     exact anchorOk_implies_get_zero x w hAnchor
   | succ k ih =>
-    rw [accelerated_orbit_succ]
-    -- IH: `(w.trajectory)[k]! = accelerated_orbit x k` (requires `k < length`).
     have hk : k < (w.trajectory).length := Nat.lt_of_succ_lt hkl
-    rw [ih hk]
-    -- Need: `(w.trajectory)[k + 1]! = acceleratedStep ((w.trajectory)[k]!)`.
-    -- `hTrans` with `i := k` and `k + 1 < length := Nat.lt_succ_of_lt hk`.
-    exact hTrans k (Nat.lt_succ_of_lt hk)
+    calc
+      (w.trajectory)[k + 1]! = acceleratedStep ((w.trajectory)[k]!) :=
+        hTrans k hkl
+      _ = acceleratedStep (accelerated_orbit x k) :=
+        congrArg acceleratedStep (ih hk)
+      _ = accelerated_orbit x (k + 1) :=
+        (accelerated_orbit_succ x k).symm
 
 /-! ## v2b.3 — Lemma 4 (terminal-claim transport)
 
