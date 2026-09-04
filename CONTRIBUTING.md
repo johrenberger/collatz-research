@@ -59,7 +59,13 @@ Replace a command only by updating the backlog and CI in the same change.
 5. Run `make ci` and capture the output.
 6. Write the evidence note (toolchain, seed/input digest, commands,
    result) and attach it to the PR.
-7. Hand off to Codex for independent validation.
+7. Run the independent Codex PR review gate in
+   `docs/codex-pr-review-gate.md`. Record the reviewed full head SHA, review
+   URL, round, verdict, and disposition of every P0/P1 finding in the PR.
+   A new push requires a new review of the new head before merge.
+8. Request maintainer merge authorization only after the reviewed SHA is the
+   current head, required CI is green for that SHA, and the Codex gate is
+   approved with no unresolved P0/P1 findings.
 
 ## Status vocabulary
 
@@ -99,6 +105,9 @@ Codex is the independent validation authority. Codex may:
 
 Maintainers own acceptance of new mathematical claims, schema versions,
 dependency additions, and publication language.
+
+The Codex gate is a required independent-review quality gate, not an automatic
+merge authority. Maintainers retain final merge authorization.
 
 ## License
 

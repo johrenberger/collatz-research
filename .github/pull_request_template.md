@@ -51,6 +51,21 @@ Record observed output for the PR head; do not substitute planned commands or a 
 - [ ] Tests verify full fixture semantics, not only endpoints.
 - [ ] Generated artifacts, caches, and secrets are excluded.
 
+## Independent Codex review gate
+
+- **Reviewed head SHA:**
+- **Review round:** 1 / 2 / 3
+- **Review state:** awaiting Codex / changes requested / approved / escalated
+- **Codex review URL(s):**
+- **Blocking findings (P0/P1) and disposition:**
+
+<!--
+The reviewed SHA must equal this PR's current head. A push invalidates a prior
+approval and starts a new review round. Do not request human merge approval
+while this section is awaiting review, has unresolved P0/P1 findings, or is
+escalated. See docs/codex-pr-review-gate.md.
+-->
+
 ## Known limitations and follow-up
 
 - **Known gaps / negative results:**
