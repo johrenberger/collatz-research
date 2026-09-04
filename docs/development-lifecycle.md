@@ -171,3 +171,26 @@ python repo/scripts/ci_status.py --repo johrenberger/collatz-research \
 This is sufficient for observation when `gh pr checks` is forbidden. For
 branch-protection-grade status, install a GitHub App with `Checks: read` and
 `Actions: read`; do not infer required checks from a prior green workflow.
+
+## Independent Codex PR review gate
+
+Every implementation PR must complete the review gate in
+[`codex-pr-review-gate.md`](codex-pr-review-gate.md) before maintainer merge
+authorization. The controller records the reviewed full SHA, review round,
+verdict, finding disposition, and review URLs as durable PR evidence.
+
+After a successful PR create or update, the implementation session emits a
+durable internal review handoff keyed by repository, PR number, full head SHA,
+and review round. An isolated Codex reviewer session consumes that handoff and
+may read PR/CI evidence and post a review, but may not edit, push, resolve
+threads, or merge. The reviewer receipt, not a chat acknowledgement, advances
+the lifecycle state. This replaces the need for an inbound GitHub webhook.
+
+A push invalidates a prior approval: the controller waits for an independent
+review of the new head rather than treating a review of an earlier commit as
+approval for the changed code. P0 and P1 findings block merge; P2 findings are
+either resolved or explicitly deferred by a maintainer with a follow-up issue.
+After three remediation-review rounds, or when a review requests an
+architecture or mathematical decision, the controller stops source edits and
+escalates with the review record and diagnostics. Codex review never grants
+merge authority; a maintainer does.

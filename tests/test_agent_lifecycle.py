@@ -280,3 +280,103 @@ def test_operation_receipt_cannot_be_finished_by_a_different_turn(project: Path)
         expect=2,
     )
     assert "does not belong" in rejected["error"]
+
+
+def test_review_request_is_deduped_by_repository_pr_and_head_sha(project: Path) -> None:
+    args = (
+        "request-review",
+        "--repository",
+        "johrenberger/collatz-research",
+        "--pr-number",
+        "65",
+        "--head-sha",
+        "a" * 40,
+        "--round",
+        "1",
+        "--payload-json",
+        '{"validation":"green"}',
+    )
+    first = _run(project, *args)
+    replay = _run(project, *args)
+    assert first["decision"] == "review_requested"
+    assert replay["decision"] == "already_requested"
+    assert replay["review_key"] == first["review_key"]
+
+
+def test_review_receipt_must_match_requested_pr_head_and_is_immutable(project: Path) -> None:
+    requested = _run(
+        project,
+        "request-review",
+        "--repository",
+        "johrenberger/collatz-research",
+        "--pr-number",
+        "65",
+        "--head-sha",
+        "b" * 40,
+        "--payload-json",
+        "{}",
+    )
+    key = str(requested["review_key"])
+    receipt = {
+        "repository": "johrenberger/collatz-research",
+        "pr_number": 65,
+        "head_sha": "b" * 40,
+        "round": 1,
+        "model": "openai/gpt-5.6-terra",
+        "verdict": "approved",
+        "review_url": "https://example.invalid/review/1",
+        "findings": [],
+    }
+    recorded = _run(
+        project,
+        "record-review",
+        "--review-key",
+        key,
+        "--receipt-json",
+        json.dumps(receipt),
+    )
+    assert recorded["decision"] == "review_recorded"
+    assert (
+        _run(
+            project,
+            "record-review",
+            "--review-key",
+            key,
+            "--receipt-json",
+            json.dumps(receipt),
+        )["decision"]
+        == "already_recorded"
+    )
+    receipt["verdict"] = "changes_requested"
+    conflict = _run(
+        project,
+        "record-review",
+        "--review-key",
+        key,
+        "--receipt-json",
+        json.dumps(receipt),
+        expect=2,
+    )
+    assert "conflicts" in conflict["error"]
+
+
+def test_only_one_dispatcher_can_claim_a_pending_review(project: Path) -> None:
+    requested = _run(
+        project,
+        "request-review",
+        "--repository",
+        "johrenberger/collatz-research",
+        "--pr-number",
+        "65",
+        "--head-sha",
+        "c" * 40,
+        "--payload-json",
+        "{}",
+    )
+    claimed = _run(project, "claim-review", "--dispatcher", "terra-worker")
+    assert claimed["decision"] == "claimed"
+    assert claimed["review_key"] == requested["review_key"]
+    assert (
+        _run(project, "claim-review", "--dispatcher", "another-worker")["decision"]
+        == "none_pending"
+    )

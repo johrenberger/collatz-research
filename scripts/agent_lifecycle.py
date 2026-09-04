@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _utc_now() -> str:
@@ -88,12 +88,14 @@ def _locked_ledger(
             ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
         else:
             ledger = {"schema_version": SCHEMA_VERSION, "turns": {}}
-        if ledger.get("schema_version") == 1:
+        if ledger.get("schema_version") in {1, 2}:
             ledger["schema_version"] = SCHEMA_VERSION
-            ledger["operations"] = {}
+            ledger.setdefault("operations", {})
+            ledger.setdefault("review_requests", {})
         if ledger.get("schema_version") != SCHEMA_VERSION:
             raise ValueError("unsupported turn ledger schema")
         ledger.setdefault("operations", {})
+        ledger.setdefault("review_requests", {})
         yield ledger_path, ledger
         temporary = ledger_path.with_suffix(".json.tmp")
         temporary.write_text(_canonical(ledger) + "\n", encoding="utf-8")
@@ -249,6 +251,86 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
         return {"decision": "finished", "turn": turn}
 
 
+def request_review(args: argparse.Namespace) -> dict[str, Any]:
+    """Create an idempotent independent-review handoff for one PR head."""
+    _, state = _paths(args)
+    payload = _load_json(args.payload_json)
+    key = _digest(
+        {
+            "repository": args.repository,
+            "pr_number": args.pr_number,
+            "head_sha": args.head_sha,
+        }
+    )
+    with _locked_ledger(state) as (_, ledger):
+        existing = ledger["review_requests"].get(key)
+        if existing:
+            if existing["payload_digest"] != _digest(payload):
+                raise ValueError("review request identity was reused with different payload")
+            return {"decision": "already_requested", "review_key": key, "review": existing}
+        review = {
+            "repository": args.repository,
+            "pr_number": args.pr_number,
+            "head_sha": args.head_sha,
+            "round": args.round,
+            "status": "awaiting_review",
+            "created_at": _utc_now(),
+            "payload_digest": _digest(payload),
+        }
+        ledger["review_requests"][key] = review
+        return {"decision": "review_requested", "review_key": key, "review": review}
+
+
+def record_review(args: argparse.Namespace) -> dict[str, Any]:
+    """Persist an immutable reviewer receipt for a previously requested head."""
+    _, state = _paths(args)
+    receipt = _load_json(args.receipt_json)
+    with _locked_ledger(state) as (_, ledger):
+        try:
+            review = ledger["review_requests"][args.review_key]
+        except KeyError as exc:
+            raise ValueError("unknown review request") from exc
+        if review["status"] == "reviewed":
+            if review["receipt_digest"] != _digest(receipt):
+                raise ValueError("review receipt conflicts with existing receipt")
+            return {"decision": "already_recorded", "review_key": args.review_key, "review": review}
+        if receipt.get("repository") != review["repository"]:
+            raise ValueError("review receipt repository does not match request")
+        if receipt.get("pr_number") != review["pr_number"]:
+            raise ValueError("review receipt PR number does not match request")
+        if receipt.get("head_sha") != review["head_sha"]:
+            raise ValueError("review receipt head SHA does not match request")
+        if receipt.get("round") != review["round"]:
+            raise ValueError("review receipt round does not match request")
+        if receipt.get("verdict") not in {"approved", "changes_requested", "escalated"}:
+            raise ValueError("review receipt has invalid verdict")
+        review["status"] = "reviewed"
+        review["recorded_at"] = _utc_now()
+        review["receipt_digest"] = _digest(receipt)
+        review["receipt"] = receipt
+        return {"decision": "review_recorded", "review_key": args.review_key, "review": review}
+
+
+def claim_review(args: argparse.Namespace) -> dict[str, Any]:
+    """Atomically lease the next pending review handoff to one dispatcher."""
+    _, state = _paths(args)
+    with _locked_ledger(state) as (_, ledger):
+        candidates = [
+            (key, review)
+            for key, review in ledger["review_requests"].items()
+            if review["status"] == "awaiting_review"
+        ]
+        if args.review_key:
+            candidates = [item for item in candidates if item[0] == args.review_key]
+        if not candidates:
+            return {"decision": "none_pending"}
+        key, review = min(candidates, key=lambda item: item[1]["created_at"])
+        review["status"] = "dispatched"
+        review["dispatched_at"] = _utc_now()
+        review["dispatcher"] = args.dispatcher
+        return {"decision": "claimed", "review_key": key, "review": review}
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root")
@@ -290,6 +372,21 @@ def _parser() -> argparse.ArgumentParser:
     )
     finish_parser.add_argument("--evidence-json", required=True)
     finish_parser.set_defaults(handler=finish)
+    request_review_parser = commands.add_parser("request-review")
+    request_review_parser.add_argument("--repository", required=True)
+    request_review_parser.add_argument("--pr-number", type=int, required=True)
+    request_review_parser.add_argument("--head-sha", required=True)
+    request_review_parser.add_argument("--round", type=int, default=1)
+    request_review_parser.add_argument("--payload-json", required=True)
+    request_review_parser.set_defaults(handler=request_review)
+    record_review_parser = commands.add_parser("record-review")
+    record_review_parser.add_argument("--review-key", required=True)
+    record_review_parser.add_argument("--receipt-json", required=True)
+    record_review_parser.set_defaults(handler=record_review)
+    claim_review_parser = commands.add_parser("claim-review")
+    claim_review_parser.add_argument("--dispatcher", required=True)
+    claim_review_parser.add_argument("--review-key")
+    claim_review_parser.set_defaults(handler=claim_review)
     return parser
 
 

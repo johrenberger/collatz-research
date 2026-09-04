@@ -52,7 +52,8 @@ Configure both paths immediately after installation and before considering
           "maxToolCalls": 20,
           "maxSeconds": 900,
           "enforcementMode": "observe",
-          "receiptToolNames": []
+          "receiptToolNames": [],
+          "reviewDispatcherCommand": "/absolute/path/to/collatz-review-dispatcher"
         }
       }
     }
@@ -79,6 +80,26 @@ openclaw plugins doctor
 `agent_end` is an observation hook. If an embedded non-Codex harness does not
 emit it, the retained turn remains resumable and `resume` is the safe recovery
 path; the plugin never guesses completion after an aborted provider call.
+
+## Internal Codex PR review dispatch
+
+After a successful pull-request create or update tool call, the plugin writes
+an idempotent review handoff keyed by repository, PR number, and full head SHA.
+If `reviewDispatcherCommand` is configured, it runs that trusted host command
+after the handoff is durable. The command receives no untrusted command-line
+arguments and must:
+
+1. call `agent_lifecycle.py ... claim-review --dispatcher terra-reviewer`;
+2. when the result is `claimed`, launch an isolated
+   `openai/gpt-5.6-terra` reviewer with the returned PR/head/round;
+3. require the reviewer to return structured JSON containing repository, PR
+   number, head SHA, round, model, verdict, findings, and review URL; and
+4. call `record-review --review-key <key> --receipt-json <json>`.
+
+The reviewer may read and post a review only. It may not edit source, push,
+resolve threads, or merge. A failed dispatcher leaves a durable `awaiting_review`
+record for safe retry; a claimed record must be explicitly recovered by the
+host supervisor if its reviewer process dies before recording a receipt.
 
 The plugin obtains its resolved configuration from the typed hook event context.
 After changing a plugin configuration value, restart Gateway before testing a
