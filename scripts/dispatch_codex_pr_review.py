@@ -63,8 +63,19 @@ def main() -> int:
     args = parser.parse_args()
 
     lifecycle = Path(args.repo_path) / "scripts" / "agent_lifecycle.py"
-    base = [args.python_command, str(lifecycle), "--repo-path", args.repo_path, "--state-dir", args.state_dir]
-    claimed = _run_json(base + ["claim-review", "--dispatcher", args.dispatcher] + (["--review-key", args.review_key] if args.review_key else []))
+    base = [
+        args.python_command,
+        str(lifecycle),
+        "--repo-path",
+        args.repo_path,
+        "--state-dir",
+        args.state_dir,
+    ]
+    claimed = _run_json(
+        base
+        + ["claim-review", "--dispatcher", args.dispatcher]
+        + (["--review-key", args.review_key] if args.review_key else [])
+    )
     if claimed["decision"] == "none_pending":
         return 0
     if claimed["decision"] != "claimed":
@@ -74,8 +85,17 @@ def main() -> int:
     review = claimed["review"]
     agent = subprocess.run(
         [
-            "openclaw", "agent", "exec", "--json", "--cwd", args.repo_path,
-            "--model", "openai/gpt-5.6-terra", "--timeout", "600", _prompt(review_key, review),
+            "openclaw",
+            "agent",
+            "exec",
+            "--json",
+            "--cwd",
+            args.repo_path,
+            "--model",
+            "openai/gpt-5.6-terra",
+            "--timeout",
+            "600",
+            _prompt(review_key, review),
         ],
         capture_output=True,
         text=True,
@@ -88,7 +108,9 @@ def main() -> int:
     if not isinstance(raw, str):
         raise RuntimeError("Terra reviewer returned no text receipt")
     receipt = json.loads(raw)
-    _run_json(base + ["record-review", "--review-key", review_key, "--receipt-json", json.dumps(receipt)])
+    _run_json(
+        base + ["record-review", "--review-key", review_key, "--receipt-json", json.dumps(receipt)]
+    )
     return 0
 
 
@@ -97,4 +119,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except (OSError, RuntimeError, json.JSONDecodeError, KeyError, TypeError) as exc:
         print(f"codex PR review dispatch failed: {exc}", file=sys.stderr)
-        raise SystemExit(2)
+        raise SystemExit(2) from exc

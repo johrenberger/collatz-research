@@ -336,14 +336,17 @@ def test_review_receipt_must_match_requested_pr_head_and_is_immutable(project: P
         json.dumps(receipt),
     )
     assert recorded["decision"] == "review_recorded"
-    assert _run(
-        project,
-        "record-review",
-        "--review-key",
-        key,
-        "--receipt-json",
-        json.dumps(receipt),
-    )["decision"] == "already_recorded"
+    assert (
+        _run(
+            project,
+            "record-review",
+            "--review-key",
+            key,
+            "--receipt-json",
+            json.dumps(receipt),
+        )["decision"]
+        == "already_recorded"
+    )
     receipt["verdict"] = "changes_requested"
     conflict = _run(
         project,
@@ -373,4 +376,7 @@ def test_only_one_dispatcher_can_claim_a_pending_review(project: Path) -> None:
     claimed = _run(project, "claim-review", "--dispatcher", "terra-worker")
     assert claimed["decision"] == "claimed"
     assert claimed["review_key"] == requested["review_key"]
-    assert _run(project, "claim-review", "--dispatcher", "another-worker")["decision"] == "none_pending"
+    assert (
+        _run(project, "claim-review", "--dispatcher", "another-worker")["decision"]
+        == "none_pending"
+    )

@@ -38,7 +38,9 @@ def test_successful_pr_create_or_update_emits_a_durable_review_handoff() -> None
     assert "reviewRequestFrom" in source
     assert "reviewRequests.set" in source
     assert "dispatchReview(config)" in source
-    assert "reviewDispatcherCommand" in (PLUGIN / "openclaw.plugin.json").read_text(encoding="utf-8")
+    assert "reviewDispatcherCommand" in (PLUGIN / "openclaw.plugin.json").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_review_dispatcher_claims_then_records_a_structured_terra_receipt() -> None:
