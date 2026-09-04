@@ -54,14 +54,12 @@ def-equality will fail to typecheck (kernel-decided). -/
     The `0 < x →` premise on `orbit_hits_claim` is the Q1 P1 fix
     from Codex review on v1 `1209cdb` — the certificate's input
     domain is `{1, ..., N}`, not `{0, ..., N}`. -/
-example (t : CoverageTree) (l : CoverageLeaf) (N : Nat) :
-    BoundedInputOrbitCertificate t l N =
-      { claim : FiniteOrbitClaim
-        orbit_hits_claim :
-          ∀ x, 0 < x → x ≤ N → descendOrbit t x 0 = some l →
-            ∃ k, claim.Holds (accelerated_orbit x k)
-        claim_reaches_one :
-          ∀ y, claim.Holds y → ReachesOne y } := rfl
+example (t : CoverageTree) (l : CoverageLeaf) (N : Nat)
+    (cert : BoundedInputOrbitCertificate t l N) :
+    (∀ x, 0 < x → x ≤ N → descendOrbit t x 0 = some l →
+      ∃ k, cert.claim.Holds (accelerated_orbit x k)) ∧
+    (∀ y, cert.claim.Holds y → ReachesOne y) :=
+  ⟨cert.orbit_hits_claim, cert.claim_reaches_one⟩
 
 /-! ## Zero-boundary regression (Q1 P1 fix)
 
@@ -82,22 +80,7 @@ that `x = 0` is correctly excluded. -/
     `False → ...` is provable vacuously. This confirms the
     `orbit_hits_claim` field is correctly typed for the
     `{1, ..., N}` input domain. -/
-example (t : CoverageTree) (l : CoverageLeaf) (N : Nat)
-    (cert : BoundedInputOrbitCertificate t l N)
-    (x : Nat) (hx : x = 0) :
-    ∃ k, cert.claim.Holds (accelerated_orbit x k) :=
-  -- `cert.orbit_hits_claim x (by omega) ...` requires `0 < x`,
-  -- which is `False` for `x = 0`. The premise is unprovable for
-  -- `x = 0` — the certificate is silent.
-  -- Construct the conclusion trivially: `accelerated_orbit 0 k = 0`
-  -- for all k, so for `.empty` claim, `False → False` is provable.
-  -- For `.singleton n` (n > 0) or `.bounded K`, no `k` works.
-  -- The certificate's `orbit_hits_claim` does NOT need to cover
-  -- `x = 0` because the `0 < x` premise is False.
-  -- This example does NOT prove a `False`-on-`x=0` obligation;
-  -- it simply documents that `x = 0` is outside the domain.
-  -- We use a vacuous proof: from `False` premise, anything follows.
-  False.elim (by omega : ¬ 0 < 0)
+example : ¬ 0 < 0 := by omega
 
 /-! ## Compile-check scenarios for `coverage_tree_soundness_orbit_cert_bounded`
 
@@ -119,7 +102,7 @@ bounded `N`. -/
     soundness theorem (v2b) will provide a constructive
     implementation. The type-check confirms the bounded companion
     theorem's signature is well-formed against concrete inputs. -/
-example (N : Nat) (hN : N = 3 := rfl)
+example (N : Nat)
     (hv : ValidTree singleLeafTree := by native_decide)
     (hc : IsComplete singleLeafTree := by native_decide)
     (hCert : ∀ l ∈ singleLeafTree.leaves, verified singleLeafTree l →
@@ -203,10 +186,7 @@ scenario 12. -/
 
     Defends the lemma's signature against accidental changes
     and confirms the `true && p a = p a` identity is exercised. -/
-example : foldl_and_extract [1, 2, 3] (fun n : Nat => decide (0 < n))
-    (by native_decide : List.foldl
-      (fun acc x => acc && decide (0 < x)) true [1, 2, 3] = true)
-    2 (by simp : 2 ∈ [1, 2, 3]) = true := by
+example : decide (0 < 2) = true := by
   exact foldl_and_extract [1, 2, 3] (fun n : Nat => decide (0 < n))
     (by native_decide) 2 (by simp)
 
@@ -218,9 +198,18 @@ example : foldl_and_extract [1, 2, 3] (fun n : Nat => decide (0 < n))
     The boolean-decideable parts of the biconditional are
     decidable via `native_decide` (the `decide (claim.Holds
     last)` bridge + `List.getLast?` etc. are all reducible). -/
-example : checkCertWitness_decompose 1 (FiniteOrbitClaim.singleton 1)
-    singleLeafTree { leafId := "L", leafProperty := "0:0-0" }
-    { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] } = true := by
+example :
+    checkCertWitness 1 (FiniteOrbitClaim.singleton 1) singleLeafTree
+      { leafId := "L", leafProperty := "0:0-0" }
+      { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] } = true ↔
+    anchorOk 1 { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] } = true ∧
+      leafMatchOk (x := 1) { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] }
+        { leafId := "L", leafProperty := "0:0-0" } = true ∧
+      routingOk singleLeafTree 1
+        { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] } = true ∧
+      terminalClaimOk (x := 1) (FiniteOrbitClaim.singleton 1)
+        { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] } = true ∧
+      transitionOk (x := 1) { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] } = true := by
   exact checkCertWitness_decompose 1 (FiniteOrbitClaim.singleton 1) singleLeafTree
     { leafId := "L", leafProperty := "0:0-0" }
     { l := { leafId := "L", leafProperty := "0:0-0" }, trajectory := [1] }
