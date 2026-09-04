@@ -59,7 +59,7 @@ Replace a command only by updating the backlog and CI in the same change.
 5. Run `make ci` and capture the output.
 6. Write the evidence note (toolchain, seed/input digest, commands,
    result) and attach it to the PR.
-7. Run the independent Codex PR review gate in
+7. Emit the internal Codex-review handoff and run the independent Codex PR review gate in
    `docs/codex-pr-review-gate.md`. Record the reviewed full head SHA, review
    URL, round, verdict, and disposition of every P0/P1 finding in the PR.
    A new push requires a new review of the new head before merge.

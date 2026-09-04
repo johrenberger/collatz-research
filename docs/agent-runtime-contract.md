@@ -118,3 +118,10 @@ fix or maintainer-approved deferral with a follow-up. After three remediation
 rounds, or on an architecture/mathematical decision, stop editing and escalate
 with the complete review record. Codex is independent review, never automatic
 merge authority.
+
+The implementation session sends an internal handoff after a successful PR
+create or update receipt. Its idempotency key includes repository, PR number,
+full head SHA, and review round. The isolated Codex reviewer returns a durable
+review receipt and posts using the connected maintainer GitHub identity; the
+review body records the reviewer model and SHA so identity and provenance stay
+separate.
