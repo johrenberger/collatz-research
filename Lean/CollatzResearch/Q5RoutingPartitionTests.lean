@@ -46,4 +46,13 @@ example : ReachesOne 1 := by
     subst y
     exact ⟨0, by simp⟩
 
+/-- Global acceptance composes with an explicit registry-wide reachability
+assumption; this remains conditional and does not assert convergence of an
+untrusted claim registry. -/
+example (hClaimReachesOne : ∀ entry ∈ routingPartitionRegistry, ∀ y,
+    entry.claim.Holds y → ReachesOne y) : ReachesOne 1 :=
+  routing_partition_certificate_slot_reaches_one routingPartitionTwoLeafTree
+    twoLeafRoutingPartition (by native_decide) hClaimReachesOne
+    ⟨0, by decide⟩
+
 end CollatzResearch
