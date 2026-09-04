@@ -606,8 +606,7 @@ theorem terminal_claim_transport (x : Nat) (w : CertWitness x)
     (hAnchor : anchorOk x w = true)
     (hTrans : ∀ i, i + 1 < (w.trajectory).length →
                  (w.trajectory)[i + 1]! = acceleratedStep ((w.trajectory)[i]!))
-    (hLast : claim.Holds ((w.trajectory)[(w.trajectory).length - 1]'
-             (Nat.pred_lt length_pos)))
+    (hLast : claim.Holds ((w.trajectory)[(w.trajectory).length - 1]!))
     : claim.Holds (accelerated_orbit x ((w.trajectory).length - 1)) := by
   -- Establish `length > 0` from `anchorOk = true` (non-empty).
   have hne : 0 < (w.trajectory).length := by
@@ -618,13 +617,12 @@ theorem terminal_claim_transport (x : Nat) (w : CertWitness x)
       simp [htr] at hAnchor
     | cons hd tl =>
       -- `(hd :: tl).length = tl.length + 1 > 0`.
-      rw [htr, List.length]
-      exact Nat.succ_pos _
+      simp
   -- `length - 1 < length` from `length > 0`.
   have hbound : (w.trajectory).length - 1 < (w.trajectory).length :=
-      Nat.pred_lt hne
+      by omega
   -- Apply Lemma 3 (restructured) with `k = length - 1`.
-  rw [trajectory_index x w ((w.trajectory).length - 1) hbound hAnchor hTrans]
+  rw [trajectory_index x w ((w.trajectory).length - 1) hbound hAnchor hTrans] at hLast
   -- `hLast : claim.Holds (accelerated_orbit x (length - 1))` after rewrite.
   exact hLast
 
@@ -696,5 +694,7 @@ must either:
 
 The PR's "soundness theorem" claim is withdrawn. PR #64 remains
 DRAFT until a future PR re-attempts Lemma 5 with closed proofs.
+
+-/
 
 end CollatzResearch
