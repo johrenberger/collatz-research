@@ -252,4 +252,84 @@ example : (decodeBoundedInputCertificateData
     : Option BoundedInputCertificateData) = none := by
   native_decide
 
+/-! ## Q5-RP-3 — global routing-partition checker regressions
+
+These executable scenarios use a two-leaf tree so acceptance cannot be
+explained by the legacy fixed-leaf checker.  They cover registry lookup,
+duplicate-registry rejection, canonical multi-leaf acceptance, and rejection
+of a witness whose declared leaf disagrees with recomputed orbit routing. -/
+
+def routingPartitionTwoLeafTree : CoverageTree :=
+  { root := .internal 2
+      [(0, .leaf { leafId := "even", leafProperty := "2:0-0" }),
+       (1, .leaf { leafId := "odd", leafProperty := "2:1-1" })],
+    leaves := [{ leafId := "even", leafProperty := "2:0-0" },
+      { leafId := "odd", leafProperty := "2:1-1" }],
+    maxDepth := 1 }
+
+def routingPartitionRegistry : List LeafClaimWire :=
+  [{ leaf := { leafId := "even", leafProperty := "2:0-0" },
+     claim := FiniteOrbitClaim.singleton 1 },
+   { leaf := { leafId := "odd", leafProperty := "2:1-1" },
+     claim := FiniteOrbitClaim.singleton 1 }]
+
+/-- A checked two-slot partition: input 1 routes to `odd`, input 2 routes to
+    `even`, and both verified trajectories terminate at 1. -/
+def twoLeafRoutingPartition : RoutingPartitionCertificateData :=
+  { wire :=
+      { N := 2,
+        rawWitnesses :=
+          [{ leaf := { leafId := "odd", leafProperty := "2:1-1" },
+             trajectory := [1] },
+           { leaf := { leafId := "even", leafProperty := "2:0-0" },
+             trajectory := [2, 7, 11, 17, 13, 5, 1] }],
+        claimRegistry := routingPartitionRegistry },
+    witnesses_length_ok := rfl,
+    registry_unique := by native_decide,
+    witness_claim_registered := by
+      intro w hw
+      simp only [List.mem_cons] at hw
+      rcases hw with h | h
+      · subst w
+        refine ⟨routingPartitionRegistry.get ⟨1, by decide⟩, ?_, ?_⟩
+        · simp [routingPartitionRegistry]
+        · native_decide
+      · rcases h with h | h
+        · subst w
+          refine ⟨routingPartitionRegistry.get ⟨0, by decide⟩, ?_, ?_⟩
+          · simp [routingPartitionRegistry]
+          · native_decide
+        · simp at h }
+
+/-- Lookup is total only for registered leaves; a missing registry entry is
+    reported as `none` by the executable lookup. -/
+example : findRoutingLeafClaim []
+    { leafId := "odd", leafProperty := "2:1-1" } = none := by
+  native_decide
+
+/-- The checked-format uniqueness predicate rejects duplicate entries for the
+    same fieldwise-identical leaf. -/
+def duplicateRoutingPartitionRegistry : List LeafClaimWire :=
+  [{ leaf := { leafId := "odd", leafProperty := "2:1-1" },
+     claim := FiniteOrbitClaim.singleton 1 },
+   { leaf := { leafId := "odd", leafProperty := "2:1-1" },
+     claim := FiniteOrbitClaim.singleton 1 }]
+
+example : ¬ duplicateRoutingPartitionRegistry.Pairwise
+    (fun a b => sameCoverageLeaf a.leaf b.leaf = false) := by
+  native_decide
+
+/-- Positive multi-leaf routing-partition regression. -/
+example : checkRoutingPartitionCertificate routingPartitionTwoLeafTree
+    twoLeafRoutingPartition = true := by
+  native_decide
+
+/-- A witness can name a registered leaf and still be rejected when it is not
+    the leaf recomputed by `descendOrbit` for its canonical input. -/
+example : ¬ checkRoutingPartitionWitness routingPartitionTwoLeafTree 1
+    routingPartitionRegistry
+    { leaf := { leafId := "even", leafProperty := "2:0-0" },
+      trajectory := [1] } = true := by
+  native_decide
+
 end CollatzResearch

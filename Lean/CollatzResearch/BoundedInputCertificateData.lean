@@ -310,4 +310,60 @@ def RoutingPartitionCertificateData.routingWitness
         exact i.isLt⟩,
     rfl⟩
 
+/-! ## Global routing-partition checker (Q5-RP-3)
+
+The checker scans the leaf-claim registry using the local fieldwise leaf
+comparison.  This makes registry resolution executable without adding a
+global equality instance for `CoverageLeaf`.  It verifies each canonical slot
+independently; no reachability or checker-soundness theorem is claimed here.
+-/
+
+/-- Find the registered finite-orbit claim for a leaf using the local
+    fieldwise Boolean leaf comparator. -/
+def findRoutingLeafClaim (registry : List LeafClaimWire)
+    (leaf : CoverageLeaf) : Option FiniteOrbitClaim :=
+  match registry with
+  | [] => none
+  | entry :: rest =>
+    if sameCoverageLeaf entry.leaf leaf = true then
+      some entry.claim
+    else
+      findRoutingLeafClaim rest leaf
+
+/-- Boolean check that orbit-aware descent for `x` reaches `leaf`. -/
+def routesToRoutingLeaf (t : CoverageTree) (x : Nat)
+    (leaf : CoverageLeaf) : Bool :=
+  match descendOrbit t x 0 with
+  | some routed => sameCoverageLeaf routed leaf
+  | none => false
+
+/-- Check one routing-partition witness at its canonical input.  Registry
+    lookup is intentionally repeated here rather than trusted from the
+    checked-bundle witness-registration fact. -/
+def checkRoutingPartitionWitness (t : CoverageTree) (x : Nat)
+    (registry : List LeafClaimWire) (w : RoutingWitnessWire) : Bool :=
+  match findRoutingLeafClaim registry w.leaf with
+  | none => false
+  | some claim =>
+    match w.trajectory with
+    | [] => false
+    | hd :: _ =>
+      hd == x &&
+      routesToRoutingLeaf t x w.leaf &&
+      (match w.trajectory.getLast? with
+       | some last => decide (claim.Holds last)
+       | none => false) &&
+      List.foldl (fun acc pair => acc && pair.snd == acceleratedStep pair.fst)
+        true (List.zip w.trajectory w.trajectory.tail)
+
+/-- Global Boolean checker for a bounded input-to-leaf routing partition.
+    Slot `i` is checked only as canonical input `i.val + 1`; all leaf routing
+    and claim selection is recomputed from the supplied tree and registry. -/
+def checkRoutingPartitionCertificate (t : CoverageTree)
+    (d : RoutingPartitionCertificateData) : Bool :=
+  List.foldl (fun acc i =>
+    acc && checkRoutingPartitionWitness t (i.val + 1)
+      d.wire.claimRegistry (d.routingWitness i).val)
+    true (List.finRange d.wire.N)
+
 end CollatzResearch
