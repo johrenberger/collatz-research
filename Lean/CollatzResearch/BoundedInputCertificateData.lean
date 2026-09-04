@@ -234,4 +234,136 @@ def checkBoundedCertificate
     acc ∧ checkCertWitness x d.wire.claim t l w)
     true (List.finRange d.wire.N)
 
+/-! ## Global routing-partition format (Q5-RP-2)
+
+The original bounded-input format above is intentionally a single-leaf
+preparatory interface: every canonical witness is checked against one fixed
+leaf and one fixed claim.  A coverage tree can route different bounded inputs
+to different leaves, so the routing-partition format represents that global
+case without changing the legacy format or reintroducing its removed
+soundness theorem.
+
+This packet defines data only.  In particular, it does not define a parser,
+registry lookup algorithm, Boolean checker, or soundness theorem.  The wire
+payload remains untrusted; the checked bundle records only structural facts
+which a future decoder must establish by explicit rejection checks. -/
+
+/-- Per-canonical-input wire witness for a routing partition.  The input is
+    deliberately absent: slot `i` in the enclosing list represents
+    `i.val + 1`. -/
+structure RoutingWitnessWire where
+  leaf : CoverageLeaf
+  trajectory : List Nat
+
+/-- A registry entry associating one coverage leaf with its finite-orbit
+    claim.  Equality is deliberately checked with `sameCoverageLeaf`, rather
+    than by adding a global `BEq CoverageLeaf` instance. -/
+structure LeafClaimWire where
+  leaf : CoverageLeaf
+  claim : FiniteOrbitClaim
+
+/-- Untrusted global routing-partition payload.  `rawWitnesses` has one slot
+    per canonical input, while `claimRegistry` can contain entries for leaves
+    that receive no input below the current bound. -/
+structure RoutingPartitionCertificateWire where
+  N : Nat
+  rawWitnesses : List RoutingWitnessWire
+  claimRegistry : List LeafClaimWire
+
+/-- Checked structural view of a global routing-partition payload.
+
+    `witnesses_length_ok` establishes the canonical domain `{1, ..., N}`.
+    `registry_unique` rules out two registry entries for the same leaf using
+    the local fieldwise Boolean comparator.  `witness_claim_registered`
+    ensures each supplied witness leaf has a registry entry.  These are
+    format invariants only: a future checker will recompute routing and all
+    trajectory conditions. -/
+structure RoutingPartitionCertificateData where
+  wire : RoutingPartitionCertificateWire
+  witnesses_length_ok : wire.rawWitnesses.length = wire.N
+  registry_unique : wire.claimRegistry.Pairwise
+    (fun a b => sameCoverageLeaf a.leaf b.leaf = false)
+  witness_claim_registered : ∀ w ∈ wire.rawWitnesses,
+    ∃ entry ∈ wire.claimRegistry, sameCoverageLeaf w.leaf entry.leaf = true
+
+/-- Canonical checked view of the witness occupying slot `i`.  Its subtype
+    equation ties the value to the list position, preserving the type-level
+    statement that this witness represents input `i.val + 1` without trusting
+    an input field supplied on the wire. -/
+abbrev RoutingWitness (d : RoutingPartitionCertificateData)
+    (i : Fin d.wire.N) : Type :=
+  { w : RoutingWitnessWire //
+    w = d.wire.rawWitnesses.get
+      ⟨i.val, by
+        rw [d.witnesses_length_ok]
+        exact i.isLt⟩ }
+
+/-- Reconstruct the checked witness at canonical slot `i` from the wire list.
+    This is the routing-partition analogue of `certWitness`; it performs no
+    routing, registry, terminal, or transition verification. -/
+def RoutingPartitionCertificateData.routingWitness
+    (d : RoutingPartitionCertificateData) (i : Fin d.wire.N) :
+    RoutingWitness d i :=
+  ⟨d.wire.rawWitnesses.get
+      ⟨i.val, by
+        rw [d.witnesses_length_ok]
+        exact i.isLt⟩,
+    rfl⟩
+
+/-! ## Global routing-partition checker (Q5-RP-3)
+
+The checker scans the leaf-claim registry using the local fieldwise leaf
+comparison.  This makes registry resolution executable without adding a
+global equality instance for `CoverageLeaf`.  It verifies each canonical slot
+independently; no reachability or checker-soundness theorem is claimed here.
+-/
+
+/-- Find the registered finite-orbit claim for a leaf using the local
+    fieldwise Boolean leaf comparator. -/
+def findRoutingLeafClaim (registry : List LeafClaimWire)
+    (leaf : CoverageLeaf) : Option FiniteOrbitClaim :=
+  match registry with
+  | [] => none
+  | entry :: rest =>
+    if sameCoverageLeaf entry.leaf leaf = true then
+      some entry.claim
+    else
+      findRoutingLeafClaim rest leaf
+
+/-- Boolean check that orbit-aware descent for `x` reaches `leaf`. -/
+def routesToRoutingLeaf (t : CoverageTree) (x : Nat)
+    (leaf : CoverageLeaf) : Bool :=
+  match descendOrbit t x 0 with
+  | some routed => sameCoverageLeaf routed leaf
+  | none => false
+
+/-- Check one routing-partition witness at its canonical input.  Registry
+    lookup is intentionally repeated here rather than trusted from the
+    checked-bundle witness-registration fact. -/
+def checkRoutingPartitionWitness (t : CoverageTree) (x : Nat)
+    (registry : List LeafClaimWire) (w : RoutingWitnessWire) : Bool :=
+  match findRoutingLeafClaim registry w.leaf with
+  | none => false
+  | some claim =>
+    match w.trajectory with
+    | [] => false
+    | hd :: _ =>
+      hd == x &&
+      routesToRoutingLeaf t x w.leaf &&
+      (match w.trajectory.getLast? with
+       | some last => decide (claim.Holds last)
+       | none => false) &&
+      List.foldl (fun acc pair => acc && pair.snd == acceleratedStep pair.fst)
+        true (List.zip w.trajectory w.trajectory.tail)
+
+/-- Global Boolean checker for a bounded input-to-leaf routing partition.
+    Slot `i` is checked only as canonical input `i.val + 1`; all leaf routing
+    and claim selection is recomputed from the supplied tree and registry. -/
+def checkRoutingPartitionCertificate (t : CoverageTree)
+    (d : RoutingPartitionCertificateData) : Bool :=
+  List.foldl (fun acc i =>
+    acc && checkRoutingPartitionWitness t (i.val + 1)
+      d.wire.claimRegistry (d.routingWitness i).val)
+    true (List.finRange d.wire.N)
+
 end CollatzResearch
