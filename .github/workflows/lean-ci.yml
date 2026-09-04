@@ -41,6 +41,15 @@ jobs:
       - name: Build CoverageTree target
         run: lake build CollatzResearch.CoverageTree
 
+      # Q5's wire-to-checked foundation is imported by the integration
+      # layer. Build it directly so an elaboration failure cannot remain
+      # hidden until a downstream PR adds another target.
+      - name: Build bounded-input certificate foundation
+        run: lake build CollatzResearch.BoundedInputCertificateData
+
+      - name: Build bounded-input verifier tests
+        run: lake build CollatzResearch.Q5VerifierTests
+
       # A test-first orbit-routing module is permitted only within an
       # implementation PR. If it exists, it must elaborate at the PR head;
       # intentionally failing Lean source is never silently excluded from CI.

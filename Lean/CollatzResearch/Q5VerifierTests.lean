@@ -72,6 +72,14 @@ def singleLeafTree : CoverageTree :=
     leaves := [{ leafId := "L", leafProperty := "0:0-0" }],
     maxDepth := 1 }
 
+/-- Regression: the wire-to-checked conversion has an explicit indexed
+    `CertWitness` representation, rather than relying on an auto-implicit
+    unresolved identifier. -/
+example (x : Nat) (l : CoverageLeaf) (trajectory : List Nat) :
+    (CertWitnessWire.toCertWitness
+      ({ l := l, trajectory := trajectory } : CertWitnessWire) x).trajectory =
+        trajectory := rfl
+
 /-- Scenario A (positive — basic valid): N=1, claim `.singleton 1`,
     witness at list index 0 (canonical input `i.val + 1 = 1`) with
     trajectory `[1]`. Head matches `x = 1`; no steps to verify;

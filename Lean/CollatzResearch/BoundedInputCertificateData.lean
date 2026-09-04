@@ -102,6 +102,13 @@ structure CertWitnessWire where
   l : CoverageLeaf
   trajectory : List Nat
 
+/-- Checked per-input trajectory evidence. The index `x` is phantom in the
+    runtime payload, but records the canonical input at the type level once a
+    wire witness has been selected by list position. -/
+structure CertWitness (x : Nat) where
+  l : CoverageLeaf
+  trajectory : List Nat
+
 /-- Wire payload — IN-MEMORY model. NO proof fields. The canonical
     list-position interpretation:
       witness at list index `i` carries canonical input `i + 1`.
