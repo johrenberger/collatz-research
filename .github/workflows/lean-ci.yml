@@ -81,3 +81,19 @@ jobs:
           if [ -f Lean/CollatzResearch/Q5IntegrationTests.lean ]; then
             lake build CollatzResearch.Q5IntegrationTests
           fi
+
+      # Routing-partition work is a separate Q5 story.  Build both its theorem
+      # module and API-shape regressions directly whenever present so a new
+      # proof-bearing module cannot remain unelaborated behind the library's
+      # default targets.
+      - name: Build Q5 routing-partition target when present
+        run: |
+          if [ -f Lean/CollatzResearch/Q5RoutingPartition.lean ]; then
+            lake build CollatzResearch.Q5RoutingPartition
+          fi
+
+      - name: Build Q5 routing-partition tests when present
+        run: |
+          if [ -f Lean/CollatzResearch/Q5RoutingPartitionTests.lean ]; then
+            lake build CollatzResearch.Q5RoutingPartitionTests
+          fi
