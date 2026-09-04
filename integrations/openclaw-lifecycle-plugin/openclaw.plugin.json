@@ -55,6 +55,10 @@
         "uniqueItems": true,
         "default": [],
         "description": "Tool names whose calls create durable external-effect receipts."
+      },
+      "reviewDispatcherCommand": {
+        "type": "string",
+        "description": "Optional host command invoked after a durable PR review handoff is created. The command must claim and dispatch the handoff; it is not passed untrusted PR arguments."
       }
     }
   }

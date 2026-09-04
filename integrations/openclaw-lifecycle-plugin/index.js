@@ -12,6 +12,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 
 const turnIds = new Map();
 const operationKeys = new Map();
+const reviewRequests = new Map();
 
 function digest(value) {
   return createHash("sha256").update(value).digest("hex").slice(0, 24);
@@ -66,6 +67,36 @@ function enforce(config) {
 
 function report(scope, error) {
   console.warn(`[collatz-lifecycle] ${scope}: ${error instanceof Error ? error.message : String(error)}`);
+}
+
+function reviewRequestFrom(event) {
+  const params = event?.params ?? {};
+  const repository = params.repository ?? params.repo ?? params.ownerRepo;
+  const prNumber = params.pull_number ?? params.prNumber ?? params.number;
+  const headSha = params.head_sha ?? params.headSha ?? params.sha;
+  if (typeof repository !== "string" || !Number.isInteger(prNumber) || typeof headSha !== "string") {
+    return undefined;
+  }
+  return { repository, prNumber, headSha };
+}
+
+function isPullRequestMutation(event) {
+  const name = String(event?.toolName ?? "").toLowerCase();
+  return name.includes("pull_request") && /(create|update|edit)/.test(name);
+}
+
+function dispatchReview(config) {
+  const command = config?.reviewDispatcherCommand;
+  if (!command) return;
+  const result = spawnSync(command, [], {
+    encoding: "utf8",
+    timeout: 10_000,
+    shell: true,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(result.stderr.trim() || "review dispatcher failed");
+  }
 }
 
 export default definePluginEntry({
@@ -142,6 +173,24 @@ export default definePluginEntry({
           "--status", event.isError ? "failed" : "succeeded",
           "--result-json", JSON.stringify({ is_error: Boolean(event.isError) }),
         ]);
+        if (!event.isError && isPullRequestMutation(event)) {
+          const request = reviewRequestFrom(event);
+          if (request) {
+            const handoff = lifecycle(config, [
+              "request-review",
+              "--repository", request.repository,
+              "--pr-number", String(request.prNumber),
+              "--head-sha", request.headSha,
+              "--payload-json", JSON.stringify({
+                source_turn: run,
+                source_tool: event.toolName,
+                tool_call_id: event.toolCallId ?? null,
+              }),
+            ]);
+            reviewRequests.set(`${request.repository}:${request.prNumber}:${request.headSha}`, handoff.review_key);
+            dispatchReview(config);
+          }
+        }
       } catch (error) {
         // A terminal hook observes an operation that has already happened; it
         // cannot enforce admission, so never propagate controller failures.
