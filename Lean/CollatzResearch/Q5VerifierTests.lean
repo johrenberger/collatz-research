@@ -80,6 +80,19 @@ example (x : Nat) (l : CoverageLeaf) (trajectory : List Nat) :
       ({ l := l, trajectory := trajectory } : CertWitnessWire) x).trajectory =
         trajectory := rfl
 
+/-- Regression: the Boolean checker rejects a witness whose declared leaf
+    differs from the requested certificate leaf. -/
+example : ¬ checkBoundedCertificate singleLeafTree
+    { leafId := "other", leafProperty := "0:0-0" }
+    (⟨{ N := 1,
+         rawWitnesses :=
+           [{ l := { leafId := "L", leafProperty := "0:0-0" },
+              trajectory := [1] }],
+         claim := FiniteOrbitClaim.singleton 1 },
+      rfl⟩ : BoundedInputCertificateData)
+    = true := by
+  native_decide
+
 /-- Scenario A (positive — basic valid): N=1, claim `.singleton 1`,
     witness at list index 0 (canonical input `i.val + 1 = 1`) with
     trajectory `[1]`. Head matches `x = 1`; no steps to verify;

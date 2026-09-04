@@ -180,6 +180,18 @@ def BoundedInputCertificateData.certWitness (d : BoundedInputCertificateData) :
     exact i.isLt
   (d.wire.rawWitnesses.get ⟨i.val, h_pos⟩).toCertWitness (i.val + 1)
 
+/-- Decidable fieldwise equality for coverage leaves, kept local to the
+    executable certificate checker so it does not require a global equality
+    instance for `CoverageLeaf`. -/
+def sameCoverageLeaf (a b : CoverageLeaf) : Bool :=
+  a.leafId == b.leafId && a.leafProperty == b.leafProperty
+
+/-- Boolean check that orbit routing reached the witness's claimed leaf. -/
+def routesToWitnessLeaf (t : CoverageTree) (x : Nat) (w : CertWitness x) : Bool :=
+  match descendOrbit t x 0 with
+  | some routed => sameCoverageLeaf routed w.l
+  | none => false
+
 /-- Verify a single witness: (1) trajectory non-empty with head
     matching `x` (the type parameter, supplied by `certWitness`
     as `i.val + 1`), (2) leaf `l` matches the witness's leaf,
@@ -193,14 +205,14 @@ def checkCertWitness (x : Nat) (claim : FiniteOrbitClaim)
   match w.trajectory with
   | [] => false
   | hd :: _ =>
-    hd = x ∧
-    w.l = l ∧
-    descendOrbit t x 0 = some w.l ∧
+    hd == x &&
+    sameCoverageLeaf w.l l &&
+    routesToWitnessLeaf t x w &&
     (match w.trajectory.getLast? with
      | some last => decide (claim.Holds last)
-     | none => false) ∧
-    List.foldl (fun acc pair => acc ∧ pair.snd = acceleratedStep pair.fst)
-              true (List.zip w.trajectory w.trajectory.tail)
+     | none => false) &&
+    List.foldl (fun acc pair => acc && pair.snd == acceleratedStep pair.fst)
+      true (List.zip w.trajectory w.trajectory.tail)
 
 /-- Q5 PR #62 v4 — top-level `Bool` checker for the parsed
     `BoundedInputCertificateData`. Returns `true` iff for each
