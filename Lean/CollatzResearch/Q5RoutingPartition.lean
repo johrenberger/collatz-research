@@ -8,7 +8,7 @@ It deliberately does not compose a claim with `ReachesOne`, and does not
 construct a legacy single-leaf certificate.  Those are Q5-RP-5 work.
 -/
 
-import CollatzResearch.BoundedInputCertificateData
+import CollatzResearch.Q5Integration
 
 namespace CollatzResearch
 
@@ -95,5 +95,26 @@ theorem checkRoutingPartitionWitness_accepts
         have hhead' : hd = x := by simpa using hhead
         exact ⟨hd, rest, rfl, hhead', hroutes, hterminal,
           htransitions⟩
+
+/-! ## Conditional reachability composition -/
+
+/-- A checked trajectory reaches one when its terminal claim is explicitly
+known to reach one.  The transition relation and claim-reachability premise
+remain explicit: this theorem performs only the kernel-checked composition,
+and does not construct a legacy single-leaf certificate. -/
+theorem routing_trajectory_reaches_one
+    (x : Nat) (w : CertWitness x) (claim : FiniteOrbitClaim)
+    (hAnchor : anchorOk x w = true)
+    (hTrans : ∀ i, i + 1 < w.trajectory.length →
+      w.trajectory[i + 1]! = acceleratedStep w.trajectory[i]!)
+    (hLast : claim.Holds (w.trajectory[w.trajectory.length - 1]!))
+    (hClaimReachesOne : ∀ y, claim.Holds y → ReachesOne y) :
+    ReachesOne x := by
+  have hOrbitClaim :
+      claim.Holds (accelerated_orbit x (w.trajectory.length - 1)) :=
+    terminal_claim_transport x w claim hAnchor hTrans hLast
+  exact orbit_predecessor_reaches_one x (w.trajectory.length - 1)
+    (accelerated_orbit x (w.trajectory.length - 1)) rfl
+    (hClaimReachesOne _ hOrbitClaim)
 
 end CollatzResearch
