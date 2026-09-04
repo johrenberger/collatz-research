@@ -203,7 +203,7 @@ theorem coverage_tree_soundness_orbit_cert_bounded
          ReachesOne x := by
   obtain ⟨l, hl, hver, hdesc, hroute⟩ := descend_orbit_complete t hv hic x hx
   obtain cert := hCert l hl hver
-  obtain ⟨k, hk⟩ := cert.orbit_hits_claim x hN hdesc
+  obtain ⟨k, hk⟩ := cert.orbit_hits_claim x hx hN hdesc
   exact ⟨l, hl, hver, hdesc,
     orbit_predecessor_reaches_one x k (accelerated_orbit x k) rfl
       (cert.claim_reaches_one (accelerated_orbit x k) hk)⟩
@@ -235,7 +235,7 @@ is the canonical per-leaf availability pattern. The suffix
     This is NOT a constructive availability theorem — see the v2b
     `per_leaf_available_bounded_of_check` (deferred) for the
     constructive form. -/
-theorem per_leaf_available_bounded_of_hCert
+def per_leaf_available_bounded_of_hCert
     (t : CoverageTree)
     (N : Nat)
     (hCert : ∀ l ∈ t.leaves, verified t l →
@@ -335,12 +335,12 @@ def anchorOk (x : Nat) (w : CertWitness x) : Bool :=
 /-- Leaf match check (witness predicate): the witness's leaf
     `w.l` matches the expected leaf `l`. -/
 def leafMatchOk (w : CertWitness x) (l : CoverageLeaf) : Bool :=
-  w.l == l
+  sameCoverageLeaf w.l l
 
 /-- Routing check (witness predicate): `descendOrbit t x 0` returns
     `some w.l` (the witness's leaf). -/
 def routingOk (t : CoverageTree) (x : Nat) (w : CertWitness x) : Bool :=
-  descendOrbit t x 0 == some w.l
+  routesToWitnessLeaf t x w
 
 /-- Terminal-claim check (witness predicate): the last trajectory
     value satisfies `claim.Holds`. Returns `false` on empty
