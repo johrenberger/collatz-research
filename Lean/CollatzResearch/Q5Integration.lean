@@ -375,35 +375,32 @@ def transitionOk (w : CertWitness x) : Bool :=
 
     Plan dependency: feeds Lemma 5 (soundness assembly) via the
     per-witness `checkCertWitness` extraction. -/
-theorem foldl_and_extract {α : Type u} (ts : List α) (p : α → Bool)
-    (h : List.foldl (fun acc x => acc ∧ p x) true ts = true)
-    : ∀ x, x ∈ ts → p x = true := by
-  induction ts with
+theorem foldl_and_extract_aux {α : Type u} (ts : List α) (p : α → Bool)
+    (acc : Bool)
+    (h : List.foldl (fun a x => a && p x) acc ts = true) :
+    acc = true ∧ ∀ x, x ∈ ts → p x = true := by
+  induction ts generalizing acc with
   | nil =>
-    intros _ hx
-    -- `x ∈ []` is contradictory; eliminated.
-    cases hx
+    refine ⟨?_, ?_⟩
+    · simpa using h
+    · intro x hx
+      simp at hx
   | cons a rest ih =>
-    intros x hx
-    cases hx with
-    | inl hxa =>
-      -- `x = a`: prove `p a = true` directly from `h`.
-      subst hxa
-      -- `(true && p a) = p a` by Bool identity (case-split on `p a`).
-      have hp_eq : (true && p a) = p a := by
-        cases hp : p a <;> simp [hp]
-      rw [hp_eq] at h
-      -- `h : (p a ∧ List.foldl (fun acc x => acc ∧ p x) (p a) rest) = true`
-      rw [Bool.and_eq_true] at h
-      exact h.1
-    | inr hxr =>
-      -- `x ∈ rest`: apply induction hypothesis to `h`.
-      have hp_eq : (true && p a) = p a := by
-        cases hp : p a <;> simp [hp]
-      rw [hp_eq] at h
-      rw [Bool.and_eq_true] at h
-      -- `h.2 : List.foldl (fun acc x => acc ∧ p x) true rest = true`
-      exact ih h.2 x hxr
+    rcases ih (acc && p a) h with ⟨hacc, hrest⟩
+    rcases (Bool.and_eq_true_eq_eq_true_and_eq_true acc (p a)).mp hacc with
+      ⟨ha, hpa⟩
+    refine ⟨ha, ?_⟩
+    intro x hx
+    simp only [List.mem_cons] at hx
+    rcases hx with hxa | hxr
+    · subst x
+      exact hpa
+    · exact hrest x hxr
+
+theorem foldl_and_extract {α : Type u} (ts : List α) (p : α → Bool)
+    (h : List.foldl (fun acc x => acc && p x) true ts = true)
+    : ∀ x, x ∈ ts → p x = true := by
+  exact (foldl_and_extract_aux ts p true h).2
 
 /-- **Lemma 2 (witness-check decomposition).** `checkCertWitness`
     is true iff all 5 named conjuncts (anchor, leaf, routing,
@@ -442,10 +439,12 @@ theorem checkCertWitness_decompose (x : Nat) (claim : FiniteOrbitClaim)
     -- `false ∧ ... = false`.
     simp [htr]
   | cons hd tl =>
-    -- Both sides reduce to the same 5-fold conjunction; `simp`
-    -- closes the biconditional via `Bool.and_eq_true` +
-    -- `decide` equivalence.
-    simp [htr, Bool.and_eq_true]
+    simp only [htr, Bool.and_eq_true]
+    constructor
+    · rintro ⟨⟨⟨⟨hhead, hleaf⟩, hroute⟩, hterminal⟩, htransition⟩
+      exact ⟨hhead, hleaf, hroute, hterminal, htransition⟩
+    · rintro ⟨hhead, hleaf, hroute, hterminal, htransition⟩
+      exact ⟨⟨⟨⟨hhead, hleaf⟩, hroute⟩, hterminal⟩, htransition⟩
 
 /-! ## v2b.2 — Lemma 3 (trajectory indexing)
 
