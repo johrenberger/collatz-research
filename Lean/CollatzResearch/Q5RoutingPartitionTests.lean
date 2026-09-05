@@ -94,7 +94,7 @@ matching the canonical input).  Mirrors the empty-trajectory rejection in
 the per-leaf checker. -/
 example : ¬ checkRoutingPartitionWitness routingPartitionTwoLeafTree 1
     routingPartitionRegistry
-      { leaf := { leafId := "odd", leafProperty := "2:1-1" }, trajectory := [] } = true :=
+      { leaf := { leafId := "odd", leafProperty := "2:1-1" }, trajectory := [] } = true := by
   native_decide
 
 /-- Head-mismatch regression (v2b'.4): a witness whose trajectory head does
@@ -102,7 +102,7 @@ not equal the canonical input is rejected.  Mirrors the head-mismatch
 rejection in the per-leaf checker. -/
 example : ¬ checkRoutingPartitionWitness routingPartitionTwoLeafTree 1
     routingPartitionRegistry
-      { leaf := { leafId := "odd", leafProperty := "2:1-1" }, trajectory := [2] } = true :=
+      { leaf := { leafId := "odd", leafProperty := "2:1-1" }, trajectory := [2] } = true := by
   native_decide
 
 /-- Multi-leaf routing positive regression (v2b'.4): global acceptance
