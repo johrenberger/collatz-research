@@ -6,6 +6,7 @@
     "Lean/CollatzResearch/CoverageTree.lean": 1,
     "Lean/CollatzResearch/Dynamics.lean": 2,
     "Lean/CollatzResearch/Equivalence.lean": 2,
-    "Lean/CollatzResearch/Importer.lean": 2
+    "Lean/CollatzResearch/Importer.lean": 2,
+    "Lean/CollatzResearch/Q5RoutingPartition.lean": 0
   }
 }
