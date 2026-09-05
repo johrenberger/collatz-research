@@ -97,22 +97,97 @@ hypotheses.
 
 This is the semantic companion to the structural composition
 formula in `AffineMap.comp`. It says that when the intermediate
-division is exact, applying the composed map equals composing the
-applications. Proving this requires Mathlib's
-`Int.mul_div_cancel_left_of_dvd` (or a successor) and induction;
-left as preparatory work pending a Mathlib lemma check. -/
+division by `2^m₂.k` is exact, applying the composed map equals
+composing the applications.
+
+**Proof status (2026-09-05, v1' — Codex-reviewed, fixes per PR #71 review):**
+
+Source-verified lemma names per `docs/lean-api-discipline.md` P12
+(read the pinned v4.33.0 Lean 4 core source at `lean4/src/Init/Data/
+Int/DivMod/{Bootstrap,Lemmas}.lean`):
+
+- `Int.mul_ediv_cancel' {a b : Int} (H : a ∣ b) : a * (b / a) = b`
+  (Bootstrap.lean:312) — divisibility-based cancellation lemma.
+  Used in Step 1 with hypothesis `h₂ : 2^m₂.k ∣ (m₂.a * n + m₂.b)`.
+- `Int.mul_ediv_mul_of_pos {a : Int} (b c : Int) (H : 0 < a) :
+  (a * b) / (a * c) = b / c` (Lemmas.lean:576) — ediv cancellation-
+  across-factors. Used in Step 4 with `a := 2^m₂.k` (positivity
+  discharged by `by positivity`).
+- `Int.pow_add` — Lean core lemma for `Int` power addition
+  (`(a : Int) ^ (b + c) = (a ^ b : Int) * (a ^ c : Int)`). Used in
+  Step 3 to factor `2^(m₁.k + m₂.k) = 2^m₁.k * 2^m₂.k`.
+- `Int.mul_comm` — standard commutativity rewrite, used in Step 3 to
+  reorder the factors for the cancellation lemma.
+
+**Note on `h₁`:** the divisibility hypothesis
+`h₁ : 2^m₁.k ∣ (m₁.a * ((m₂.a * n + m₂.b) / 2^m₂.k) + m₁.b)` is
+preserved as a semantic precondition (mirrors `appliesTo`-style
+exact-divisibility obligations on the RHS) but is **not used** by
+this v1' proof — the ediv equality holds regardless of exactness
+via `Int.mul_ediv_mul_of_pos`'s floor-quotient semantics. Kept for
+potential downstream v2 (`execute_eq_toAffine_apply`) usage; remove
+in a separately reviewed API change if it ends up unused there too.
+
+**Proof structure:**
+1. `have h₃` — distribute first via `ring` (so the
+   `2^m₂.k * ((m₂.a * n + m₂.b) / 2^m₂.k)` redex is exposed), then
+   rewrite via `Int.mul_ediv_cancel' h₂`. The divisibility hypothesis
+   `h₂` is the witness for the inner division being exact.
+2. Rewrite the LHS numerator via `ring` (distributivity bridge) +
+   `h₃`.
+3. Factor denominator via `Int.pow_add` + `Int.mul_comm` to get
+   `(2^m₂.k * X) / (2^m₂.k * 2^m₁.k)` where `X` is the RHS numerator.
+4. Cancel common factor via `Int.mul_ediv_mul_of_pos _ _
+   (by positivity : 0 < (2 ^ m₂.k : ℤ))`.
+
+The proof has **not yet been CI-verified** (awaiting v1' push +
+GitHub Lean CI run). The two Codex reviews on PR #71 v1 caught two
+P0 issues (Step 1 redex not exposed; Step 2 used nonexistent
+`Int.ofNat_pow`); both are fixed in this v1'. After CI green, the
+follow-up commit will update `docs/theorem-status.md`
+(`comp_apply_eq` row: Pending → Checked) and
+`docs/lean-sorry-budget.json` (`Affine.lean` allowance: 4 → 3). -/
 theorem AffineMap.comp_apply_eq (m₁ m₂ : AffineMap) (n : ℤ)
     (h₂ : (2 ^ m₂.k : ℤ) ∣ (m₂.a * n + m₂.b))
     (h₁ : (2 ^ m₁.k : ℤ) ∣
             (m₁.a * ((m₂.a * n + m₂.b) / (2 ^ m₂.k : ℤ)) + m₁.b)) :
     (m₁.comp m₂).apply n = m₁.apply (m₂.apply n) := by
+  -- Unfold `AffineMap.apply` and `AffineMap.comp` to expose the
+  -- numerator/denominator structure.
   unfold AffineMap.apply AffineMap.comp
-  -- Numerator equality is the structural coefficient identity
-  -- (proved by `ring`); the divisibility hypotheses are used to push
-  -- `m₁.a` inside the inner division. The full proof requires
-  -- `Int.mul_div_cancel_left_of_dvd` (Mathlib), a divisibility
-  -- combination lemma, and `ring`. Documented as preparatory.
-  sorry
+  -- Step 1: establish the LHS numerator identity.
+  -- First distribute (via `ring`) so the
+  -- `2^m₂.k * ((m₂.a * n + m₂.b) / 2^m₂.k)` redex is exposed, then
+  -- rewrite via `Int.mul_ediv_cancel' h₂` (source-verified
+  -- Bootstrap.lean:312). The divisibility hypothesis h₂ is the witness
+  -- for the inner division being exact.
+  have h₃ : (2 ^ m₂.k : ℤ) *
+             (m₁.a * ((m₂.a * n + m₂.b) / (2 ^ m₂.k : ℤ)) + m₁.b) =
+           m₁.a * (m₂.a * n + m₂.b) + m₁.b * (2 ^ m₂.k : ℤ) := by
+    rw [show (2 ^ m₂.k : ℤ) *
+              (m₁.a * ((m₂.a * n + m₂.b) / (2 ^ m₂.k : ℤ)) + m₁.b)
+            = m₁.a * ((2 ^ m₂.k : ℤ) *
+                  ((m₂.a * n + m₂.b) / (2 ^ m₂.k : ℤ)))
+              + m₁.b * (2 ^ m₂.k : ℤ) by ring]
+    rw [Int.mul_ediv_cancel' h₂]
+  -- Step 2: rewrite the LHS numerator via distributivity bridge
+  -- (`ring`) + `h₃`. The LHS numerator is
+  -- `m₁.a * m₂.a * n + (m₁.a * m₂.b + m₁.b * (2 ^ m₂.k : ℤ))`,
+  -- which equals `m₁.a * (m₂.a * n + m₂.b) + m₁.b * (2 ^ m₂.k : ℤ)`
+  -- by ring (distributivity), which is the RHS of h₃.
+  rw [show m₁.a * m₂.a * n + (m₁.a * m₂.b + m₁.b * (2 ^ m₂.k : ℤ))
+          = m₁.a * (m₂.a * n + m₂.b) + m₁.b * (2 ^ m₂.k : ℤ) by ring]
+  rw [← h₃]
+  -- Step 3: factor denominator 2^(m₁.k + m₂.k) = 2^m₁.k * 2^m₂.k via
+  -- `Int.pow_add` (Lean core lemma for `Int` powers); reorder via
+  -- targeted `Int.mul_comm (2 ^ m₁.k : ℤ) (2 ^ m₂.k : ℤ)` so the
+  -- rewrite does not match an unintended numerator multiplication.
+  rw [Int.pow_add]
+  rw [Int.mul_comm (2 ^ m₁.k : ℤ) (2 ^ m₂.k : ℤ)]
+  -- Step 4: cancel common factor 2^m₂.k via `Int.mul_ediv_mul_of_pos`
+  -- (source-verified Lemmas.lean:576). Positivity discharged by
+  -- `by positivity` since m₂.k : ℕ implies 2^m₂.k ≥ 1.
+  rw [Int.mul_ediv_mul_of_pos _ _ (by positivity : 0 < (2 ^ m₂.k : ℤ))]
 
 /-- A branch word: a list of **positive** two-adic valuations. -/
 abbrev BranchWord := List ℕ+
