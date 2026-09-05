@@ -18,7 +18,7 @@ iterations can be represented as affine maps over �. This module:
 6. Defines `appliesTo`: a word applies to `n` iff `n` is positive odd
    and each step's valuation matches `ν₂(3nᵢ + 1)`.
 7. Defines `execute` and states the semantic theorem
-   `execute_eq_toAffine_apply` (cons case pending — see "Proof status").
+   `execute_eq_toAffine_apply` (cons case proved — see "Proof status").
 
 This module makes no convergence, cycle-exclusion, or global descent
 claim. It is the symbolic-executor foundation for Story 05 (residue
@@ -148,13 +148,10 @@ is therefore a justified API weakening bundled with v2 in this PR.
 4. Cancel common factor via `Int.mul_ediv_mul_of_pos _ _
    (by positivity : 0 < (2 ^ m₂.k : ℤ))`.
 
-The proof has **not yet been CI-verified** (awaiting v1' push +
-GitHub Lean CI run). The two Codex reviews on PR #71 v1 caught two
-P0 issues (Step 1 redex not exposed; Step 2 used nonexistent
-`Int.ofNat_pow`); both are fixed in this v1'. After CI green, the
-follow-up commit will update `docs/theorem-status.md`
-(`comp_apply_eq` row: Pending → Checked) and
-`docs/lean-sorry-budget.json` (`Affine.lean` allowance: 4 → 3). -/
+The proof is **CI-verified** (merged via PR #71 v1''). The v2/v2'''' commits
+in PR #72 further refine the proof structure (`comp_apply_eq` API weakened
+to drop `h₁`; cons case of `execute_eq_toAffine_apply` proved via
+`Nat.Prime.pow_dvd_iff_le_factorization` + `Int.natCast_ediv` cast bridge). -/
 theorem AffineMap.comp_apply_eq (m₁ m₂ : AffineMap) (n : ℤ)
     (h₂ : (2 ^ m₂.k : ℤ) ∣ (m₂.a * n + m₂.b)) :
     (m₁.comp m₂).apply n = m₁.apply (m₂.apply n) := by
@@ -284,7 +281,6 @@ theorem BranchWord.execute_eq_toAffine_apply (word : BranchWord) (n : ℕ)
     have harg : ((Nat.div (3 * n + 1) (2 ^ (k : ℕ)) : ℕ) : ℤ) = (AffineMap.step k).apply (n : ℤ) := by
       rw [AffineMap.apply]
       norm_cast
-      rw [Int.natCast_ediv]
     -- Apply induction hypothesis at ((3*n+1) / 2^k).
     -- (ih is universalized via `induction word generalizing n`.)
     have ihapp := ih _ happ
