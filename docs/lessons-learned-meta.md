@@ -1,10 +1,10 @@
-# Lessons Learned — Meta Synthesis Across All Arcs (02c/03c + 07c-2 + Q3 + Q4)
+# Lessons Learned — Meta Synthesis Across All Arcs (02c/03c + 07c-2 + Q3 + Q4 + Q5)
 
-**Status:** Meta doc; companion to `docs/lessons-learned-07c-2.md` (PR #50, 07c-2 arc) and `docs/lessons-learned-q4-bounded-orbit.md` (PR #59, Q4 arc). All arc-specific lessons-learned docs in master at `437225f`.
+**Status:** Meta doc; companion to `docs/lessons-learned-07c-2.md` (PR #50, 07c-2 arc), `docs/lessons-learned-q4-bounded-orbit.md` (PR #59, Q4 arc), and `docs/lessons-learned-q5-external-certificates.md` (Q5 arc). All arc-specific lessons-learned docs in master at `437225f` (pre-Q5) + Q5 additions via this PR.
 
-**Scope:** Cross-cutting synthesis across 4 arcs (9 PRs total: 02c/03c PRs #30–#48, 07c-2 PRs #36 + #49–#51, Q3 PRs #52–#54, Q4 PRs #55–#59). All merged at master HEAD `437225f` as of 2026-08-23T20:03:11Z.
+**Scope:** Cross-cutting synthesis across 5 arcs (17 PRs total: 02c/03c PRs #30–#48, 07c-2 PRs #36 + #49–#51, Q3 PRs #52–#54, Q4 PRs #55–#59, Q5 PRs #61–#69). Q5 PRs MERGED 2026-08-28 through 2026-09-04; PR #64 retitled post-merge to reflect v2b partial state (Lemmas 5–6 REMOVED per Codex P0).
 
-**Outcome:** 12 cross-cutting patterns extracted + actionable insights for Q5+ external-certificate workstream + future companion theorem / data layer patterns. Use this doc when starting a new arc or when a pattern recurs across arcs.
+**Outcome:** 12 cross-cutting patterns + actionable insights for Q6+ and future verifier / soundness / routing-partition workstreams. Use this doc when starting a new arc or when a pattern recurs across arcs.
 
 This document captures patterns that emerged across multiple arcs, so future contributors can avoid the same pitfalls and reuse the working patterns at the meta-level. For arc-specific lessons (e.g., the Q4 parallel-predicate design or the 07c-2 conditional theorem pattern), see the per-arc docs (linked above).
 
@@ -73,6 +73,24 @@ Reusable patterns from this arc:
 - **Position verification before commit** (3x forward-reference cascade lesson in this arc alone)
 - **The 4-PR split** (Q4 v3 run-21858 resolution: spec → foundation → data → theorem → lessons)
 - **Be precise about established vs deferred** (Q4 v2 overclaimed "constructively inhabitable"; precise wording: "expressible as an orbit-state-relative certificate contract")
+
+### 1.5 Q5 — External-certificates + bounded-input + routing-partition (PRs #61–#69)
+
+The Q5 arc delivered the external-certificate infrastructure + bounded-input integration + routing-partition sub-arc:
+- **PR #61** (spec): Q5 v5 spec — external-certificate inhabitation via Python search + Lean verifier. Defines trust boundary (Python UNTRUSTED, Lean TCB), the 4-PR split, the bounded-input vs unbounded-input scope distinction.
+- **PR #62** (verifier): `BoundedInputCertificateWire` + `BoundedInputCertificateData` + `decodeBoundedInputCertificateData` + `checkBoundedCertificate` (Bool verifier) + `checkCertWitness` (5-conjunct single-witness checker). 5 versions before final merge (v1→v2→v3→v4→v5).
+- **PR #63** (producer + parser): Python external generator + hand-rolled Lean JSON parser + parser-rejection tests. Closes the producer side of the trust boundary.
+- **PR #64** (bounded-input integration): 16 commits — v1 → v2a → v2b.0 plan → v2b.1 (Lemmas 1–2 + 5 helper predicates) → v2b.2 (Lemma 3 + 2 bridging lemmas) → v2b.3 (Lemma 4) → v2b.4 (Lemma 5, REMOVED per Codex P0) → v2b.5 (Lemma 6, REMOVED per Codex P0) → v2b.6 (tests, trimmed) → sorry-budget tracker (REVERTED) → Codex P0/P1 fixes → WP-2/3/4 polish → repair integration tests. Retitled post-merge to `v2b partial — bounded-input infrastructure + soundness-chain helpers (Lemmas 1–4); soundness theorem (Lemmas 5–6) REMOVED per Codex P0; re-attempt requires architectural decision`.
+- **PR #66** (hotfix): restore concrete `CertWitness` representation after a prior commit abstracted it away.
+- **PRs #67–#69** (routing-partition sub-arc): certificate design → acceptance facts → RP-5 conditional routing-partition reachability. Parallel architecture established to address the per-leaf vs single-leaf quantification mismatch identified as a blocker for Lemma 5 re-attempt.
+
+Reusable patterns from this arc:
+- **Wire/checked split** (PR #62 v4) — `BoundedInputCertificateWire` is the wire payload; `BoundedInputCertificateData` is the checked bundle (wire + `length_ok` proof); `decodeBoundedInputCertificateData` is the trust boundary. Mirrors the proof-carrying-data pattern at the verifier boundary.
+- **List-position identity** (PR #62 v3) — witness at index `i` carries canonical input `i + 1`. Reconstructed via `List.get` with the `length_ok` proof. Avoids storing canonical input as a Lean function field.
+- **The 5-PR split** (extension of Q4 v3's 4-PR) — when integration tests need a concrete representation that an earlier commit abstracted away, insert a hotfix PR between the data and integration PRs. Hotfix is 1-PR scope, additive, no scope expansion.
+- **Per-PR squash-merge with descriptive commit messages** (PR #64's 16-commit squash) — clean history even when many commits ship in one PR. Each commit message names the sub-arc + intent.
+- **The actor pattern** (`app-dev-discovery-bot` shipped 12 commits in 48h with one Codex P0 rejection) — observation documented in `lessons-learned-q5-external-certificates.md` §3; **not promoted to a META pattern** (single-arc observation; see header note).
+- **Reviewer-pivot not reviewer-launder** (Codex P0 on v2b.4) — the correct response to an independent rejection is structural restructure, not budget extension or hypothesis softening.
 
 ---
 
@@ -206,9 +224,11 @@ No local `lake` commands run — Lean validation runs only in GitHub CI. The "no
 
 **Actionable insight**: do not run `lake build` locally to validate PR cycles. Let the GitHub Lean CI run and verify. Local lake commands bypass the admission budget step (which is a GitHub-only check).
 
+**Note on the actor pattern (Q5)**: META's section count is intentionally **12 cross-cutting patterns**, not 13. The actor pattern observation (autonomous multi-commit sub-arc with sub-arc-boundary review) is documented in `lessons-learned-q5-external-certificates.md` §3 as a single-arc observation, not promoted to a META pattern. META conventions reserve §2 for patterns that reference 2+ arcs and arc-specific lessons; a single-arc observation does not meet the threshold for promotion. When/if a second arc demonstrates the pattern independently, the observation can be elevated.
+
 ---
 
-## 3. Actionable insights for Q5+ (external-certificate inhabitation)
+## 3. Actionable insights for Q6+ (post-Q5)
 
 The Q4 v3 spec (`docs/story-q4-bounded-orbit-certificates.md` § "Out of scope") explicitly defers external-certificate inhabitation to Q5+. The certificate contract is **already defined** in master — `BoundedOrbitCertificate t l` at `437225f`. Q5+ just needs to construct inhabitant instances.
 
