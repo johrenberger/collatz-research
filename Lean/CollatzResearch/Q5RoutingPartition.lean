@@ -213,4 +213,25 @@ theorem routing_partition_certificate_slot_reaches_one
     (checkRoutingPartitionCertificate_accepts_slot t d hcheck i)
     hClaimReachesOne
 
+/-- Global soundness of the routing-partition checker: every canonical
+input slot (1..N) reaches 1, provided every registered claim is explicitly
+known to reach 1.  This is the option-b (single-leaf redesign via routing
+partition) analogue of `checkBoundedCertificate_sound`, closed via
+the per-slot reachability above.  No `sorry` / `admit` / `axiom`; closed
+by 2-line bounded proof (`intro x hx hN; simpa […]`). -/
+theorem RoutingPartitionCertificate_sound
+    (t : CoverageTree) (d : RoutingPartitionCertificateData)
+    (hcheck : checkRoutingPartitionCertificate t d = true)
+    (hClaimReachesOne : ∀ (entry : LeafClaimWire),
+      entry ∈ d.wire.claimRegistry → ∀ y,
+        entry.claim.Holds y → ReachesOne y) :
+    ∀ (x : Nat), 0 < x → x ≤ d.wire.N → ReachesOne x := by
+  intro x hx hN
+  -- Convert the canonical input x (with 0 < x ≤ N) to the Fin-indexed slot
+  -- `i = ⟨x - 1, hN : x - 1 < N⟩` whose canonical input is `i.val + 1 = x`.
+  -- Use `simpa` + `Nat.sub_add_cancel` to rewrite the per-slot conclusion
+  -- `ReachesOne ((x - 1) + 1)` to `ReachesOne x`.
+  simpa [Nat.sub_add_cancel (by omega : 1 ≤ x)] using
+    routing_partition_certificate_slot_reaches_one t d hcheck
+      hClaimReachesOne ⟨x - 1, by omega⟩
 end CollatzResearch
