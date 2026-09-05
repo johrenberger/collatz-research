@@ -32,9 +32,15 @@ representation with explicit denominator exponent.
 - Structural algebra (`comp_assoc`, `comp_id_left`, `comp_id_right`):
   proved by `ring`.
 - Semantic theorems (`comp_apply_eq`, `execute_eq_toAffine_apply`):
-  stated; cons case of `execute_eq_toAffine_apply` admitted via `sorry`
-  pending a Mathlib divisibility lemma (see ADR-0007 and the PR #8
-  body). Marked **preparatory** in `docs/theorem-status.md`.
+  proved (`comp_apply_eq` via PR #71 v1'' using source-verified
+  `Int.mul_ediv_cancel'` Bootstrap.lean:312 + `Int.mul_ediv_mul_of_pos`
+  Lemmas.lean:576 + `Int.pow_add` Pow.lean + `Int.mul_comm` Basic.lean;
+  `execute_eq_toAffine_apply`'s cons case via PR #72 v2''' using
+  `Nat.Prime.pow_dvd_iff_le_factorization` for the inner divisibility
+  + `comp_apply_eq` + `Int.natCast_ediv` for the Nat→Int cast bridge).
+  `h₁` was dropped from `comp_apply_eq` in PR #72 as a justified API
+  weakening (the ediv equality holds via `Int.mul_ediv_mul_of_pos`'s
+  floor-quotient semantics regardless of exactness).
 -/
 
 namespace CollatzResearch
@@ -119,14 +125,16 @@ Int/DivMod/{Bootstrap,Lemmas}.lean`):
 - `Int.mul_comm` — standard commutativity rewrite, used in Step 3 to
   reorder the factors for the cancellation lemma.
 
-**Note on `h₁`:** the divisibility hypothesis
-`h₁ : 2^m₁.k ∣ (m₁.a * ((m₂.a * n + m₂.b) / 2^m₂.k) + m₁.b)` is
-preserved as a semantic precondition (mirrors `appliesTo`-style
-exact-divisibility obligations on the RHS) but is **not used** by
-this v1' proof — the ediv equality holds regardless of exactness
-via `Int.mul_ediv_mul_of_pos`'s floor-quotient semantics. Kept for
-potential downstream v2 (`execute_eq_toAffine_apply`) usage; remove
-in a separately reviewed API change if it ends up unused there too.
+**Note on `h₁` (v2 API weakening, removed in PR for v2/v3):**
+the divisibility hypothesis
+`h₁ : 2^m₁.k ∣ (m₁.a * ((m₂.a * n + m₂.b) / 2^m₂.k) + m₁.b)` was
+preserved in v1'' as a semantic precondition but is **not used** by
+the proof — the ediv equality holds regardless of exactness via
+`Int.mul_ediv_mul_of_pos`'s floor-quotient semantics. v2's cons case
+for `execute_eq_toAffine_apply` doesn't have `h₁` available
+naturally (`appliesTo` gives the inner divisibility
+`twoAdicValuation (3 * n + 1) = k`, not the outer one). Removing `h₁`
+is therefore a justified API weakening bundled with v2 in this PR.
 
 **Proof structure:**
 1. `have h₃` — distribute first via `ring` (so the
@@ -148,9 +156,7 @@ follow-up commit will update `docs/theorem-status.md`
 (`comp_apply_eq` row: Pending → Checked) and
 `docs/lean-sorry-budget.json` (`Affine.lean` allowance: 4 → 3). -/
 theorem AffineMap.comp_apply_eq (m₁ m₂ : AffineMap) (n : ℤ)
-    (h₂ : (2 ^ m₂.k : ℤ) ∣ (m₂.a * n + m₂.b))
-    (h₁ : (2 ^ m₁.k : ℤ) ∣
-            (m₁.a * ((m₂.a * n + m₂.b) / (2 ^ m₂.k : ℤ)) + m₁.b)) :
+    (h₂ : (2 ^ m₂.k : ℤ) ∣ (m₂.a * n + m₂.b)) :
     (m₁.comp m₂).apply n = m₁.apply (m₂.apply n) := by
   -- Unfold `AffineMap.apply` and `AffineMap.comp` to expose the
   -- numerator/denominator structure.
@@ -235,18 +241,63 @@ The empty case is trivial by `rfl`. The cons case requires:
 2. `AffineMap.comp_apply_eq` (above).
 3. An induction on `BranchWord`.
 
-Cons case admitted via `sorry`; marked **preparatory** in
+Cons case proved in PR #72 v2''' via the source-verified
+`Nat.Prime.pow_dvd_iff_le_factorization` (Mathlib
+`Data/Nat/Factorization/Basic.lean:164–166`) for the inner
+divisibility, plus `comp_apply_eq` + `Int.natCast_ediv`
+(`Init/Data/Int/DivMod/Basic.lean:120`) for the Nat→Int cast bridge.
+Marked **closed** in `docs/theorem-status.md`.
 `docs/theorem-status.md`. -/
 theorem BranchWord.execute_eq_toAffine_apply (word : BranchWord) (n : ℕ)
     (_h : BranchWord.appliesTo word n) :
     BranchWord.execute word n = (BranchWord.toAffine word).apply n := by
-  induction word with
+  induction word generalizing n with
   | nil =>
     simp [BranchWord.execute, BranchWord.toAffine, AffineMap.id, AffineMap.apply]
   | cons k rest ih =>
-    -- Cons case: by `comp_apply_eq` and the divisibility induced by
-    -- `appliesTo`. Admitted pending Mathlib lemma check.
-    sorry
+    -- Destructure _h: (k :: rest).appliesTo n unfolds to:
+    -- n > 0 ∧ n % 2 = 1 ∧ twoAdicValuation (3 * n + 1) = k ∧
+    --   rest.appliesTo (Nat.div (3 * n + 1) (2 ^ k))
+    have htv : twoAdicValuation (3 * n + 1) = k := _h.2.2.1
+    have happ : BranchWord.appliesTo rest (Nat.div (3 * n + 1) (2 ^ (k : ℕ))) := _h.2.2.2
+    -- Derive hk_nat: 2^k ∣ (3 * n + 1) from htv using
+    -- Nat.Prime.pow_dvd_iff_le_factorization (source-verified at
+    -- Mathlib Data/Nat/Factorization/Basic.lean:164–166, already used
+    -- successfully in Equivalence.lean per LEAN_PATTERNS.md P02).
+    -- The iff states: 2^k ∣ (3*n+1) ↔ k ≤ (3*n+1).factorization 2.
+    -- htv gives (3*n+1).factorization 2 = k, so k ≤ k trivially (le_rfl).
+    have hk_nat : 2 ^ (k : ℕ) ∣ (3 * n + 1) := by
+      rw [htv]
+      exact (Nat.Prime.pow_dvd_iff_le_factorization (p := 2) (k := k) (n := 3 * n + 1)
+        Nat.prime_two (by omega)).mpr le_rfl
+    -- Cast to Int for comp_apply_eq.
+    have hk : (2 ^ (k : ℕ) : ℤ) ∣ (3 * (n : ℤ) + 1) := by
+      exact_mod_cast hk_nat
+    -- Apply comp_apply_eq (without h₁, per v2 API change).
+    have hcomp := AffineMap.comp_apply_eq (m₁ := BranchWord.toAffine rest)
+      (m₂ := AffineMap.step k) (n := (n : ℤ)) hk
+    -- Show that the LHS argument (Nat ediv cast to Int) equals (step k).apply (n : ℤ)
+    -- via Int.natCast_ediv (source-verified at Int/DivMod/Basic.lean:120).
+    -- This rewrites the Nat ediv `(3*n+1) / 2^k : ℕ` to the Int ediv
+    -- `(3*n+1 : ℤ) / (2^k : ℤ)`, matching the RHS of hcomp after apply-unfolding.
+    have harg : ((Nat.div (3 * n + 1) (2 ^ (k : ℕ)) : ℕ) : ℤ) = (AffineMap.step k).apply (n : ℤ) := by
+      rw [AffineMap.apply]
+      rw [Int.natCast_ediv]
+      norm_cast
+    -- Apply induction hypothesis at ((3*n+1) / 2^k).
+    -- (ih is universalized via `induction word generalizing n`.)
+    have ihapp := ih happ
+    -- Chain the chain:
+    -- LHS = BranchWord.execute rest ((3 * n + 1) / (2^k))       [simp execute]
+    --     = (BranchWord.toAffine rest).apply ((3 * n + 1) / (2^k))  [ihapp]
+    --     = (BranchWord.toAffine rest).apply ((step k).apply (n : ℤ))   [harg]
+    --     = ((BranchWord.toAffine rest).comp (AffineMap.step k)).apply (n : ℤ)  [hcomp.symm]
+    --     = (BranchWord.toAffine (k :: rest)).apply n           [simp toAffine]
+    --     = RHS
+    simp only [BranchWord.execute, BranchWord.toAffine]
+    rw [ihapp]
+    rw [harg]
+    exact hcomp.symm
 
 /-- TDD test (Story 04b): concrete application of `comp_apply_eq` mirroring
 the Python oracle `tests/test_affine.py::test_affine_compose_apply_compatible`.
