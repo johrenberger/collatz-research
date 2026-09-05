@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "allowed": {
-    "Lean/CollatzResearch/Affine.lean": 2,
+    "Lean/CollatzResearch/Affine.lean": 0,
     "Lean/CollatzResearch/Certificate.lean": 1,
     "Lean/CollatzResearch/CoverageTree.lean": 1,
     "Lean/CollatzResearch/Dynamics.lean": 2,
