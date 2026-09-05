@@ -241,13 +241,12 @@ The empty case is trivial by `rfl`. The cons case requires:
 2. `AffineMap.comp_apply_eq` (above).
 3. An induction on `BranchWord`.
 
-Cons case proved in PR #72 v2''' via the source-verified
+Cons case proved in PR #72 v2'''' via the source-verified
 `Nat.Prime.pow_dvd_iff_le_factorization` (Mathlib
 `Data/Nat/Factorization/Basic.lean:164–166`) for the inner
 divisibility, plus `comp_apply_eq` + `Int.natCast_ediv`
 (`Init/Data/Int/DivMod/Basic.lean:120`) for the Nat→Int cast bridge.
-Marked **closed** in `docs/theorem-status.md`.
-`docs/theorem-status.md`. -/
+Marked **closed** in `docs/theorem-status.md`. -/
 theorem BranchWord.execute_eq_toAffine_apply (word : BranchWord) (n : ℕ)
     (_h : BranchWord.appliesTo word n) :
     BranchWord.execute word n = (BranchWord.toAffine word).apply n := by
@@ -267,9 +266,11 @@ theorem BranchWord.execute_eq_toAffine_apply (word : BranchWord) (n : ℕ)
     -- The iff states: 2^k ∣ (3*n+1) ↔ k ≤ (3*n+1).factorization 2.
     -- htv gives (3*n+1).factorization 2 = k, so k ≤ k trivially (le_rfl).
     have hk_nat : 2 ^ (k : ℕ) ∣ (3 * n + 1) := by
-      rw [htv]
-      exact (Nat.Prime.pow_dvd_iff_le_factorization (p := 2) (k := k) (n := 3 * n + 1)
-        Nat.prime_two (by omega)).mpr le_rfl
+      rw [Nat.Prime.pow_dvd_iff_le_factorization (p := 2) (k := k) (n := 3 * n + 1)
+        Nat.prime_two (by omega)]
+      rw [← htv]
+      unfold twoAdicValuation
+      exact le_rfl
     -- Cast to Int for comp_apply_eq.
     have hk : (2 ^ (k : ℕ) : ℤ) ∣ (3 * (n : ℤ) + 1) := by
       exact_mod_cast hk_nat
@@ -282,11 +283,11 @@ theorem BranchWord.execute_eq_toAffine_apply (word : BranchWord) (n : ℕ)
     -- `(3*n+1 : ℤ) / (2^k : ℤ)`, matching the RHS of hcomp after apply-unfolding.
     have harg : ((Nat.div (3 * n + 1) (2 ^ (k : ℕ)) : ℕ) : ℤ) = (AffineMap.step k).apply (n : ℤ) := by
       rw [AffineMap.apply]
-      rw [Int.natCast_ediv]
       norm_cast
+      rw [Int.natCast_ediv]
     -- Apply induction hypothesis at ((3*n+1) / 2^k).
     -- (ih is universalized via `induction word generalizing n`.)
-    have ihapp := ih happ
+    have ihapp := ih _ happ
     -- Chain the chain:
     -- LHS = BranchWord.execute rest ((3 * n + 1) / (2^k))       [simp execute]
     --     = (BranchWord.toAffine rest).apply ((3 * n + 1) / (2^k))  [ihapp]
