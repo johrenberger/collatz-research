@@ -1,4 +1,5 @@
 """Finite trajectory utilities for candidate discovery."""
+
 from collections.abc import Iterator
 
 from .accelerated import accelerated_step

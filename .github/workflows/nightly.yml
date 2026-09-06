@@ -1,0 +1,39 @@
+name: Nightly validation
+on:
+  schedule:
+    # 02:00 UTC daily. Spaced 30+ min from typical PR-peak times so the
+    # runner is free and the cache is cold for the night's sweep.
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Manual trigger for ad-hoc nightly runs.
+jobs:
+  heavy-validation:
+    # Hosted runners are the supported baseline. The former self-hosted
+    # runner is not an availability dependency for research validation.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+      - name: Cache Lake build
+        uses: actions/cache@v4
+        with:
+          path: .lake
+          key: lake-${{ hashFiles('lake-manifest.json', 'lean-toolchain') }}
+          restore-keys: |
+            lake-
+      - run: uv sync --group dev
+      - name: Nightly reproduction
+        # Heavy validation that the PR gate should not pay: full
+        # reproduction + (eventually) Hypothesis property-based suite +
+        # regression corpus. Scaffolded now; full job content lands in a
+        # future story when proof obligations are stable.
+        run: make reproduce

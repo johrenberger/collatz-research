@@ -1,16 +1,21 @@
 [build-system]
-requires = ["hatchling>=1.25"]
+requires = ["hatchling==1.26.3"]
 build-backend = "hatchling.build"
 
 [project]
 name = "collatz-research"
 version = "0.1.0"
 description = "Untrusted discovery tooling for formally checked Collatz research"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest>=8.3", "jsonschema>=4.23", "ruff>=0.8"]
+dev = [
+    "pytest==8.3.4",
+    "jsonschema==4.23.0",
+    "ruff==0.8.6",
+    "hypothesis==6.111.1",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["python/collatz_research"]

@@ -1,9 +1,99 @@
 name: Lean CI
-on: [pull_request]
+
+on:
+  pull_request:
+    branches:
+      - main
+      - agent/bootstrap-research-monorepo
+    paths:
+      - 'lean-toolchain'
+      - 'lakefile.toml'
+      - 'lake-manifest.json'
+      - 'Lean/**'
+      - '.github/workflows/lean-ci.yml'
+  push:
+    branches:
+      - main
+      - agent/bootstrap-research-monorepo
+  workflow_dispatch:
+
+concurrency:
+  group: lean-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+
     steps:
       - uses: actions/checkout@v4
-      - uses: leanprover/lean-action@v1
-      - run: lake build
+
+      - name: Enforce Lean admission budget
+        run: python3 scripts/check_sorry_budget.py
+
+      - name: Build and validate Lean
+        uses: leanprover/lean-action@v1
+        with:
+          use-github-cache: false
+          use-mathlib-cache: true
+
+      - name: Build CoverageTree target
+        run: lake build CollatzResearch.CoverageTree
+
+      # Q5's wire-to-checked foundation is imported by the integration
+      # layer. Build it directly so an elaboration failure cannot remain
+      # hidden until a downstream PR adds another target.
+      - name: Build bounded-input certificate foundation
+        run: lake build CollatzResearch.BoundedInputCertificateData
+
+      - name: Build bounded-input verifier tests
+        run: lake build CollatzResearch.Q5VerifierTests
+
+      # A test-first orbit-routing module is permitted only within an
+      # implementation PR. If it exists, it must elaborate at the PR head;
+      # intentionally failing Lean source is never silently excluded from CI.
+      - name: Build CoverageTree orbit-routing tests when present
+        run: |
+          if [ -f Lean/CollatzResearch/CoverageTreeOrbitTests.lean ]; then
+            lake build CollatzResearch.CoverageTreeOrbitTests
+          fi
+
+      # The Q5 integration module (bounded-input certificate +
+      # bounded companion theorem + per-leaf availability) is
+      # permitted only within Story Q5 PR #4. If it exists, it
+      # must elaborate at the PR head; intentionally failing Lean
+      # source is never silently excluded from CI.
+      #
+      # Added per Codex P1 review `PRR_kwDOTuMD788AAAABL71GQA`
+      # (2026-09-02): the previous CI workflow only built
+      # CoverageTree targets and did NOT build Q5Integration or
+      # Q5IntegrationTests, so any Lean errors in the new Q5
+      # files were silently invisible to CI.
+      - name: Build Q5Integration target when present
+        run: |
+          if [ -f Lean/CollatzResearch/Q5Integration.lean ]; then
+            lake build CollatzResearch.Q5Integration
+          fi
+
+      - name: Build Q5Integration tests when present
+        run: |
+          if [ -f Lean/CollatzResearch/Q5IntegrationTests.lean ]; then
+            lake build CollatzResearch.Q5IntegrationTests
+          fi
+
+      # Routing-partition work is a separate Q5 story.  Build both its theorem
+      # module and API-shape regressions directly whenever present so a new
+      # proof-bearing module cannot remain unelaborated behind the library's
+      # default targets.
+      - name: Build Q5 routing-partition target when present
+        run: |
+          if [ -f Lean/CollatzResearch/Q5RoutingPartition.lean ]; then
+            lake build CollatzResearch.Q5RoutingPartition
+          fi
+
+      - name: Build Q5 routing-partition tests when present
+        run: |
+          if [ -f Lean/CollatzResearch/Q5RoutingPartitionTests.lean ]; then
+            lake build CollatzResearch.Q5RoutingPartitionTests
+          fi

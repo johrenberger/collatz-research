@@ -2,9 +2,20 @@
 
 
 def two_adic_valuation(value: int) -> int:
-    """Return v_2(value) for a positive integer."""
-    if value <= 0:
-        raise ValueError("two_adic_valuation is defined here only for positive integers")
+    """Return v_2(value) for a non-negative integer.
+
+    By convention (ADR-0006), v_2(0) = 0, matching Mathlib's
+    `Nat.factorization`. Negative inputs raise `ValueError`.
+
+    The Collatz domain is the positive integers, so v_2 is only ever
+    called with strictly positive inputs in production code; the
+    zero-handling is for symmetry with the Lean counterpart and for
+    the differential test suite.
+    """
+    if value < 0:
+        raise ValueError("two_adic_valuation is defined here only for non-negative integers")
+    if value == 0:
+        return 0
     exponent = 0
     while value % 2 == 0:
         value //= 2

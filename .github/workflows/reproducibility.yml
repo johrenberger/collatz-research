@@ -11,4 +11,4 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with: { python-version: "3.12" }
       - run: uv sync --group dev
-      - run: uv run python scripts/check.py
+      - run: make reproduce

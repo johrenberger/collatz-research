@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "description": "Canonical Collatz inputs and expected outputs for Python and Lean differential testing. The two-adic entries assert the ADR-0006 convention: nu_2(0) = 0.",
+  "two_adic": [
+    {"input": 0, "expected": 0, "note": "ADR-0006: nu_2(0) = 0 by convention."},
+    {"input": 1, "expected": 0},
+    {"input": 2, "expected": 1},
+    {"input": 4, "expected": 2},
+    {"input": 7, "expected": 0},
+    {"input": 8, "expected": 3},
+    {"input": 16, "expected": 4},
+    {"input": 40, "expected": 3},
+    {"input": 100, "expected": 2},
+    {"input": 1024, "expected": 10}
+  ],
+  "vectors": [
+    {
+      "name": "v_1",
+      "input": 1,
+      "accelerated_output": 1,
+      "standard_next": 4,
+      "standard_trajectory_to_1": [1, 4, 2, 1],
+      "standard_steps_to_1": 3,
+      "accelerated_trajectory_to_1": [1],
+      "accelerated_steps_to_1": 0,
+      "note": "1 is a fixed point of the accelerated map."
+    },
+    {
+      "name": "v_3",
+      "input": 3,
+      "accelerated_output": 5,
+      "standard_next": 10,
+      "standard_trajectory_to_1": [3, 10, 5, 16, 8, 4, 2, 1],
+      "standard_steps_to_1": 7,
+      "accelerated_trajectory_to_1": [3, 5, 1],
+      "accelerated_steps_to_1": 2
+    },
+    {
+      "name": "v_5",
+      "input": 5,
+      "accelerated_output": 1,
+      "standard_next": 16,
+      "standard_trajectory_to_1": [5, 16, 8, 4, 2, 1],
+      "standard_steps_to_1": 5,
+      "accelerated_trajectory_to_1": [5, 1],
+      "accelerated_steps_to_1": 1
+    },
+    {
+      "name": "v_7",
+      "input": 7,
+      "accelerated_output": 11,
+      "standard_next": 22,
+      "standard_trajectory_to_1": [7, 22, 11, 34, 17, 52, 26, 13, 40, 20, 10, 5, 16, 8, 4, 2, 1],
+      "standard_steps_to_1": 16,
+      "accelerated_trajectory_to_1": [7, 11, 17, 13, 5, 1],
+      "accelerated_steps_to_1": 5
+    },
+    {
+      "name": "v_11",
+      "input": 11,
+      "accelerated_output": 17,
+      "standard_next": 34,
+      "standard_trajectory_to_1": [11, 34, 17, 52, 26, 13, 40, 20, 10, 5, 16, 8, 4, 2, 1],
+      "standard_steps_to_1": 14,
+      "accelerated_trajectory_to_1": [11, 17, 13, 5, 1],
+      "accelerated_steps_to_1": 4
+    },
+    {
+      "name": "v_13",
+      "input": 13,
+      "accelerated_output": 5,
+      "standard_next": 40,
+      "standard_trajectory_to_1": [13, 40, 20, 10, 5, 16, 8, 4, 2, 1],
+      "standard_steps_to_1": 9,
+      "accelerated_trajectory_to_1": [13, 5, 1],
+      "accelerated_steps_to_1": 2
+    },
+    {
+      "name": "v_15",
+      "input": 15,
+      "accelerated_output": 23,
+      "standard_next": 46,
+      "standard_trajectory_to_1": [15, 46, 23, 70, 35, 106, 53, 160, 80, 40, 20, 10, 5, 16, 8, 4, 2, 1],
+      "standard_steps_to_1": 17,
+      "accelerated_trajectory_to_1": [15, 23, 35, 53, 5, 1],
+      "accelerated_steps_to_1": 5
+    },
+    {
+      "name": "v_27",
+      "input": 27,
+      "accelerated_output": 41,
+      "standard_next": 82,
+      "standard_steps_to_1": 111,
+      "accelerated_steps_to_1": 23,
+      "note": "27 has a long trajectory but is well-known to terminate at 1; accelerated length matches the standard Collatz literature."
+    }
+  ]
+}

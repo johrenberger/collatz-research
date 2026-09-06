@@ -1,12 +1,27 @@
 name: Python CI
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+      - 'python/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Makefile'
+      - '.github/workflows/python-ci.yml'
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-        with: { python-version: "3.12" }
+        with:
+          python-version: "3.12"
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
       - run: uv sync --group dev
-      - run: uv run ruff check .
-      - run: uv run pytest
+      - run: make python-ci

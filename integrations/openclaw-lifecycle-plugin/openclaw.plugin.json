@@ -1,0 +1,65 @@
+{
+  "id": "collatz-lifecycle",
+  "name": "Collatz lifecycle controller",
+  "description": "Durable packet receipts and bounded OpenClaw agent execution.",
+  "version": "0.1.0",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "repoPath": {
+        "type": "string",
+        "description": "Absolute path of the canonical Git checkout."
+      },
+      "stateDir": {
+        "type": "string",
+        "description": "Absolute external directory for durable lifecycle state."
+      },
+      "pythonCommand": {
+        "type": "string",
+        "default": "python3",
+        "description": "Python interpreter used for repo/scripts/agent_lifecycle.py."
+      },
+      "packetPrefix": {
+        "type": "string",
+        "default": "openclaw",
+        "description": "Stable prefix used with the OpenClaw session key for packet IDs."
+      },
+      "maxModelAttempts": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 3
+      },
+      "maxToolCalls": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 20
+      },
+      "maxSeconds": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 900
+      },
+      "enforcementMode": {
+        "type": "string",
+        "enum": ["observe", "enforce"],
+        "default": "observe",
+        "description": "Observe records controller failures; enforce blocks a run or tool call."
+      },
+      "receiptToolNames": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true,
+        "default": [],
+        "description": "Tool names whose calls create durable external-effect receipts."
+      },
+      "reviewDispatcherCommand": {
+        "type": "string",
+        "description": "Optional host command invoked after a durable PR review handoff is created. The command must claim and dispatch the handoff; it is not passed untrusted PR arguments."
+      }
+    }
+  }
+}
