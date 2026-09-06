@@ -250,12 +250,24 @@ noncomputable def checkBoundedCertificate_sound
   have ⟨hLeaf, hrest2⟩ := hrest1
   have ⟨hRouting, hrest3⟩ := hrest2
   have ⟨hTerminal, hTransition⟩ := hrest3
-  -- Trajectory is non-empty (from `anchorOk = true`).
-  have hne : 0 < (d.certWitness i).trajectory.length := by
-    unfold anchorOk at hAnchor
-    cases htr : (d.certWitness i).trajectory with
-    | nil => simp [htr] at hAnchor
-    | cons hd tl => simp
+  -- Trajectory is non-empty (from `anchorOk = true`). Derive via `by_contra`
+  -- to avoid the `cases` + `simp` interaction with the dependent
+  -- `(d.certWitness i)` term. The existing `anchorOk_implies_get_zero`
+  -- kernel-checked lemma uses the same `cases` + `simp` pattern but with a
+  -- non-dependent `w : CertWitness x`; the dependent version here trips
+  -- Lean's simplifier on the nil case.
+  have hne' : (d.certWitness i).trajectory ≠ [] := by
+    intro hcontra
+    -- hcontra : (d.certWitness i).trajectory = []
+    -- Then `anchorOk x (d.certWitness i)` reduces to `false`, contradicting hAnchor.
+    have : anchorOk x (d.certWitness i) = false := by
+      unfold anchorOk; rw [hcontra]
+    rw [this] at hAnchor
+    -- hAnchor : false = true; this is `False`, derived by `cases`.
+    exact (by cases hAnchor)
+  -- Convert `xs ≠ []` to `0 < xs.length` (Mathlib v4.33.0 prefers `Ne`).
+  have hne : 0 < (d.certWitness i).trajectory.length :=
+    List.length_pos_iff_ne_nil.mpr hne'
   -- `length - 1 < length` for the indexed access in `terminal_claim_transport`.
   have hidx : (d.certWitness i).trajectory.length - 1 <
       (d.certWitness i).trajectory.length := by omega
