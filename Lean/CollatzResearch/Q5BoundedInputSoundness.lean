@@ -272,17 +272,27 @@ noncomputable def checkBoundedCertificate_sound
         ((d.certWitness i).trajectory.getLast hne)) = true := by
       simpa [List.getLast?_eq_some_getLast hne, terminalClaimOk] using hTerminal
     exact of_decide_eq_true hterm'
-  -- Per-pair check via `transitionOk_implies_step_forall`.
+  -- Per-pair check via `transitionOk_implies_step_forall`. Note: pass
+-- `i.val + 1` (not `x`) so the elaborator matches `CertWitness (i.val + 1)`
+-- with `(d.certWitness i) : CertWitness (i.val + 1)`. Lean's elaborator
+-- doesn't auto-substitute via `hiVal`.
   have hPerPair : ∀ j, j + 1 < (d.certWitness i).trajectory.length →
       (d.certWitness i).trajectory[j + 1]! = acceleratedStep
         ((d.certWitness i).trajectory[j]!) := by
     intro j hj
-    exact transitionOk_implies_step x (d.certWitness i) hTransition j hj
-  -- Apply Lemma 4 (terminal_claim_transport).
+    exact transitionOk_implies_step (i.val + 1) (d.certWitness i) hTransition j hj
+  -- Apply Lemma 4 (terminal_claim_transport). Same `i.val + 1`
+-- substitution as above.
   have hReaches : d.wire.claim.Holds
-      (accelerated_orbit x ((d.certWitness i).trajectory.length - 1)) :=
-    terminal_claim_transport x (d.certWitness i) d.wire.claim
+      (accelerated_orbit (i.val + 1) ((d.certWitness i).trajectory.length - 1)) :=
+    terminal_claim_transport (i.val + 1) (d.certWitness i) d.wire.claim
       hAnchor hPerPair hLast
+  -- Re-substitute `i.val + 1 → x` to satisfy the `orbit_hits_claim` shape.
+  -- `hiVal : i.val + 1 = x` is the canonical-input identity.
+  -- `hReaches : claim.Holds (accelerated_orbit (i.val + 1) (length - 1))`.
+  -- `rw [hiVal]` rewrites `accelerated_orbit (i.val + 1) ...` to
+  -- `accelerated_orbit x ...` via `congrArg accelerated_orbit`.
+  rw [hiVal] at hReaches
   -- Set `k = length - 1` to satisfy `∃ k, claim.Holds (accelerated_orbit x k)`.
   -- `hdesc` is the explicit hypothesis of `orbit_hits_claim` (accepted
   -- directly per PR #51 P1 — the witness's `routingOk` derives it
