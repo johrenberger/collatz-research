@@ -26,6 +26,7 @@ import CollatzResearch.CoverageTree
 import CollatzResearch.BoundedInputCertificateData
 import CollatzResearch.Q5Integration
 import CollatzResearch.Q5RoutingPartition
+import CollatzResearch.Q5BoundedInputSoundness
 import CollatzResearch.Q5VerifierTests
 import CollatzResearch.Q5IntegrationTests
 import CollatzResearch.Q5RoutingPartitionTests
