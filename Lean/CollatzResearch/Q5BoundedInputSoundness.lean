@@ -234,7 +234,7 @@ noncomputable def checkBoundedCertificate_sound
   intro x hx hN hdesc
   -- `i : Fin d.wire.N` with `i.val + 1 = x`. `x - 1 < d.wire.N` from
   -- `x ≤ N ∧ 0 < x`.
-  have hxpos : x - 1 < d.wire.N := Nat.lt_of_le_of_lt hN (Nat.succ_pos x)
+  have hxpos : x - 1 < d.wire.N := by omega
   let i : Fin d.wire.N := ⟨x - 1, hxpos⟩
   have hiVal : i.val + 1 = x := by simp [i, Nat.sub_add_cancel hx]
   -- Per-witness check via `hExtracted` (canonical-input identity).
