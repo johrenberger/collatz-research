@@ -17,6 +17,16 @@ on:
       - agent/bootstrap-research-monorepo
   workflow_dispatch:
 
+# Explicit permissions per GPT-5.6 Terra reviewer round 6 (P1): the
+# default GITHUB_TOKEN without an explicit `permissions:` block can be
+# configured read-only for `statuses` by repo/org policy, which would
+# cause the final commit-status POST to 403. Grant `statuses: write`
+# explicitly so the new "Report commit status" step can post to the
+# legacy commit-status API.
+permissions:
+  contents: read
+  statuses: write
+
 concurrency:
   group: lean-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -97,3 +107,40 @@ jobs:
           if [ -f Lean/CollatzResearch/Q5RoutingPartitionTests.lean ]; then
             lake build CollatzResearch.Q5RoutingPartitionTests
           fi
+
+      # Final step: post legacy commit-status. The `lean-action@v1`
+      # only reports check-run status (via GitHub Checks API), not
+      # legacy commit-status. GitHub's PR view combines both APIs —
+      # until the legacy status API receives a final signal, DRAFT
+      # PRs show as "waiting for status to be reported" even though
+      # the check ran green. This step posts the final commit status
+      # so the PR view flips to success/failure immediately.
+      #
+      # Per GPT-5.6 Terra reviewer round 6 (P1 corrections):
+      #   - Use `github.event.pull_request.head.sha` for the status POST.
+      #     For `pull_request` workflows, `github.sha` resolves to the
+      #     synthetic test-merge SHA, not the PR head SHA; posting to the
+      #     test-merge SHA would NOT fix the PR view.
+      #   - Map `job.status` to a valid Commit Status API state.
+      #     `cancelled` (workflow cancellation) is NOT accepted by the
+      #     API; map it to `failure`. Any other unknown state → `error`.
+      #   - Do NOT add `|| true` / `exit 0`; let API/token failures fail
+      #     this step so they're surfaced rather than masked.
+      - name: Report commit status
+        if: always()
+        env:
+          GH_TOKEN: *** secrets.GITHUB_TOKEN }}
+        run: |
+          sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          case "${{ job.status }}" in
+            success) state=success ;;
+            failure|cancelled) state=failure ;;
+            *) state=error ;;
+          esac
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/statuses/${sha}" \
+            -f "state=${state}" \
+            -f "context=lean-ci/lake-build" \
+            -f "description=Final commit status report from lean-ci workflow"
