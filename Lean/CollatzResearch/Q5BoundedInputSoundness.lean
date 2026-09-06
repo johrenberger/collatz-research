@@ -237,81 +237,67 @@ noncomputable def checkBoundedCertificate_sound
   have hxpos : x - 1 < d.wire.N := by omega
   let i : Fin d.wire.N := ⟨x - 1, hxpos⟩
   have hiVal : i.val + 1 = x := by simp [i, Nat.sub_add_cancel hx]
+  -- OPTION B (structural rewrite per formal-math-codex-escalate):
+  -- Bind the witness to a non-dependent `w : CertWitness (i.val + 1)` so
+  -- the per-witness work uses `w.trajectory` directly. The existing
+  -- kernel-checked `anchorOk_implies_get_zero` in Q5Integration.lean uses
+  -- this exact pattern with non-dependent `w : CertWitness x`. Working
+  -- directly with the dependent `(d.certWitness i).trajectory` tripped
+  -- Lean's simplifier on the nil branch (4th CI failure); the non-dependent
+  -- `w.trajectory` mirrors the proven `anchorOk_implies_get_zero` pattern.
+  let w : CertWitness (i.val + 1) := d.certWitness i
   -- Per-witness check via `hExtracted` (canonical-input identity).
-  have hwcheck : checkCertWitness x d.wire.claim t l (d.certWitness i) = true := by
-    rw [← hiVal]
-    exact hExtracted i
+  -- `hExtracted i : checkCertWitness (i.val + 1) d.wire.claim t l (d.certWitness i) = true`;
+  -- `w = d.certWitness i` definitionally, so no rewrite needed.
+  have hwcheck : checkCertWitness (i.val + 1) d.wire.claim t l w = true :=
+    hExtracted i
   -- Decompose the per-witness check (Lemma 2). Right-associative
   -- `A ∧ B ∧ C ∧ D ∧ E` is `A ∧ (B ∧ (C ∧ (D ∧ E)))`; destructure
   -- nested.
-  have hwdecomp := (checkCertWitness_decompose x d.wire.claim t l
-      (d.certWitness i)).mp hwcheck
+  have hwdecomp := (checkCertWitness_decompose (i.val + 1) d.wire.claim t l w).mp hwcheck
   have ⟨hAnchor, hrest1⟩ := hwdecomp
   have ⟨hLeaf, hrest2⟩ := hrest1
   have ⟨hRouting, hrest3⟩ := hrest2
   have ⟨hTerminal, hTransition⟩ := hrest3
-  -- Trajectory is non-empty (from `anchorOk = true`). Derive via `by_contra`
-  -- to avoid the `cases` + `simp` interaction with the dependent
-  -- `(d.certWitness i)` term. The existing `anchorOk_implies_get_zero`
-  -- kernel-checked lemma uses the same `cases` + `simp` pattern but with a
-  -- non-dependent `w : CertWitness x`; the dependent version here trips
-  -- Lean's simplifier on the nil case.
-  have hne' : (d.certWitness i).trajectory ≠ [] := by
-    intro hcontra
-    -- hcontra : (d.certWitness i).trajectory = []
-    -- Then `anchorOk x (d.certWitness i)` reduces to `false`, contradicting hAnchor.
-    have : anchorOk x (d.certWitness i) = false := by
-      unfold anchorOk; rw [hcontra]
-    rw [this] at hAnchor
-    -- hAnchor : false = true; this is `False`, derived by `cases`.
-    exact (by cases hAnchor)
-  -- Convert `xs ≠ []` to `0 < xs.length` (Mathlib v4.33.0 prefers `Ne`).
-  have hne : 0 < (d.certWitness i).trajectory.length :=
-    List.length_pos_iff_ne_nil.mpr hne'
+  -- Trajectory is non-empty (from `anchorOk = true`). Mirror
+  -- `anchorOk_implies_get_zero` exactly: `unfold anchorOk at hAnchor`,
+  -- then `cases` on the (non-dependent) `w.trajectory`. The nil branch
+  -- discharges via `simp [htr] at hAnchor` (the `match` reduces to
+  -- `false`, contradicting `hAnchor : true`).
+  have hne : 0 < w.trajectory.length := by
+    unfold anchorOk at hAnchor
+    cases htr : w.trajectory with
+    | nil => simp [htr] at hAnchor
+    | cons hd tl => simp
+  -- Mathlib v4.33.0 `List.getLast_eq_getElem` takes `xs ≠ []` (Ne proof,
+  -- not `0 < xs.length`); convert via `List.length_pos_iff_ne_nil`.
+  have hne' : w.trajectory ≠ [] := List.length_pos_iff_ne_nil.mp hne
   -- `length - 1 < length` for the indexed access in `terminal_claim_transport`.
-  have hidx : (d.certWitness i).trajectory.length - 1 <
-      (d.certWitness i).trajectory.length := by omega
+  have hidx : w.trajectory.length - 1 < w.trajectory.length := by omega
   -- Convert `terminalClaimOk` (uses `getLast?`) to the indexed form
   -- `(trajectory)[length - 1]!` required by `terminal_claim_transport`.
-  -- Mathlib v4.33.0's `List.getLast_eq_getElem` takes `xs ≠ []` (Ne proof,
-  -- not `0 < xs.length`); convert via `List.length_pos_iff_ne_nil`.
-  have hne' : (d.certWitness i).trajectory ≠ [] :=
-    List.length_pos_iff_ne_nil.mp hne
-  have hLast : d.wire.claim.Holds
-      ((d.certWitness i).trajectory[(d.certWitness i).trajectory.length - 1]!) := by
-    rw [getElem!_pos (d.certWitness i).trajectory
-          ((d.certWitness i).trajectory.length - 1) hidx]
+  have hLast : d.wire.claim.Holds (w.trajectory[w.trajectory.length - 1]!) := by
+    rw [getElem!_pos w.trajectory (w.trajectory.length - 1) hidx]
     rw [← List.getLast_eq_getElem hne']
-    have hterm' : decide (d.wire.claim.Holds
-        ((d.certWitness i).trajectory.getLast hne')) = true := by
+    have hterm' : decide (d.wire.claim.Holds (w.trajectory.getLast hne')) = true := by
       simpa [List.getLast?_eq_some_getLast hne', terminalClaimOk] using hTerminal
     exact of_decide_eq_true hterm'
-  -- Per-pair check via `transitionOk_implies_step_forall`. Note: pass
--- `i.val + 1` (not `x`) so the elaborator matches `CertWitness (i.val + 1)`
--- with `(d.certWitness i) : CertWitness (i.val + 1)`. Lean's elaborator
--- doesn't auto-substitute via `hiVal`.
-  have hPerPair : ∀ j, j + 1 < (d.certWitness i).trajectory.length →
-      (d.certWitness i).trajectory[j + 1]! = acceleratedStep
-        ((d.certWitness i).trajectory[j]!) := by
+  -- Per-pair check via `transitionOk_implies_step`. Pass `i.val + 1` so
+  -- the elaborator matches `CertWitness (i.val + 1)` with `w`.
+  have hPerPair : ∀ j, j + 1 < w.trajectory.length →
+      w.trajectory[j + 1]! = acceleratedStep (w.trajectory[j]!) := by
     intro j hj
-    exact transitionOk_implies_step (i.val + 1) (d.certWitness i) hTransition j hj
-  -- Apply Lemma 4 (terminal_claim_transport). Same `i.val + 1`
--- substitution as above.
+    exact transitionOk_implies_step (i.val + 1) w hTransition j hj
+  -- Apply Lemma 4 (`terminal_claim_transport`).
   have hReaches : d.wire.claim.Holds
-      (accelerated_orbit (i.val + 1) ((d.certWitness i).trajectory.length - 1)) :=
-    terminal_claim_transport (i.val + 1) (d.certWitness i) d.wire.claim
+      (accelerated_orbit (i.val + 1) (w.trajectory.length - 1)) :=
+    terminal_claim_transport (i.val + 1) w d.wire.claim
       hAnchor hPerPair hLast
-  -- Re-substitute `i.val + 1 → x` to satisfy the `orbit_hits_claim` shape.
-  -- `rw [hiVal] at hReaches` fails with "motive is not type correct"
-  -- because `(d.certWitness i) : CertWitness (i.val + 1)` depends on
-  -- the rewritten term; Lean's tactic-mode `rw` can't abstract through
-  -- dependent types cleanly. Use the `congrArg ▸` pattern instead.
-  let k : Nat := (d.certWitness i).trajectory.length - 1
+  -- Final: assemble `k = length - 1`, then `i.val + 1 = x` via `congrArg`
+  -- (avoids the dependent-type motive failure of `rw [hiVal]`).
+  let k : Nat := w.trajectory.length - 1
   have hEq : accelerated_orbit (i.val + 1) k = accelerated_orbit x k :=
     congrArg (fun n => accelerated_orbit n k) hiVal
-  -- `hEq ▸ hReaches : claim.Holds (accelerated_orbit x k)` by
-  -- substituting LHS (`accelerated_orbit (i.val + 1) k`) with RHS
-  -- (`accelerated_orbit x k`) inside `hReaches`.
   exact ⟨k, hEq ▸ hReaches⟩
 
 /-! ## v2b.5 — Lemma 6: per_leaf_available_bounded_of_check (kernel-clean)
