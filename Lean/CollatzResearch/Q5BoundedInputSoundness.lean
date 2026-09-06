@@ -261,16 +261,18 @@ noncomputable def checkBoundedCertificate_sound
       (d.certWitness i).trajectory.length := by omega
   -- Convert `terminalClaimOk` (uses `getLast?`) to the indexed form
   -- `(trajectory)[length - 1]!` required by `terminal_claim_transport`.
-  -- Mirrors `routing_partition_witness_reaches_one`'s construction in
-  -- `Q5RoutingPartition.lean` (the `getLast_eq_getElem` rewrite + `of_decide_eq_true`).
+  -- Mathlib v4.33.0's `List.getLast_eq_getElem` takes `xs ≠ []` (Ne proof,
+  -- not `0 < xs.length`); convert via `List.length_pos_iff_ne_nil`.
+  have hne' : (d.certWitness i).trajectory ≠ [] :=
+    List.length_pos_iff_ne_nil.mp hne
   have hLast : d.wire.claim.Holds
       ((d.certWitness i).trajectory[(d.certWitness i).trajectory.length - 1]!) := by
     rw [getElem!_pos (d.certWitness i).trajectory
           ((d.certWitness i).trajectory.length - 1) hidx]
-    rw [← List.getLast_eq_getElem hne]
+    rw [← List.getLast_eq_getElem hne']
     have hterm' : decide (d.wire.claim.Holds
-        ((d.certWitness i).trajectory.getLast hne)) = true := by
-      simpa [List.getLast?_eq_some_getLast hne, terminalClaimOk] using hTerminal
+        ((d.certWitness i).trajectory.getLast hne')) = true := by
+      simpa [List.getLast?_eq_some_getLast hne', terminalClaimOk] using hTerminal
     exact of_decide_eq_true hterm'
   -- Per-pair check via `transitionOk_implies_step_forall`. Note: pass
 -- `i.val + 1` (not `x`) so the elaborator matches `CertWitness (i.val + 1)`
@@ -288,16 +290,17 @@ noncomputable def checkBoundedCertificate_sound
     terminal_claim_transport (i.val + 1) (d.certWitness i) d.wire.claim
       hAnchor hPerPair hLast
   -- Re-substitute `i.val + 1 → x` to satisfy the `orbit_hits_claim` shape.
-  -- `hiVal : i.val + 1 = x` is the canonical-input identity.
-  -- `hReaches : claim.Holds (accelerated_orbit (i.val + 1) (length - 1))`.
-  -- `rw [hiVal]` rewrites `accelerated_orbit (i.val + 1) ...` to
-  -- `accelerated_orbit x ...` via `congrArg accelerated_orbit`.
-  rw [hiVal] at hReaches
-  -- Set `k = length - 1` to satisfy `∃ k, claim.Holds (accelerated_orbit x k)`.
-  -- `hdesc` is the explicit hypothesis of `orbit_hits_claim` (accepted
-  -- directly per PR #51 P1 — the witness's `routingOk` derives it
-  -- internally but the structure accepts the explicit hypothesis).
-  exact ⟨(d.certWitness i).trajectory.length - 1, hReaches⟩
+  -- `rw [hiVal] at hReaches` fails with "motive is not type correct"
+  -- because `(d.certWitness i) : CertWitness (i.val + 1)` depends on
+  -- the rewritten term; Lean's tactic-mode `rw` can't abstract through
+  -- dependent types cleanly. Use the `congrArg ▸` pattern instead.
+  let k : Nat := (d.certWitness i).trajectory.length - 1
+  have hEq : accelerated_orbit (i.val + 1) k = accelerated_orbit x k :=
+    congrArg (fun n => accelerated_orbit n k) hiVal
+  -- `hEq ▸ hReaches : claim.Holds (accelerated_orbit x k)` by
+  -- substituting LHS (`accelerated_orbit (i.val + 1) k`) with RHS
+  -- (`accelerated_orbit x k`) inside `hReaches`.
+  exact ⟨k, hEq ▸ hReaches⟩
 
 /-! ## v2b.5 — Lemma 6: per_leaf_available_bounded_of_check (kernel-clean)
 
