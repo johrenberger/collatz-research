@@ -61,6 +61,7 @@ Per GPT-5.6 Terra reviewer round 3 (Q1–Q4, subagent `9464f91e-...`):
 -/
 
 import CollatzResearch.BoundedInputCertificateData
+import CollatzResearch.Q5RoutingPartition
 
 namespace CollatzResearch
 
@@ -95,5 +96,30 @@ structure BoundedInputCertificateTree (t : CoverageTree) where
 def checkBoundedCertificateTree (t : CoverageTree)
     (tree : BoundedInputCertificateTree t) : Bool :=
   checkRoutingPartitionCertificate t tree.certData
+
+/-- **Lemma 5 (v2b.5 — per-tree reachability, kernel-clean by delegation).**
+    If `checkBoundedCertificateTree t tree = true` and every entry in
+    `tree.certData.wire.claimRegistry` is known to reach 1, then every
+    canonical input `x ∈ {1, …, N}` (where `N = tree.certData.wire.N`)
+    reaches 1.
+
+    The proof directly delegates to `RoutingPartitionCertificate_sound`
+    (PR #74, kernel-clean in main). No novel soundness work — the
+    thin-wrapper structure means the per-tree reachability is exactly
+    the routing-partition reachability.
+
+    Per reviewer round 4 F confirmation: this theorem is a one-line
+    exact delegation.
+
+    See `.openclaw/followouts/story-q5-option-c-spec.md` §
+    "checkBoundedCertificateTree_sound" for the full design rationale. -/
+theorem checkBoundedCertificateTree_sound
+    (t : CoverageTree) (tree : BoundedInputCertificateTree t)
+    (hcheck : checkBoundedCertificateTree t tree = true)
+    (hClaimReachesOne : ∀ (entry : LeafClaimWire),
+      entry ∈ tree.certData.wire.claimRegistry →
+      ∀ y, entry.claim.Holds y → ReachesOne y) :
+    ∀ (x : Nat), 0 < x → x ≤ tree.certData.wire.N → ReachesOne x := by
+  exact RoutingPartitionCertificate_sound t tree.certData hcheck hClaimReachesOne
 
 end CollatzResearch
