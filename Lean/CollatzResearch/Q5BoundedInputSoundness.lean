@@ -124,6 +124,9 @@ theorem transitionOk_implies_step (x : Nat) (w : CertWitness x)
     -- (and the min is in fact `xs.length - 1`, which is `≥ i` from `hi`).
     omega
   -- Lift the per-pair check from the fold to the indexed element.
+  -- `hpair` has type `((...).snd == acceleratedStep (...).fst) = true`
+  -- (Bool eq form). `simpa using hpair` discharges the Eq form
+  -- `(...).snd = acceleratedStep (...).fst` by rewriting with `beq_iff_eq`.
   have hpair := foldl_and_extract (List.zip (w.trajectory) (w.trajectory).tail)
     (fun pair => pair.snd == acceleratedStep pair.fst) hTrans
     (List.zip (w.trajectory) (w.trajectory).tail)[i]
@@ -132,8 +135,8 @@ theorem transitionOk_implies_step (x : Nat) (w : CertWitness x)
   -- `List.getElem_zip`, then `List.getElem_tail` rewrites the tail
   -- index to the parent.
   have hpair' : (List.zip (w.trajectory) (w.trajectory).tail)[i].snd =
-      acceleratedStep (List.zip (w.trajectory) (w.trajectory).tail)[i].fst :=
-    hpair
+      acceleratedStep (List.zip (w.trajectory) (w.trajectory).tail)[i].fst := by
+    simpa using hpair
   rw [List.getElem_zip] at hpair'
   rw [List.getElem_tail] at hpair'
   -- Rewrite to the original list's indexed access and conclude.
@@ -202,7 +205,7 @@ structure accepts the explicit hypothesis). -/
     `coverage_tree_soundness_orbit_cert_bounded` (which uses
     `descend_orbit_complete`) and to keep the PR #51 P1 discipline
     (explicit hypothesis preservation throughout). -/
-theorem checkBoundedCertificate_sound
+noncomputable def checkBoundedCertificate_sound
     (t : CoverageTree) (l : CoverageLeaf)
     (d : BoundedInputCertificateData)
     (hv : ValidTree t)
@@ -225,7 +228,7 @@ theorem checkBoundedCertificate_sound
     exact foldl_and_extract (List.finRange d.wire.N)
       (fun i => let x : Nat := i.val + 1
                 checkCertWitness x d.wire.claim t l (d.certWitness i))
-      hfoldTrue i (List.mem_finRange.mpr i.isLt)
+      hfoldTrue i (List.mem_finRange i)
   -- Step 2: Construct the certificate.
   refine { claim := d.wire.claim, claim_reaches_one := hcr, orbit_hits_claim := ?_ }
   intro x hx hN hdesc
@@ -310,11 +313,15 @@ hypothesis. -/
     Built from `checkBoundedCertificate_sound` (this file, Lemma 5).
     NO `sorry` / `admit` / `axiom`.
 
+    `noncomputable def` because it returns `BoundedInputOrbitCertificate`
+    (`: Type`-valued); see `checkBoundedCertificate_sound` for the
+    rationale.
+
     The bound is taken from the per-leaf data's `wire.N` (matching
     `checkBoundedCertificate_sound`'s return type), not as a free
     parameter (avoids the coercion-through-`BoundedInputOrbitCertificate`
     that a free-`N` signature would force). -/
-theorem per_leaf_available_bounded_of_check
+noncomputable def per_leaf_available_bounded_of_check
     (t : CoverageTree)
     (dataPerLeaf : ∀ l ∈ t.leaves, verified t l → BoundedInputCertificateData)
     (checkPerLeaf : ∀ l ∈ t.leaves, verified t l →
