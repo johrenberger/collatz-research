@@ -230,3 +230,28 @@ Depends on PR #55–#60 (Q4 META + bounded-orbit infrastructure; all merged), PR
 Story Q5 closes the Q5 4-PR split (extended to 5-PR with hotfix #66) for the bounded-input integration side. The end-to-end Q5 closure claim is NOT made — the soundness theorem is absent. Re-attempt gates documented in §4.
 
 The routing-partition sub-arc (PRs #67–#69) is complete and provides a parallel architecture for any future Lemma 5 re-attempt that chooses option (b) in §4.2.
+
+---
+
+## 8. 2026-09-06 — Conditional CI is not a backstop against API drift
+
+### 8a. PR #77 finding (conditional CI compiles files unconditionally)
+
+The conditional Lean CI job `Build Q5 routing-partition tests when present` (in `.github/workflows/lean-ci.yml` via `leanprover/lean-action@v1`'s `auto-config`) actually compiles `Lean/CollatzResearch/Q5RoutingPartitionTests.lean` against the root module environment, NOT just `lake build`. The file was NOT imported by `Lean/CollatzResearch.lean` at the time, but the conditional job still built it — and caught the two `native_decide` examples that needed `:= by` wrappers. Implication: a file that's compiled only by the conditional job path can still escape local `lake build` (default target). The P1 fix `:= by native_decide` was mandatory kernel elaboration, not just syntax hygiene, contradicting the PR #77 body claim that "CI does not exercise the file by design".
+
+### 8b. PR #78 finding (extending default-target build surface surfaces stale code)
+
+Story #1 (`#78`, MERGED `69b453b`) extended `Lean/CollatzResearch.lean` to import every orphaned Q5 + bounded-input module. CI caught 2 files with stale code against Lean 4 v4.33.0 + current Mathlib:
+
+- `Lean/CollatzResearch/BoundedInputCertificateParser.lean`: Mathlib API drift — `List.enum` removed, `←` outside `do`-block parse error, `partial def` parse error, `String.data` deprecated → `String.toList`. Plus `ParseError.wrongType` ctor name no longer matches the surface in `BoundedInputCertificateData.lean`.
+- `Lean/CollatzResearch/EquivalenceHelpersTests.lean`: 4 example-block "type expected, got" errors at lines 44, 48, 52, 56 against the current signatures of `standardTrajectory_compose` and `acceleratedTrajectory_reaches_one_implies_standard` (between Mathlib versions these gained extra implicit args).
+
+These 2 files had been orphaned from the root import block for ages without the conditional CI flagging the API drift. The fix was a bounded drop in Story #1's PR; the proper repair is captured as **follow-up Story #1b** ("bring `BoundedInputCertificateParser` + `EquivalenceHelpersTests` up to Lean 4 v4.33.0 + current Mathlib"). Three of the 4 errors in `EquivalenceHelpersTests.lean` are likely signature-tracking fixes that Mathlib updates broke; restoring them requires checking the current arity of `standardTrajectory_compose`/`acceleratedTrajectory_reaches_one_implies_standard` and either adjusting the `example` blocks or restoring the prior arity via local lemmas.
+
+### 8c. Implication for future work
+
+"Conditional CI = when present" is **not** a backstop against API drift. The durable fix is to import every file under `Lean/CollatzResearch/**` into the root so `make ci`'s `lake build` validates them all every run. Story #1 partially achieves this (11 of 14 newly-imported modules now root-compiled); the remaining work is Story #1b to repair the last 2 + close the loop.
+
+### 8d. Future CI improvement (open follow-up)
+
+Add a Lean CI step that compiles each `Lean/CollatzResearch/*.lean` file individually as a top-level target (e.g., `lake env lean <file> -c <output>`) **in addition to** the default-target build. The current conditional-jobs path is fragile because it depends on the action's internal pattern-matching against specific filenames. A "compile each file individually" job would catch API drift regardless of which file is orphaned or how the import graph shifts.
