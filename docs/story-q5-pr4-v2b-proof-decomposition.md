@@ -136,96 +136,123 @@ per-witness extraction. Same pattern as Q3 v4 + Q4 v3 + PR #58. The
 `descend_orbit_complete` projection step (step 6) is where v2a's proof attempt hit a wall;
 the issue is aligning witness anchors with `descendOrbit` routing.
 
-### 6. constructive per-leaf availability theorem (OPTION C redesign — 2026-09-06)
+### 6. constructive per-leaf availability theorem (OPTION C redesign, REVISED — 2026-09-06T15:56:40Z)
 
-**Architectural disposition (per Justin call message_id 23313):** **Option C** (hybrid:
-per-tree verifier with per-leaf certificate projection). Supersedes the original v2b
-per-leaf design (Option A) flagged as architecturally mismatched by GPT-5.6 Terra
-reviewer round 2 (subagent `0ee9bf18-...`, Q9 P0 stop signal). Full disposition in
+**Architectural disposition (per Justin calls message_id 23313 + 23323):** **Option C**
+(hybrid: per-tree verifier with per-leaf certificate projection), **revised per
+GPT-5.6 Terra reviewer round 3 (subagent `9464f91e-...`)** to use `RoutingPartitionCertificateData`
+(PR #74, kernel-clean in main) as the underlying data structure instead of legacy
+`BoundedInputCertificateData`. Supersedes the original v2b per-leaf design (Option A,
+flagged as architecturally mismatched by reviewer round 2 Q9). Full disposition in
 `.openclaw/followups/story-2-arch-disposition.md`; design details in
 `.openclaw/followups/story-q5-option-c-spec.md`.
 
 **Type:**
 
 ```lean
--- New per-tree wrapper (replaces the original per-leaf `dataPerLeaf` threading):
+-- THIN WRAPPER over the kernel-clean RoutingPartitionCertificateData (PR #74):
 structure BoundedInputCertificateTree (t : CoverageTree) where
-  perLeafData  : ∀ l ∈ t.leaves, verified t l → BoundedInputCertificateData
-  checkPerLeaf : ∀ l ∈ t.leaves, verified t l →
-    checkBoundedCertificate t l (perLeafData l ‹_› ‹_›) = true
+  certData : RoutingPartitionCertificateData   -- single field; no perLeafData / no checkPerLeaf
 
--- Per-tree verifier (no leaf parameter — analog of `checkRoutingPartitionCertificate`):
+-- Per-tree verifier (delegates to checkRoutingPartitionCertificate):
 def checkBoundedCertificateTree (t : CoverageTree)
-    (tree : BoundedInputCertificateTree t) : Bool := …
+    (tree : BoundedInputCertificateTree t) : Bool :=
+  checkRoutingPartitionCertificate t tree.certData
 
--- Lemma 5 (per-tree reachability — analog of `RoutingPartitionCertificate_sound`):
+-- Lemma 5 (per-tree reachability — DIRECTLY inherits RoutingPartitionCertificate_sound):
 theorem checkBoundedCertificateTree_sound
     (t : CoverageTree) (tree : BoundedInputCertificateTree t)
-    (hv : ValidTree t) (hic : IsComplete t)
-    (hcr : ∀ l ∈ t.leaves, verified t l →
-      ∀ y, (tree.perLeafData l …).wire.claim.Holds y → ReachesOne y)
+    (hcr : ∀ (entry : LeafClaimWire),
+      entry ∈ tree.certData.wire.claimRegistry →
+      ∀ y, entry.claim.Holds y → ReachesOne y)
     (hcheck : checkBoundedCertificateTree t tree = true) :
-    ∀ (x : Nat), 0 < x → x ≤ (tree.perLeafData l …).wire.N → ReachesOne x
+    ∀ (x : Nat), 0 < x → x ≤ tree.certData.wire.N → ReachesOne x :=
+  RoutingPartitionCertificate_sound t tree.certData hcheck hcr
 
--- Lemma 6 (per-leaf certificate projection — satisfies META § 3.2):
+-- NEW intermediate extraction (per-leaf certificate from per-tree reachability + per-leaf routing):
+theorem routing_partition_leaf_certificate
+    (t : CoverageTree) (tree : BoundedInputCertificateTree t)
+    (hcr : ∀ (entry : LeafClaimWire),
+      entry ∈ tree.certData.wire.claimRegistry →
+      ∀ y, entry.claim.Holds y → ReachesOne y)
+    (hcheck : checkBoundedCertificateTree t tree = true)
+    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l) :
+    BoundedInputOrbitCertificate t l tree.certData.wire.N := by
+  -- Construction uses `descend_orbit_complete` (PR #29) +
+  --   `checkRoutingPartitionCertificate_accepts_slot` (PR #74) +
+  --   `RoutingPartitionCertificate_sound` (PR #74).
+  ...
+
+-- Lemma 6 (per-leaf certificate projection — alias for routing_partition_leaf_certificate):
 theorem per_leaf_available_bounded_of_tree
     (t : CoverageTree) (tree : BoundedInputCertificateTree t)
-    (hv : ValidTree t) (hic : IsComplete t)
     (hcr : …)
     (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l) :
-    BoundedInputOrbitCertificate t l (tree.perLeafData l hl hver).wire.N
+    BoundedInputOrbitCertificate t l tree.certData.wire.N :=
+  routing_partition_leaf_certificate t tree hcr hcheck l hl hver
 ```
 
-**Strategy:** Apply the per-leaf `checkBoundedCertificate_sound` (v2b kernel-clean
-attempt) to `tree.perLeafData l hl hver` + `tree.checkPerLeaf l hl hver` + per-leaf
-`hcr l hl hver` to construct the per-leaf certificate directly. Alternatively,
-construct from the per-tree `checkBoundedCertificateTree_sound` reachability + per-
-leaf routing evidence (cleaner but requires more lemmas).
+**Strategy:** The thin wrapper means the per-tree reachability (Lemma 5) IS the
+routing-partition reachability — no new soundness theorem, just a delegation.
+The NEW intermediate extraction `routing_partition_leaf_certificate` bridges per-tree
+reachability + per-leaf routing evidence (`descendOrbit t x 0 = some l`) to the
+per-leaf `BoundedInputOrbitCertificate`. Lemma 6 is a direct alias for this
+extraction (no separate forward needed).
 
-Supersedes the v2a hypothesis-eliminator form `per_leaf_available_bounded_of_hCert`
-and the v2b per-leaf `per_leaf_available_bounded_of_check` (Option A, architecturally
-mismatched).
+Supersedes the v2a hypothesis-eliminator form `per_leaf_available_bounded_of_hCert`,
+the v2b per-leaf `per_leaf_available_bounded_of_check` (Option A, architecturally
+mismatched), and the intermediate Option C spec with legacy
+`BoundedInputCertificateData` (revision 2026-09-06T15:40:25Z).
 
-**Dependencies:** Lemma 5 (per-leaf, kernel-clean attempt) +
-`checkBoundedCertificateTree_sound` (per-tree, NEW v2b.5) +
-`descend_orbit_complete` (PR #29) + `orbit_predecessor_reaches_one` (PR #56) +
-`RoutingPartitionCertificate_sound` (PR #74, kernel-clean analog).
+**Dependencies:** `RoutingPartitionCertificateData` (PR #74, kernel-clean) +
+`RoutingPartitionCertificate_sound` (PR #74, kernel-clean) +
+`checkRoutingPartitionCertificate_accepts_slot` (PR #74, per-slot acceptance) +
+`descend_orbit_complete` (PR #29) + `orbit_predecessor_reaches_one` (PR #56).
 
-**Risk:** Low (Option C is the kernel-clean synthesis of per-tree routing-partition
-+ per-leaf constructive availability). The hybrid is the natural resolution of the
-mismatch identified by reviewer round 2 Q9.
+**Risk:** Low. The thin wrapper over kernel-clean routing-partition data eliminates
+the legacy per-leaf `checkBoundedCertificate_sound` direct path (which repeated the
+fixed-leaf error per reviewer round 3). The intermediate extraction
+`routing_partition_leaf_certificate` is the natural bridge, paralleling the
+kernel-clean routing-partition closure pattern.
 
-**Why Option C:**
-- Matches the kernel-clean routing-partition closure pattern (PR #74) for the
-  per-tree reachability piece.
-- Satisfies META § 3.2 (constructive per-leaf availability) for the per-leaf
-  certificate projection piece.
-- Wire format compatible: `BoundedInputCertificateWire` per-leaf payload is preserved
-  (the per-tree wrapper is a Lean-only construct).
+**Why revised Option C (per reviewer round 3):**
+- **Q1:** Single-field `BoundedInputCertificateTree` wrapping
+  `RoutingPartitionCertificateData` — no `checkPerLeaf` field (verifier recomputes,
+  matches routing-partition pattern).
+- **Q2:** `checkBoundedCertificateTree : Bool` — matches
+  `checkRoutingPartitionCertificate` signature.
+- **Q3:** Per-tree path with intermediate `routing_partition_leaf_certificate` —
+  direct path via per-leaf `checkBoundedCertificate_sound` repeats the fixed-leaf
+  error.
+- **Q4:** Use existing `RoutingPartitionCertificateWire` — no new wire types needed.
 
-## Sub-commit sequencing (OPTION C updated — 2026-09-06)
+## Sub-commit sequencing (OPTION C REVISED — 2026-09-06T15:56:40Z)
 
-- **v2b.1** — Lemmas 1–2 + supporting definitions (mechanical extraction; kernel-clean in `Q5Integration.lean`)
-- **v2b.2** — Lemma 3 + Lemma 4 (trajectory indexing + terminal-claim transport; kernel-clean in `Q5Integration.lean` after the v2b.2 Codex P0 fix)
+The revised sequencing is shorter because the per-tree reachability is inherited from
+routing-partition (no new soundness theorem needed):
+
+- **v2b.1** — Lemmas 1–2 + supporting definitions (kernel-clean in `Q5Integration.lean`)
+- **v2b.2** — Lemma 3 + Lemma 4 (kernel-clean in `Q5Integration.lean` after the v2b.2 Codex P0 fix)
 - **v2b.3** — `transitionOk_implies_step` bridge + `transitionOk_implies_step_forall` (**MERGED** via PR #81 commit `441f878` — kernel-clean)
-- **v2b.4** — `BoundedInputCertificateTree` structure + `checkBoundedCertificateTree` function (NEW per-tree wrapper + verifier — depends on v2b.1–3)
-- **v2b.5** — `checkBoundedCertificateTree_sound` (per-tree reachability, kernel-clean; analog of `RoutingPartitionCertificate_sound` — depends on v2b.4)
-- **v2b.6** — `per_leaf_available_bounded_of_tree` (per-leaf certificate projection; kernel-checked via per-leaf `checkBoundedCertificate_sound` direct path — depends on v2b.5)
-- **v2b.7** — Tests (per-tree `check = true` regressions + soundness closure scenario + per-leaf projection regressions — mirrors PR #62 + PR #63 + PR #75 test patterns)
+- **v2b.4** — `BoundedInputCertificateTree` structure + `checkBoundedCertificateTree` delegation (THIN WRAPPER over `RoutingPartitionCertificateData` + `checkRoutingPartitionCertificate` — kernel-clean delegation; depends on v2b.1–3)
+- **v2b.5** — `checkBoundedCertificateTree_sound` (per-tree reachability; DIRECTLY inherits `RoutingPartitionCertificate_sound`; depends on v2b.4)
+- **v2b.6** — `routing_partition_leaf_certificate` (NEW intermediate extraction — bridges per-tree reachability + per-leaf routing to per-leaf `BoundedInputOrbitCertificate`; depends on v2b.5 + `descend_orbit_complete` (PR #29))
+- **v2b.7** — `per_leaf_available_bounded_of_tree` (alias for v2b.6 — satisfies META § 3.2; depends on v2b.6)
+- **v2b.8** — Tests (per-tree + per-leaf regressions — mirrors PR #75 routing-partition test patterns; depends on v2b.7)
 
 **Staged implementation (Option B per Justin message_id 23317):**
 - Stage 1 = spec doc update (this section + design doc) — **CURRENT**
 - Stage 2 = v2b.4 implementation (gated on Stage 1 approval)
 - Stage 3 = v2b.5 implementation (gated on Stage 2 kernel-clean + GPT-5.6 Terra review)
-- Stage 4 = v2b.6 implementation (gated on Stage 3 kernel-clean + review)
-- Stage 5 = v2b.7 tests (gated on Stage 4 kernel-clean + review)
+- Stage 4 = v2b.6 + v2b.7 implementation (gated on Stage 3 kernel-clean + review)
+- Stage 5 = v2b.8 tests (gated on Stage 4 kernel-clean + review)
 
 Each sub-commit triggers a Codex review round. PR `story-q5-per-tree-with-projection`
 stays in DRAFT throughout the staged implementation.
 
-Once GPT-5.6 Terra approves v2b.7 (Stage 5), retitle PR from "v2b Option C staged
-implementation" to "v2 — bounded-input integration (closes Q5 4-PR split)" and
-remove from draft. No Q5-end-to-end / Q5-complete claim is allowed before v2b.7.
+Once GPT-5.6 Terra approves v2b.8 (Stage 5), retitle PR from "v2b Option C revised
+staged implementation" to "v2 — bounded-input integration (closes Q5 4-PR split)" and
+remove from draft. No Q5-end-to-end / Q5-complete claim is allowed before v2b.8.
 
 ## Open questions
 
