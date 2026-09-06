@@ -10,14 +10,17 @@ import CollatzResearch.Residues
 -- conditional Lean CI jobs ("when present"); making them root imports
 -- ensures `make ci` and `lake build` validate them every run.
 --
--- Excluded (kept on the conditional CI path until Story #1b fixes them):
---   * `BoundedInputCertificateParser` / `BoundedInputCertificateParserTests`
---     — Mathlib API drift (`List.enum` removed in current Mathlib),
---     `←` outside `do`-block parse error, `partial def` parse error,
---     `String.data` deprecated → `String.toList`.
---   * `EquivalenceHelpersTests` — 4 example-block syntax errors against
---     the current signatures of `standardTrajectory_compose` and
---     `acceleratedTrajectory_reaches_one_implies_standard`.
+-- Story #1b (PR #80) attempted to bring the 3 remaining orphans up to
+-- Lean 4 v4.33.0 + current Mathlib, but the cascade exceeded the
+-- controller's "same strategy × 2 failed → BLOCK" budget (RCS >> 12)
+-- and was formally escalated. See
+-- `.openclaw/diagnostics/story-q5-root-import-coverage/escalation-001.md`
+-- for the full diagnostic. **Story #1c** is the follow-up rewrite work
+-- packet (partial rewrite of `BoundedInputCertificateParser.lean` against
+-- current Mathlib + Lean 4 v4.33.0 idioms). Until that lands, these
+-- 3 modules stay on the conditional-CI path. The parser-fixup commits
+-- from PR #80 are kept as defensive hygiene (they help conditional CI
+-- even without root-import).
 import CollatzResearch.Importer
 import CollatzResearch.CoverageTree
 import CollatzResearch.BoundedInputCertificateData

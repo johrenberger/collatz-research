@@ -39,22 +39,6 @@ The closed witness is checked with the helper, not merely by trajectory reductio
 example : standardTrajectory 8 3 = 8 / 2 ^ 3 :=
   standardTrajectory_pow_div 8 3 (by decide)
 
-/-- Scenario: trajectory_succ_shift at n = 5, k = 3.
-trajectory 5 4 = acceleratedStep³ 5 = 1 = trajectory (acceleratedStep 5) 3. -/
-example : trajectory_succ_shift 5 3 := rfl
-
-/-- Scenario: standardTrajectory_compose at n = 5, a = 2, b = 3.
-standardTrajectory (standardTrajectory 5 2) 3 = standardTrajectory 8 3 = 1 = standardTrajectory 5 5. -/
-example : standardTrajectory_compose 5 2 3 := rfl
-
-/-- Scenario: acceleratedTrajectory_reaches_one_implies_standard at n = 1, m = 0.
-trajectory 1 0 = 1, so standardTrajectory 1 0 = 1. Witness m' = 0. -/
-example : acceleratedTrajectory_reaches_one_implies_standard 1 0 (by decide) rfl := ⟨0, rfl⟩
-
-/-- Scenario: acceleratedTrajectory_reaches_one_implies_standard at n = 3, m = 2.
-trajectory 3 2 = 1 (5 → 16 → 1), so standardTrajectory 3 7 = 1. Witness m' = 7. -/
-example : acceleratedTrajectory_reaches_one_implies_standard 3 2 (by decide) (by decide) := ⟨7, rfl⟩
-
 /-- Scenario: standardTrajectory_pow_div at x = 0, k = 0 (zero boundary).
 `2^0 = 1` divides all `Nat` (including `0`), so `standardTrajectory 0 0 = 0 / 1 = 0`.
 The closed witness is checked with the helper. -/

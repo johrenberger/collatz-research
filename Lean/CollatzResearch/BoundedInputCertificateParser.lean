@@ -169,7 +169,7 @@ def ParseError.toString : ParseError → String
   | .surrogateInUnicodeEscape =>
     "MALFORMED_JSON: surrogate halves not allowed in \\uXXXX"
   | .missingField k => s!"MISSING_FIELD: '{k}'"
-  | .wrongType t p => s!"WRONG_TYPE: expected {t} at {p}"
+  | .wrongTypeAt t p => s!"WRONG_TYPE: expected {t} at {p}"
   | .unknownField f p => s!"UNKNOWN_FIELD: '{f}' at {p}"
   | .unknownClaimTag t => s!"UNSUPPORTED_CLAIM_TAG: '{t}'"
   | .unsupportedSchemaVersion v => s!"UNSUPPORTED_SCHEMA_VERSION: '{v}'"
@@ -184,7 +184,7 @@ def ParseError.toString : ParseError → String
   | .wrongFieldSet p m => s!"WRONG_TYPE: at {p}: {m}"
   | .notAnObject p => s!"WRONG_TYPE: expected JSON object at {p}"
   | .nonAsciiChar p cp =>
-    s!"INVALID_VALUE: non-ASCII character (codepoint U+{cp.toHexString}) at {p}"
+    s!"INVALID_VALUE: non-ASCII character (codepoint {cp}) at {p}"
   | .invalidHexDigit c => s!"MALFORMED_JSON: invalid hex digit '{c}'"
   | .notALiteral => "MALFORMED_JSON: expected literal (true/false/null)"
   | .expectedDigit => "MALFORMED_JSON: expected digit"
@@ -214,7 +214,7 @@ def isAsciiPrintable (c : Char) : Bool :=
     if any char in `s` is outside 0x20..0x7E; `.ok ()` otherwise.
     `path` is included in the rejection for diagnostics. -/
 def checkAscii (path : String) (s : String) : Except ParseError Unit :=
-  match s.data.find? (fun c => ¬ isAsciiPrintable c) with
+  match s.toList.find? (fun c => ¬ isAsciiPrintable c) with
   | some c => .error (.nonAsciiChar path c.toNat)
   | none => .ok ()
 
@@ -270,12 +270,12 @@ def hexDigitVal : Char → Except ParseError Nat
   | c => .error (.invalidHexDigit c)
 
 def parseHex4 : List Char → Except ParseError (Nat × List Char)
-  | c1 :: c2 :: c3 :: c4 :: rest =>
+  | c1 :: c2 :: c3 :: c4 :: rest => do
     let n1 ← hexDigitVal c1
     let n2 ← hexDigitVal c2
     let n3 ← hexDigitVal c3
     let n4 ← hexDigitVal c4
-    .ok (n1 * 0x1000 + n2 * 0x100 + n3 * 0x10 + n4, rest)
+    pure (n1 * 0x1000 + n2 * 0x100 + n3 * 0x10 + n4, rest)
   | _ => .error (.invalidEscape "expected 4 hex digits after \\u")
 
 partial def parseStringContent (acc : List Char) : List Char →
@@ -296,7 +296,7 @@ partial def parseStringContent (acc : List Char) : List Char →
     else if let some c := Char.ofNat? n then
       parseStringContent (c :: acc) rest
     else
-      .error (.invalidEscape s!"invalid unicode codepoint U+{n.toHexString}")
+      .error (.invalidEscape s!"invalid unicode codepoint U+{n}")
   | '\\' :: c :: _ => .error (.invalidEscape s!"\\{c}")
   | c :: rest =>
     let cp := c.toNat
@@ -312,7 +312,23 @@ def parseString : List Char → Except ParseError (String × List Char)
 
 /-! ## Value / Array / Object parsing -/
 
-def parseValue : List Char → Except ParseError (JsonValue × List Char)
+mutual
+
+partial def parseValue : List Char → Except ParseError (JsonValue × List Char)
+  | cs =>
+    let cs := skipWs cs
+    match cs with
+    | 't' :: _ | 'f' :: _ | 'n' :: _ => parseLiteral cs
+    | '"' :: _ => parseString cs
+    | '[' :: rest => parseArray [] (skipWs rest)
+    | '{' :: rest => parseObject [] (skipWs rest)
+    | c :: _ =>
+      if '0' ≤ c ∧ c ≤ '9' then
+        let (n, rest) ← parseNum cs
+        .ok (.num n, rest)
+      else
+        .error (.unexpectedCharacter c)
+    | [] => .error .unexpectedEof
 
 partial def parseArray (items : List JsonValue) : List Char →
     Except ParseError (JsonValue × List Char)
@@ -356,24 +372,10 @@ partial def parseObject (entries : List (String × JsonValue)) :
         | [] => .error .unexpectedEof
         | c :: _ => .error (.expectedChar ',' s!"'{c}'")
 
-def parseValue : List Char → Except ParseError (JsonValue × List Char)
-  | cs =>
-    let cs := skipWs cs
-    match cs with
-    | 't' :: _ | 'f' :: _ | 'n' :: _ => parseLiteral cs
-    | '"' :: _ => parseString cs
-    | '[' :: rest => parseArray [] (skipWs rest)
-    | '{' :: rest => parseObject [] (skipWs rest)
-    | c :: _ =>
-      if '0' ≤ c ∧ c ≤ '9' then
-        let (n, rest) ← parseNum cs
-        .ok (.num n, rest)
-      else
-        .error (.unexpectedCharacter c)
-    | [] => .error .unexpectedEof
+end
 
 def parseJson (s : String) : Except ParseError JsonValue :=
-  let cs := s.data
+  let cs := s.toList
   let cs := skipWs cs
   match parseValue cs with
   | .ok (v, rest) =>
@@ -466,7 +468,7 @@ def parseCertWitnessWire (path : String) (v : JsonValue) :
     let trajectory ← match lookupKey "trajectory" entries with
       | some (.array []) => .error .emptyTrajectory
       | some (.array items) =>
-        items.enum.foldlM (init := []) fun acc (i, item) =>
+        (List.range items.length).zip items |>.foldlM (init := []) fun acc (i, item) =>
           match item with
           | .num 0 => .error (.trajectoryEntryMustBePositive i)
           | .num n => .ok (n :: acc)
@@ -503,7 +505,7 @@ def parseBoundedInputCertificateWire (s : String) :
   let rawWitnesses ← match rawV with
     | .array [] => .error .emptyTrajectory
     | .array items =>
-      items.enum.foldlM (init := []) fun acc (i, item) =>
+      (List.range items.length).zip items |>.foldlM (init := []) fun acc (i, item) =>
         parseCertWitnessWire s!"rawWitnesses[{i}]" item >>= fun w =>
           .ok (w :: acc)
     | _ => .error (.wrongTypeAt "non-empty array" "$.rawWitnesses")
