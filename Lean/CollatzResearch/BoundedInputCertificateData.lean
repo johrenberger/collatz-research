@@ -186,6 +186,51 @@ def BoundedInputCertificateData.certWitness (d : BoundedInputCertificateData) :
 def sameCoverageLeaf (a b : CoverageLeaf) : Bool :=
   a.leafId == b.leafId && a.leafProperty == b.leafProperty
 
+/-- **Bridge lemma (Story Q5 Stage 4).** Convert the local Boolean
+    fieldwise equality `sameCoverageLeaf` into propositional equality.
+
+    The default `BEq String` instance is derived from `DecidableEq String`,
+    so `s == t = decide (s = t)` definitionally. Combined with
+    `of_decide_eq_true` (the forward direction of the `decide`-`Prop`
+    bridge), this yields `(s == t) = true → s = t` for any `s t : String`.
+    Case-splitting on the conjunction, then on each fieldwise `BEq`-`true`
+    fact, gives fieldwise `Prop` equalities, which combine to `a = b` via
+    the auto-generated constructor injectivity `CoverageLeaf.mk.injEq`
+    (after unfolding `a` and `b` to their `CoverageLeaf.mk` constructor).
+
+    Kernel-clean (no `sorry` / `admit` / `axiom`).
+
+    Required by `routing_partition_leaf_certificate` (Stage 4) to bridge
+    the Boolean witness acceptance `routesToRoutingLeaf t x w.leaf = true`
+    and the registry-leaf `entry.leaf = l` with the routing fact
+    `descendOrbit t x 0 = some l`. -/
+theorem sameCoverageLeaf_eq {a b : CoverageLeaf} :
+    sameCoverageLeaf a b = true → a = b := by
+  intro h
+  -- Extract the two BEq conjuncts from the conjunction equality.
+  obtain ⟨hId, hProp⟩ := (Bool.and_eq_true _ _).mp h
+  -- Bridge each String `BEq`-true fact to a Prop equality. The default
+  -- `BEq String` instance is derived from `DecidableEq String`, so
+  -- `(s == t) = decide (s = t)` is definitional; `of_decide_eq_true`
+  -- then closes each fieldwise equality.
+  have hIdEq : a.leafId = b.leafId := by
+    have heq : (a.leafId == b.leafId) = decide (a.leafId = b.leafId) := rfl
+    rw [heq] at hId
+    exact of_decide_eq_true hId
+  have hPropEq : a.leafProperty = b.leafProperty := by
+    have heq : (a.leafProperty == b.leafProperty) = decide (a.leafProperty = b.leafProperty) := rfl
+    rw [heq] at hProp
+    exact of_decide_eq_true hProp
+  -- Unfold `a` and `b` to their `CoverageLeaf.mk` constructors (struct
+  -- eta-equality); then `CoverageLeaf.mk.injEq` (auto-generated) reduces
+  -- the constructor equality to the fieldwise conjunction, and `.mpr`
+  -- reconstructs `a = b` from the conjunction.
+  have ha : a = ⟨a.leafId, a.leafProperty⟩ := rfl
+  have hb : b = ⟨b.leafId, b.leafProperty⟩ := rfl
+  rw [ha, hb]
+  exact (CoverageLeaf.mk.injEq a.leafId a.leafProperty b.leafId b.leafProperty).mpr
+    ⟨hIdEq, hPropEq⟩
+
 /-- Boolean check that orbit routing reached the witness's claimed leaf. -/
 def routesToWitnessLeaf (t : CoverageTree) (x : Nat) (w : CertWitness x) : Bool :=
   match descendOrbit t x 0 with
