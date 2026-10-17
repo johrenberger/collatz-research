@@ -332,4 +332,50 @@ noncomputable def routing_partition_leaf_certificate
     intros y hy
     exact hClaimReachesOne entry_canon hmem_canon y hy
 
+/-- **v2b.7 — per-leaf availability pattern (constructive form, alias).**
+
+    Wraps `routing_partition_leaf_certificate` (v2b.6) with the spec's
+    naming convention. This is the constructive availability theorem
+    per Codex Q5 verdict — takes a `BoundedInputCertificateTree`
+    (wrapping `RoutingPartitionCertificateData`) + the per-tree
+    `check = true` evidence + the per-registry `claim_reaches_one`
+    hypothesis + the per-leaf `hRegistry` hypothesis, returns the
+    per-leaf `BoundedInputOrbitCertificate` constructively.
+
+    **Supersedes the v2a hypothesis-eliminator form
+    `per_leaf_available_bounded_of_hCert`** in `Q5Integration.lean`
+    (which required the caller to already have the per-leaf
+    certificate in scope). The constructive form closes the
+    per-leaf certificate from the Boolean check + the reachability
+    assumption + the per-leaf registry witness.
+
+    **Naming note:** the spec doc-comments in `Q5Integration.lean`
+    use the name `per_leaf_available_bounded_of_check` (Codex Q5
+    verdict name); the v2b.7 summary previously called it
+    `per_leaf_available_bounded_of_tree`. This alias uses the
+    spec name for consistency with META § 3.2 terminology.
+
+    **Kernel-clean:** no `sorry` / `admit` / `axiom`. The def is
+    `noncomputable` because the construction uses
+    `Classical.choose` to extract from the `hRegistry` existential
+    in a `Type` context (inherited from v2b.6).
+
+    **Why this file, not `Q5Integration.lean`:** importing
+    `BoundedInputCertificateTree` in `Q5Integration.lean` would
+    create a build cycle (`Q5Integration` → `BoundedInputCertificateTree`
+    → `Q5RoutingPartition` → `Q5Integration`). Placing the alias
+    here, alongside v2b.6, keeps the import DAG acyclic. -/
+noncomputable def per_leaf_available_bounded_of_check
+    (t : CoverageTree) (tree : BoundedInputCertificateTree t)
+    (hcheck : checkBoundedCertificateTree t tree = true)
+    (hClaimReachesOne : ∀ (entry : LeafClaimWire),
+      entry ∈ tree.certData.wire.claimRegistry →
+      ∀ y, entry.claim.Holds y → ReachesOne y)
+    (hRegistry : ∀ l, l ∈ t.leaves → verified t l →
+      ∃ entry ∈ tree.certData.wire.claimRegistry, entry.leaf = l)
+    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l) :
+    BoundedInputOrbitCertificate t l tree.certData.wire.N :=
+  routing_partition_leaf_certificate t tree hcheck hClaimReachesOne
+    hRegistry l hl hver
+
 end CollatzResearch
