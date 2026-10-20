@@ -50,6 +50,7 @@ clarity. -/
 import CollatzResearch.BoundedInputCertificateTree
 import CollatzResearch.Q5Integration
 import CollatzResearch.Q5RoutingPartition
+import CollatzResearch.Q5VerifierTests
 
 -- Type-check tests. `#check` is a Lean 4 command that must appear at the
 -- top level (not inside a `namespace` block) and not after a doc
@@ -179,5 +180,76 @@ noncomputable example (t : CoverageTree) (tree : BoundedInputCertificateTree t)
             (accelerated_orbit x k) :=
   (routing_partition_leaf_certificate t tree hcheck hClaimReachesOne
     hRegistry l hl hver).orbit_hits_claim
+
+/-! ## Concrete-data test (v2b.6 + v2b.7)
+
+Replaces the abstract `t : CoverageTree` from the type-only layer with the
+actual `routingPartitionTwoLeafTree` fixture from `Q5VerifierTests.lean`.
+This exercises v2b.6 + v2b.7 elaborating against:
+
+- The canonical `BoundedInputCertificateTree` wrapper
+  (`{ certData := twoLeafRoutingPartition }`),
+- The canonical routing-partition check (`by native_decide`,
+  matching the existing `RoutingPartitionCertificate_sound` example
+  in `Q5RoutingPartitionTests.lean`).
+
+The per-leaf hypotheses (`hClaimReachesOne` / `hRegistry` /
+`hl` / `hver`) are retained symbolically per LEAN_PATTERNS.md P10
+("retain a symbolic theorem for general claims"). Each is a
+constructive obligation discharged independently by a downstream
+caller; this test verifies that v2b.6 + v2b.7 typecheck and
+elaborate against the canonical fixture + the decidable check. -/
+
+noncomputable example
+    (hClaimReachesOne : ∀ (entry : LeafClaimWire),
+      entry ∈ twoLeafRoutingPartition.wire.claimRegistry →
+      ∀ y, entry.claim.Holds y → ReachesOne y)
+    (hRegistry : ∀ (l : CoverageLeaf),
+      l ∈ routingPartitionTwoLeafTree.leaves →
+      verified routingPartitionTwoLeafTree l →
+      ∃ entry ∈ twoLeafRoutingPartition.wire.claimRegistry,
+        entry.leaf = l)
+    (l : CoverageLeaf) (hl : l ∈ routingPartitionTwoLeafTree.leaves)
+    (hver : verified routingPartitionTwoLeafTree l) :
+    BoundedInputOrbitCertificate routingPartitionTwoLeafTree
+      l twoLeafRoutingPartition.wire.N :=
+  per_leaf_available_bounded_of_check
+    routingPartitionTwoLeafTree
+    { certData := twoLeafRoutingPartition }
+    (by native_decide)
+    hClaimReachesOne
+    hRegistry l hl hver
+
+/-! ## Concrete-data test (v2b.6 via `routing_partition_leaf_certificate`)
+
+Symmetric concrete-data elaboration test for v2b.6 (the parent's
+`routing_partition_leaf_certificate` extraction). Same fixture,
+same per-leaf hypotheses retained symbolically, same decidable
+check.  Independent elaboration site from v2b.7 above: if the
+v2b.6 extraction reuses the v2b.6 sub-proofs
+(`registry_unique_of_pairwise_irrefl`,
+`trajectory_anchor_orbit_step`, etc., kernel-clean in
+`Q5Stage4Subproofs.lean`) then this test elaborates against the
+same concrete data without touching the proof bodies. -/
+
+noncomputable example
+    (hClaimReachesOne : ∀ (entry : LeafClaimWire),
+      entry ∈ twoLeafRoutingPartition.wire.claimRegistry →
+      ∀ y, entry.claim.Holds y → ReachesOne y)
+    (hRegistry : ∀ (l : CoverageLeaf),
+      l ∈ routingPartitionTwoLeafTree.leaves →
+      verified routingPartitionTwoLeafTree l →
+      ∃ entry ∈ twoLeafRoutingPartition.wire.claimRegistry,
+        entry.leaf = l)
+    (l : CoverageLeaf) (hl : l ∈ routingPartitionTwoLeafTree.leaves)
+    (hver : verified routingPartitionTwoLeafTree l) :
+    BoundedInputOrbitCertificate routingPartitionTwoLeafTree
+      l twoLeafRoutingPartition.wire.N :=
+  routing_partition_leaf_certificate
+    routingPartitionTwoLeafTree
+    { certData := twoLeafRoutingPartition }
+    (by native_decide)
+    hClaimReachesOne
+    hRegistry l hl hver
 
 end CollatzResearch
