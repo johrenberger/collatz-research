@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from pathlib import Path
 
 PLUGIN = Path(__file__).parents[1] / "integrations" / "openclaw-lifecycle-plugin"
+SCOPE = PLUGIN / "scope.js"
 DISPATCHER = Path(__file__).parents[1] / "scripts" / "dispatch_codex_pr_review.py"
 
 
@@ -88,3 +91,67 @@ def test_fresh_install_bootstrap_is_valid() -> None:
     assert "required" not in manifest["configSchema"]
     assert "repoPath, stateDir, and scripts/agent_lifecycle.py are required" in source
     assert "2026.7.1-2" in readme
+
+
+_SCOPE_HARNESS = """
+import { inScope } from "__MODULE__";
+const cases = JSON.parse(process.env.SCOPE_CASES);
+const out = cases.map((c) => inScope(c.context, c.config));
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+def _scope_decisions(cases: list[dict]) -> list[bool]:
+    """Evaluate the real scope module for each case through node."""
+    harness = _SCOPE_HARNESS.replace("__MODULE__", SCOPE.as_uri())
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", harness],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "SCOPE_CASES": json.dumps(cases)},
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def test_workspace_gate_limits_enforcement_to_the_configured_repository(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "collatz-research"
+    repo.mkdir()
+    sibling = tmp_path / "collatz-research-sandbox"
+    sibling.mkdir()
+    alias = tmp_path / "repo-link"
+    alias.symlink_to(repo)
+
+    cases = [
+        # The repository's own workspace stays in scope.
+        ({"workspaceDir": str(repo)}, {"repoPath": str(repo)}, True),
+        # A symlink resolving to the repository is the same project.
+        ({"workspaceDir": str(alias)}, {"repoPath": str(repo)}, True),
+        # A prefix sibling must not inherit the ledger's budgets.
+        ({"workspaceDir": str(sibling)}, {"repoPath": str(repo)}, False),
+        # The unrelated global agent workspace is out of scope.
+        ({"workspaceDir": "/data/.openclaw/workspace"}, {"repoPath": str(repo)}, False),
+        # A turn reporting no workspace is untrusted, not admitted.
+        ({}, {"repoPath": str(repo)}, False),
+        ({"workspaceDir": ""}, {"repoPath": str(repo)}, False),
+        # An unreadable path never matches.
+        ({"workspaceDir": str(tmp_path / "absent")}, {"repoPath": str(repo)}, False),
+        # Without repoPath nothing can match.
+        ({"workspaceDir": str(repo)}, {}, False),
+    ]
+
+    decisions = _scope_decisions([{"context": ctx, "config": cfg} for ctx, cfg, _ in cases])
+
+    assert decisions == [expected for _, _, expected in cases]
+
+
+def test_given_a_global_plugin_when_a_turn_is_outside_the_repo_then_no_hook_enforces() -> None:
+    source = (PLUGIN / "index.js").read_text(encoding="utf-8")
+
+    for hook in ("before_agent_run", "before_tool_call", "after_tool_call", "agent_end"):
+        start = source.index(f'api.on("{hook}"')
+        end = source.index("}, { priority:", start)
+        assert "inThisProject(context, config)" in source[start:end], hook
