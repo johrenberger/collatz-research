@@ -9,6 +9,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import { inScope } from "./scope.js";
 
 const turnIds = new Map();
 const operationKeys = new Map();
@@ -69,6 +70,21 @@ function report(scope, error) {
   console.warn(`[collatz-lifecycle] ${scope}: ${error instanceof Error ? error.message : String(error)}`);
 }
 
+let missingWorkspaceReported = false;
+
+/**
+ * The ledger is registered globally but governs one project, so every hook is
+ * gated on the host resolving this turn to the configured repository. Other
+ * sessions keep their own budgets and receipts.
+ */
+function inThisProject(context, config) {
+  return inScope(context, config, () => {
+    if (missingWorkspaceReported) return;
+    missingWorkspaceReported = true;
+    report("scope", "hook context carries no workspaceDir; lifecycle enforcement skipped for this turn");
+  });
+}
+
 function reviewRequestFrom(event) {
   const params = event?.params ?? {};
   const repository = params.repository ?? params.repo ?? params.ownerRepo;
@@ -108,6 +124,7 @@ export default definePluginEntry({
       let config;
       try {
         config = pluginConfig(event, context);
+        if (!inThisProject(context, config)) return { outcome: "pass" };
         const { packet, run } = identifiers(event, context, config);
         const payload = JSON.stringify({
           source: "openclaw",
@@ -140,6 +157,7 @@ export default definePluginEntry({
       let config;
       try {
         config = pluginConfig(event, context);
+        if (!inThisProject(context, config)) return undefined;
         const { run } = identifiers(event, context, config);
         const budget = lifecycle(config, ["consume", "--turn-id", run, "--kind", "tool"]);
         if (budget.decision === "blocked") return block("tool budget is exhausted");
@@ -164,6 +182,7 @@ export default definePluginEntry({
       let receiptKey;
       try {
         const config = pluginConfig(event, context);
+        if (!inThisProject(context, config)) return;
         const { run } = identifiers(event, context, config);
         receiptKey = String(event.toolCallId ?? `${run}:${event.toolName ?? "unknown-tool"}`);
         const stored = operationKeys.get(receiptKey);
@@ -204,6 +223,7 @@ export default definePluginEntry({
       let run;
       try {
         const config = pluginConfig(event, context);
+        if (!inThisProject(context, config)) return;
         ({ run } = identifiers(event, context, config));
         if (!turnIds.has(run)) return;
         lifecycle(config, [
