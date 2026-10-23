@@ -1,28 +1,50 @@
 name: Lean CI
 
+# Trigger on every pull request and push to the protected branches.
+# No `paths:` filter on `pull_request`: if branch protection lists
+# `Lean CI / build` as a required check, the workflow MUST run for every
+# PR; otherwise the PR is BLOCKED with "waiting for status to be reported"
+# despite the Lean source being unchanged. (This caused the v2b.6 PR #89
+# merge-state to be BLOCKED after a successful run.) Keeping the filter
+# off is the safe default for required checks; the workflow is cheap to
+# run when there's nothing to rebuild because `lean-action` caches Mathlib
+# and incremental `lake build` is sub-second on unchanged modules.
 on:
   pull_request:
     branches:
       - main
       - agent/bootstrap-research-monorepo
-    paths:
-      - 'lean-toolchain'
-      - 'lakefile.toml'
-      - 'lake-manifest.json'
-      - 'Lean/**'
-      - '.github/workflows/lean-ci.yml'
   push:
     branches:
       - main
       - agent/bootstrap-research-monorepo
   workflow_dispatch:
 
+# Do NOT cancel in-flight runs on new commits. Cancelling leaves the PR
+# with no passing required check until the new run finishes; if a
+# force-push happens during the run, the user sees "stuck after successful
+# run" because the previous successful completion was discarded. Letting
+# runs finish keeps the most recent successful completion available.
 concurrency:
   group: lean-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+# Explicit least-privilege. Default `GITHUB_TOKEN` permissions are broad;
+# declaring only what we need prevents accidental escalation and makes
+# the workflow's intent auditable.
+permissions:
+  contents: read
 
 jobs:
+  # Job name explicitly follows the `Workflow / Job` pattern that GitHub
+  # uses to identify required status checks. Earlier this job was named
+  # just `build`; if branch protection requires the check under its
+  # workflow-qualified name (`Lean CI / build`), the completed run was
+  # not recognized as satisfying the requirement. The `name:` line below
+  # makes the identifier stable and matches what GitHub renders in the
+  # checks panel.
   build:
+    name: Lean CI / build
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -38,22 +60,31 @@ jobs:
           use-github-cache: false
           use-mathlib-cache: true
 
+      # Post-build steps are guarded with `if: success()` so a failure in
+      # the Lean build itself short-circuits the rest of the pipeline with
+      # a clean failure signal, instead of cascading into confusing
+      # "module not found" errors from `lake build` on a half-built
+      # cache.
       - name: Build CoverageTree target
+        if: success()
         run: lake build CollatzResearch.CoverageTree
 
       # Q5's wire-to-checked foundation is imported by the integration
       # layer. Build it directly so an elaboration failure cannot remain
       # hidden until a downstream PR adds another target.
       - name: Build bounded-input certificate foundation
+        if: success()
         run: lake build CollatzResearch.BoundedInputCertificateData
 
       - name: Build bounded-input verifier tests
+        if: success()
         run: lake build CollatzResearch.Q5VerifierTests
 
       # A test-first orbit-routing module is permitted only within an
       # implementation PR. If it exists, it must elaborate at the PR head;
       # intentionally failing Lean source is never silently excluded from CI.
       - name: Build CoverageTree orbit-routing tests when present
+        if: success()
         run: |
           if [ -f Lean/CollatzResearch/CoverageTreeOrbitTests.lean ]; then
             lake build CollatzResearch.CoverageTreeOrbitTests
@@ -71,12 +102,14 @@ jobs:
       # Q5IntegrationTests, so any Lean errors in the new Q5
       # files were silently invisible to CI.
       - name: Build Q5Integration target when present
+        if: success()
         run: |
           if [ -f Lean/CollatzResearch/Q5Integration.lean ]; then
             lake build CollatzResearch.Q5Integration
           fi
 
       - name: Build Q5Integration tests when present
+        if: success()
         run: |
           if [ -f Lean/CollatzResearch/Q5IntegrationTests.lean ]; then
             lake build CollatzResearch.Q5IntegrationTests
@@ -87,13 +120,43 @@ jobs:
       # proof-bearing module cannot remain unelaborated behind the library's
       # default targets.
       - name: Build Q5 routing-partition target when present
+        if: success()
         run: |
           if [ -f Lean/CollatzResearch/Q5RoutingPartition.lean ]; then
             lake build CollatzResearch.Q5RoutingPartition
           fi
 
       - name: Build Q5 routing-partition tests when present
+        if: success()
         run: |
           if [ -f Lean/CollatzResearch/Q5RoutingPartitionTests.lean ]; then
             lake build CollatzResearch.Q5RoutingPartitionTests
+          fi
+
+      # Q5 v2b.6 sub-proof module — research-only scaffolding for the
+      # Stage 4 parent theorem `routing_partition_leaf_certificate`.
+      # Built directly so elaboration errors are visible to CI.
+      - name: Build Q5 v2b.6 sub-proofs module
+        if: success()
+        run: lake build CollatzResearch.Q5Stage4Subproofs
+
+      # Final status reporter. Runs `if: always()` so it executes on
+      # every terminal state (success, failure, cancelled). Prints a
+      # single, unambiguous line describing the run outcome, which makes
+      # it easy to grep for in logs and to distinguish a clean success
+      # from a cancelled/partial run.
+      - name: Report Lean CI status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Lean CI passed; PR is ready for review and merge."
+          elif [ "${{ job.status }}" = "failure" ]; then
+            echo "❌ Lean CI failed; see the failing step's log above for details."
+            exit 1
+          elif [ "${{ job.status }}" = "cancelled" ]; then
+            echo "⚠️ Lean CI was cancelled; re-run or push to retrigger."
+            exit 1
+          else
+            echo "⚠️ Lean CI ended in unexpected state: ${{ job.status }}"
+            exit 1
           fi

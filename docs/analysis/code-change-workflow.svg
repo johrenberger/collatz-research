@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="980" viewBox="0 0 1500 980" role="img" aria-labelledby="title desc">
+  <title id="title">Collatz Research code-change workflow</title>
+  <desc id="desc">A left-to-right workflow showing story planning, implementation, validation, pull request CI, independent Codex review, and maintainer merge authorization, with bounded repair and escalation loops.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,3 L0,6 Z" fill="#334155"/>
+    </marker>
+    <style>
+      .bg{fill:#f8fafc}.title{font:700 28px system-ui,sans-serif;fill:#0f172a}.subtitle{font:15px system-ui,sans-serif;fill:#475569}
+      .box{stroke:#334155;stroke-width:2;rx:14}.label{font:700 16px system-ui,sans-serif;fill:#0f172a}.body{font:14px system-ui,sans-serif;fill:#334155}
+      .edge{fill:none;stroke:#334155;stroke-width:2.5;marker-end:url(#arrow)}.loop{fill:none;stroke:#b45309;stroke-width:2.5;stroke-dasharray:8 6;marker-end:url(#arrow)}
+      .note{font:13px system-ui,sans-serif;fill:#7c2d12}.legend{font:13px system-ui,sans-serif;fill:#334155}
+    </style>
+  </defs>
+  <rect class="bg" width="1500" height="980"/>
+  <text class="title" x="60" y="58">Collatz Research — code-change workflow</text>
+  <text class="subtitle" x="60" y="86">Story-sized vertical slices, evidence-led validation, explicit trust boundaries, and independent review at the exact PR head SHA.</text>
+
+  <!-- connectors first -->
+  <path class="edge" d="M250 240 H300"/>
+  <path class="edge" d="M490 240 H540"/>
+  <path class="edge" d="M730 240 H780"/>
+  <path class="edge" d="M970 240 H1020"/>
+  <path class="edge" d="M1210 240 H1260"/>
+  <path class="edge" d="M1355 310 V420 H1160 V520"/>
+  <path class="edge" d="M970 590 H1020"/>
+  <path class="edge" d="M1210 590 H1260"/>
+  <path class="edge" d="M1160 660 V760 H830 V660"/>
+  <path class="loop" d="M780 310 V390 H635 V310"/>
+  <path class="loop" d="M1020 660 V835 H635 V310"/>
+  <path class="loop" d="M1260 660 V900 H1140 V660"/>
+
+  <!-- main path -->
+  <rect class="box" x="60" y="170" width="190" height="140" fill="#e0f2fe"/>
+  <text class="label" x="84" y="207">1. Story / decision</text>
+  <text class="body" x="84" y="235"><tspan x="84" dy="0">Read backlog and</tspan><tspan x="84" dy="21">acceptance criteria.</tspan><tspan x="84" dy="21">ADR first for semantic,</tspan><tspan x="84" dy="21">schema, or trust changes.</tspan></text>
+
+  <rect class="box" x="300" y="170" width="190" height="140" fill="#e0f2fe"/>
+  <text class="label" x="324" y="207">2. Isolate</text>
+  <text class="body" x="324" y="235"><tspan x="324" dy="0">One branch per story:</tspan><tspan x="324" dy="21">story-&lt;NN&gt;-&lt;slug&gt;.</tspan><tspan x="324" dy="21">Record full SHA and</tspan><tspan x="324" dy="21">clean worktree.</tspan></text>
+
+  <rect class="box" x="540" y="170" width="190" height="140" fill="#dcfce7"/>
+  <text class="label" x="564" y="207">3. Implement</text>
+  <text class="body" x="564" y="235"><tspan x="564" dy="0">BDD tests first.</tspan><tspan x="564" dy="21">Keep the change scoped</tspan><tspan x="564" dy="21">to the packet; update</tspan><tspan x="564" dy="21">theorem status as needed.</tspan></text>
+
+  <rect class="box" x="780" y="170" width="190" height="140" fill="#fef3c7"/>
+  <text class="label" x="804" y="207">4. Local gates</text>
+  <text class="body" x="804" y="235"><tspan x="804" dy="0">make ci</tspan><tspan x="804" dy="21">format-check · lint · test</tspan><tspan x="804" dy="21">· Lean build.</tspan><tspan x="804" dy="21">Capture evidence.</tspan></text>
+
+  <rect class="box" x="1020" y="170" width="190" height="140" fill="#fef3c7"/>
+  <text class="label" x="1044" y="207">5. Commit / PR</text>
+  <text class="body" x="1044" y="235"><tspan x="1044" dy="0">Commit Story NN: title.</tspan><tspan x="1044" dy="21">Push branch and open</tspan><tspan x="1044" dy="21">PR with commands,</tspan><tspan x="1044" dy="21">toolchain, and evidence.</tspan></text>
+
+  <rect class="box" x="1260" y="170" width="190" height="140" fill="#fef3c7"/>
+  <text class="label" x="1284" y="207">6. CI at SHA</text>
+  <text class="body" x="1284" y="235"><tspan x="1284" dy="0">Python CI + Lean CI.</tspan><tspan x="1284" dy="21">Reproducibility is</tspan><tspan x="1284" dy="21">scheduled/manual.</tspan><tspan x="1284" dy="21">No stale green runs.</tspan></text>
+
+  <rect class="box" x="1020" y="520" width="190" height="140" fill="#fce7f3"/>
+  <text class="label" x="1044" y="557">7. Codex review</text>
+  <text class="body" x="1044" y="585"><tspan x="1044" dy="0">Independent reviewer</tspan><tspan x="1044" dy="21">checks exact full SHA,</tspan><tspan x="1044" dy="21">scope, tests, trust,</tspan><tspan x="1044" dy="21">claims, and proof debt.</tspan></text>
+
+  <rect class="box" x="1260" y="520" width="190" height="140" fill="#ede9fe"/>
+  <text class="label" x="1284" y="557">8. Merge ready</text>
+  <text class="body" x="1284" y="585"><tspan x="1284" dy="0">CI green, current-head</tspan><tspan x="1284" dy="21">approval, no P0/P1.</tspan><tspan x="1284" dy="21">Maintainer authorizes</tspan><tspan x="1284" dy="21">merge.</tspan></text>
+
+  <!-- repair/escalation panel -->
+  <rect class="box" x="300" y="420" width="670" height="240" fill="#fff7ed"/>
+  <text class="label" x="330" y="458">Failure path — bounded, classified, and evidence-led</text>
+  <text class="body" x="330" y="490"><tspan x="330" dy="0">Validation failure → classify: LOCAL / STRUCTURAL / DEPENDENCY / SOURCE_INTEGRITY / DESIGN / UNKNOWN</tspan><tspan x="330" dy="24">→ repair, reassess, investigate, refresh source, or design review.</tspan><tspan x="330" dy="24">Every repair has a falsifiable hypothesis; identical strategies max out after two attempts.</tspan><tspan x="330" dy="24">RCS ≥ 12 stops source editing for reassessment; RCS ≥ 24 escalates to Codex;</tspan><tspan x="330" dy="24">RCS ≥ 32 hard-stops. Save diagnostics and restore the last green checkpoint when needed.</tspan></text>
+  <text class="note" x="330" y="620">Orange dashed arrows show bounded repair/re-review loops.</text>
+
+  <!-- trust panel -->
+  <rect class="box" x="60" y="730" width="650" height="150" fill="#f1f5f9"/>
+  <text class="label" x="90" y="768">Trust boundary</text>
+  <text class="body" x="90" y="798"><tspan x="90" dy="0">Python / experiments / generated certificates = untrusted discovery evidence.</tspan><tspan x="90" dy="24">Schemas = reviewed interchange contracts. Lean kernel build = formal evidence.</tspan><tspan x="90" dy="24">A finite computation or checked certificate is never described as a theorem.</tspan></text>
+
+  <rect class="box" x="780" y="730" width="670" height="150" fill="#f1f5f9"/>
+  <text class="label" x="810" y="768">Operational invariants</text>
+  <text class="body" x="810" y="798"><tspan x="810" dy="0">Git, CI, Lean output, and durable lifecycle receipts outrank chat memory.</tspan><tspan x="810" dy="24">A push invalidates prior review approval; the new head needs a new review.</tspan><tspan x="810" dy="24">Codex review is a gate, not merge authority; maintainers own final acceptance.</tspan></text>
+
+  <text class="legend" x="60" y="930">Blue = planning/isolation · Green = implementation · Yellow = validation/evidence · Pink = independent review · Purple = human-controlled terminal state</text>
+</svg>
