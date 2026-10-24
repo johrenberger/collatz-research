@@ -24,18 +24,27 @@ claim). This module takes a layered approach:
    concrete hypothesis parameters. Catches elaboration errors
    (e.g., a hypothesis that the typechecker cannot unify).
 
-Concrete constructive tests with the two-leaf routing partition
-test data (`routingPartitionTwoLeafTree` +
-`twoLeafRoutingPartition`) are deferred to a follow-up — they
-require constructing `hClaimReachesOne` from the
-`FiniteOrbitClaim.singleton 1` reachability obligation (one
-`ReachesOne 1` proof per registry entry), which is non-trivial
-and orthogonal to the v2b.6 / v2b.7 signature.
+4. **Concrete-data discharge (`theorem` layer)**: the
+   two-leaf routing partition fixture
+   (`routingPartitionTwoLeafTree` + `twoLeafRoutingPartition`) is
+   used to *discharge* the per-leaf obligations
+   (`hClaimReachesOne` / `hRegistry` / `verified`) concretely,
+   yielding two named `noncomputable def` statements rather than
+   anonymous examples. The `FiniteOrbitClaim.singleton 1` reachability
+   obligation is discharged once per registry entry (`ReachesOne 1`
+   via `accelerated_orbit 1 0 = 1`); the registry lookup and the
+   `verified` obligation are discharged structurally.
+
+The concrete layer is *additional* to the symbolic layer: the
+type-only / roundtrip / constructor-field tests above still exercise
+the fully general signatures, so the concrete statements never
+replace the symbolic ones.
 
 ## Kernel-clean
 
 No `sorry` / `admit` / `axiom` in any test. All tests are
-type-only or `rfl` (definitional equality).
+type-only, `rfl` (definitional equality), or closed decidable
+facts over the concrete fixture.
 
 ## Noncomputable note
 
@@ -181,75 +190,176 @@ noncomputable example (t : CoverageTree) (tree : BoundedInputCertificateTree t)
   (routing_partition_leaf_certificate t tree hcheck hClaimReachesOne
     hRegistry l hl hver).orbit_hits_claim
 
-/-! ## Concrete-data test (v2b.6 + v2b.7)
+/-! ## Concrete per-leaf discharge (v2b.8 closure)
 
-Replaces the abstract `t : CoverageTree` from the type-only layer with the
-actual `routingPartitionTwoLeafTree` fixture from `Q5VerifierTests.lean`.
-This exercises v2b.6 + v2b.7 elaborating against:
+The blocks above retain the per-leaf hypotheses (`hClaimReachesOne` /
+`hRegistry`) as *symbolic* arguments — the right shape for a general
+claim, but leaving the concrete obligations undischarged.
 
-- The canonical `BoundedInputCertificateTree` wrapper
-  (`{ certData := twoLeafRoutingPartition }`),
-- The canonical routing-partition check (`by native_decide`,
-  matching the existing `RoutingPartitionCertificate_sound` example
-  in `Q5RoutingPartitionTests.lean`).
+This section discharges those obligations against the canonical fixture
+(`routingPartitionTwoLeafTree` + `twoLeafRoutingPartition`), so the
+result is a named, reusable statement rather than an anonymous
+`example`.
 
-The per-leaf hypotheses (`hClaimReachesOne` / `hRegistry` /
-`hl` / `hver`) are retained symbolically per LEAN_PATTERNS.md P10
-("retain a symbolic theorem for general claims"). Each is a
-constructive obligation discharged independently by a downstream
-caller; this test verifies that v2b.6 + v2b.7 typecheck and
-elaborate against the canonical fixture + the decidable check. -/
+Discharge summary:
 
-noncomputable example
-    (hClaimReachesOne : ∀ (entry : LeafClaimWire),
+- **`hClaimReachesOne`** — both registry entries carry
+  `FiniteOrbitClaim.singleton 1`, whose `Holds` predicate is `y = 1`;
+  `ReachesOne 1` is witnessed by `k := 0` (`accelerated_orbit 1 0 = 1`).
+- **`hRegistry`** — the registry holds one entry per leaf of the fixture
+  tree, and each entry's `leaf` field is definitionally the
+  corresponding tree leaf, so the existential is witnessed by the
+  matching registry entry.
+- **`verified`** — purely structural: membership in the fixture's
+  `leaves` list plus the two non-empty string fields, both of which hold
+  for every leaf of the fixture.
+
+No `ReachesOne 2` is claimed here: the `[2,7,11,17,13,5,1]` trajectory
+for input `2` is a separate Collatz obligation and out of scope for
+this closure.
+
+**Form note.** The two closure statements below are `noncomputable def`
+rather than `theorem`. The conclusion (`BoundedInputOrbitCertificate`)
+is `Type`-valued — it carries the `claim` datum — and Lean 4 rejects
+both a `theorem` with a `Type` conclusion and a `noncomputable
+theorem`. This mirrors the upstream v2b.6 / v2b.7 declarations, which
+are themselves `noncomputable def`s with the same `Type`-valued
+conclusion. -/
+
+/-- The `even` leaf of the canonical two-leaf fixture. -/
+private def q5evenLeaf : CoverageLeaf :=
+  { leafId := "even", leafProperty := "2:0-0" }
+
+/-- The `odd` leaf of the canonical two-leaf fixture. -/
+private def q5oddLeaf : CoverageLeaf :=
+  { leafId := "odd", leafProperty := "2:1-1" }
+
+/-- The `even` registry entry of the canonical two-leaf fixture. -/
+private def q5evenEntry : LeafClaimWire :=
+  { leaf := q5evenLeaf, claim := FiniteOrbitClaim.singleton 1 }
+
+/-- The `odd` registry entry of the canonical two-leaf fixture. -/
+private def q5oddEntry : LeafClaimWire :=
+  { leaf := q5oddLeaf, claim := FiniteOrbitClaim.singleton 1 }
+
+/-- Concrete discharge of the `hClaimReachesOne` obligation for the
+    canonical two-leaf routing partition.
+
+    Both registry entries carry `FiniteOrbitClaim.singleton 1`, whose
+    `Holds` predicate reduces to `y = 1`; `ReachesOne 1` is witnessed
+    by `k := 0`.  Closed and decidable — no `Classical` extraction and
+    no trajectory reasoning. -/
+theorem twoLeafRoutingPartition_claim_reaches_one :
+    ∀ (entry : LeafClaimWire),
       entry ∈ twoLeafRoutingPartition.wire.claimRegistry →
-      ∀ y, entry.claim.Holds y → ReachesOne y)
-    (hRegistry : ∀ (l : CoverageLeaf),
-      l ∈ routingPartitionTwoLeafTree.leaves →
+      ∀ y, entry.claim.Holds y → ReachesOne y := by
+  intro entry hmem y hy
+  have hmem' : entry ∈ (q5evenEntry :: q5oddEntry :: []) := hmem
+  rcases List.mem_cons.mp hmem' with h | h
+  · subst h
+    change (FiniteOrbitClaim.singleton 1).Holds y at hy
+    simp only [FiniteOrbitClaim.Holds] at hy
+    subst hy
+    show ∃ k, accelerated_orbit 1 k = 1
+    exact ⟨0, accelerated_orbit_zero 1⟩
+  · rcases List.mem_cons.mp h with h | h
+    · subst h
+      change (FiniteOrbitClaim.singleton 1).Holds y at hy
+      simp only [FiniteOrbitClaim.Holds] at hy
+      subst hy
+      show ∃ k, accelerated_orbit 1 k = 1
+      exact ⟨0, accelerated_orbit_zero 1⟩
+    · cases h
+
+/-- Concrete discharge of the per-leaf `hRegistry` obligation for the
+    canonical two-leaf routing partition.
+
+    The registry contains one entry per leaf of
+    `routingPartitionTwoLeafTree`, and each entry's `leaf` field is
+    definitionally equal to the corresponding tree leaf, so the
+    existential witness is the matching registry entry.
+
+    The `verified` premise is not needed: membership in the fixture's
+    `leaves` list already pins the leaf to one of the two fixture
+    leaves (see `routingPartitionTwoLeafTree_verified`). -/
+theorem twoLeafRoutingPartition_registry :
+    ∀ (l : CoverageLeaf), l ∈ routingPartitionTwoLeafTree.leaves →
       verified routingPartitionTwoLeafTree l →
-      ∃ entry ∈ twoLeafRoutingPartition.wire.claimRegistry,
-        entry.leaf = l)
-    (l : CoverageLeaf) (hl : l ∈ routingPartitionTwoLeafTree.leaves)
-    (hver : verified routingPartitionTwoLeafTree l) :
-    BoundedInputOrbitCertificate routingPartitionTwoLeafTree
-      l twoLeafRoutingPartition.wire.N :=
-  per_leaf_available_bounded_of_check
-    routingPartitionTwoLeafTree
-    { certData := twoLeafRoutingPartition }
-    (by native_decide)
-    hClaimReachesOne
-    hRegistry l hl hver
+      ∃ entry ∈ twoLeafRoutingPartition.wire.claimRegistry, entry.leaf = l := by
+  intro l hl _
+  have hl' : l ∈ (q5evenLeaf :: q5oddLeaf :: []) := hl
+  rcases List.mem_cons.mp hl' with h | h
+  · subst h
+    refine ⟨q5evenEntry, ?_, ?_⟩
+    · show q5evenEntry ∈ (q5evenEntry :: q5oddEntry :: [])
+      exact List.mem_cons.mpr (Or.inl rfl)
+    · rfl
+  · rcases List.mem_cons.mp h with h | h
+    · subst h
+      refine ⟨q5oddEntry, ?_, ?_⟩
+      · show q5oddEntry ∈ (q5evenEntry :: q5oddEntry :: [])
+        exact List.mem_cons.mpr (Or.inr (List.mem_cons.mpr (Or.inl rfl)))
+      · rfl
+    · cases h
 
-/-! ## Concrete-data test (v2b.6 via `routing_partition_leaf_certificate`)
+/-- Concrete discharge of `verified` for every leaf of the canonical
+    two-leaf fixture tree.
 
-Symmetric concrete-data elaboration test for v2b.6 (the parent's
-`routing_partition_leaf_certificate` extraction). Same fixture,
-same per-leaf hypotheses retained symbolically, same decidable
-check.  Independent elaboration site from v2b.7 above: if the
-v2b.6 extraction reuses the v2b.6 sub-proofs
-(`registry_unique_of_pairwise_irrefl`,
-`trajectory_anchor_orbit_step`, etc., kernel-clean in
-`Q5Stage4Subproofs.lean`) then this test elaborates against the
-same concrete data without touching the proof bodies. -/
+    Purely structural: membership in the fixture's `leaves` list, plus
+    the two non-empty string fields (`leafId` / `leafProperty`), which
+    hold for both fixture leaves.  No trajectory or reachability fact is
+    smuggled in. -/
+theorem routingPartitionTwoLeafTree_verified :
+    ∀ l, l ∈ routingPartitionTwoLeafTree.leaves →
+      verified routingPartitionTwoLeafTree l := by
+  intro l hl
+  have hl' : l ∈ (q5evenLeaf :: q5oddLeaf :: []) := hl
+  rcases List.mem_cons.mp hl' with h | h
+  · subst h
+    exact ⟨hl, by decide, by decide⟩
+  · rcases List.mem_cons.mp h with h | h
+    · subst h
+      exact ⟨hl, by decide, by decide⟩
+    · cases h
 
-noncomputable example
-    (hClaimReachesOne : ∀ (entry : LeafClaimWire),
-      entry ∈ twoLeafRoutingPartition.wire.claimRegistry →
-      ∀ y, entry.claim.Holds y → ReachesOne y)
-    (hRegistry : ∀ (l : CoverageLeaf),
-      l ∈ routingPartitionTwoLeafTree.leaves →
-      verified routingPartitionTwoLeafTree l →
-      ∃ entry ∈ twoLeafRoutingPartition.wire.claimRegistry,
-        entry.leaf = l)
-    (l : CoverageLeaf) (hl : l ∈ routingPartitionTwoLeafTree.leaves)
-    (hver : verified routingPartitionTwoLeafTree l) :
+/-- **v2b.6 closure against the canonical two-leaf fixture.**
+
+    Concrete counterpart of the symbolic v2b.6 example above: the
+    per-leaf hypotheses are discharged by
+    `twoLeafRoutingPartition_claim_reaches_one`,
+    `twoLeafRoutingPartition_registry` and
+    `routingPartitionTwoLeafTree_verified`, so this is a named statement
+    rather than an anonymous example.  The decidable check is the
+    canonical routing-partition acceptance (`by native_decide`),
+    matching the existing positive regression in
+    `Q5VerifierTests.lean`. -/
+noncomputable def twoLeaf_routing_partition_leaf_certificate
+    (l : CoverageLeaf) (hl : l ∈ routingPartitionTwoLeafTree.leaves) :
     BoundedInputOrbitCertificate routingPartitionTwoLeafTree
       l twoLeafRoutingPartition.wire.N :=
   routing_partition_leaf_certificate
     routingPartitionTwoLeafTree
     { certData := twoLeafRoutingPartition }
     (by native_decide)
-    hClaimReachesOne
-    hRegistry l hl hver
+    twoLeafRoutingPartition_claim_reaches_one
+    twoLeafRoutingPartition_registry
+    l hl (routingPartitionTwoLeafTree_verified l hl)
+
+/-- **v2b.7 closure against the canonical two-leaf fixture.**
+
+    Symmetric concrete counterpart for the constructive alias
+    `per_leaf_available_bounded_of_check` (v2b.7), with the same
+    discharged per-leaf hypotheses and the same decidable check. -/
+noncomputable def twoLeaf_per_leaf_available_bounded_of_check
+    (l : CoverageLeaf) (hl : l ∈ routingPartitionTwoLeafTree.leaves) :
+    BoundedInputOrbitCertificate routingPartitionTwoLeafTree
+      l twoLeafRoutingPartition.wire.N :=
+  per_leaf_available_bounded_of_check
+    routingPartitionTwoLeafTree
+    { certData := twoLeafRoutingPartition }
+    (by native_decide)
+    twoLeafRoutingPartition_claim_reaches_one
+    twoLeafRoutingPartition_registry
+    l hl (routingPartitionTwoLeafTree_verified l hl)
 
 end CollatzResearch
