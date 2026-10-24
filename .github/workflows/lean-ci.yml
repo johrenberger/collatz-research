@@ -140,6 +140,23 @@ jobs:
         if: success()
         run: lake build CollatzResearch.Q5Stage4Subproofs
 
+      # Q5 v2b.8 Stage-4 test module — the concrete-data elaboration and
+      # discharge layer for `routing_partition_leaf_certificate` (v2b.6)
+      # and `per_leaf_available_bounded_of_check` (v2b.7).
+      #
+      # Built directly for the same reason as the Q5 targets above. The
+      # precise reason this target is needed: lean-ci.yml builds a list of
+      # individual module targets and never builds the default
+      # `CollatzResearch` root target, which is the ONLY module that
+      # imports `CollatzResearch.Q5Stage4Tests`. The Stage-4 test file is
+      # therefore not reached by any CI step, and an elaboration error
+      # there would be invisible to CI. Keeping the target explicit makes
+      # it visible. (Added alongside the v2b.9 concrete-discharge closure
+      # PR.)
+      - name: Build Q5 Stage-4 tests module
+        if: success()
+        run: lake build CollatzResearch.Q5Stage4Tests
+
       # Final status reporter. Runs `if: always()` so it executes on
       # every terminal state (success, failure, cancelled). Prints a
       # single, unambiguous line describing the run outcome, which makes
