@@ -13,11 +13,9 @@ on:
   pull_request:
     branches:
       - main
-      - agent/bootstrap-research-monorepo
   push:
     branches:
       - main
-      - agent/bootstrap-research-monorepo
   workflow_dispatch:
 
 # Do NOT cancel in-flight runs on new commits. Cancelling leaves the PR
