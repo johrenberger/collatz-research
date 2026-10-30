@@ -220,7 +220,8 @@ to mask the issue.
   preferred approach is **one PR per phase** for reviewability.
 - Codex review of each PR (since the bump touches mathematical
   infrastructure, the project's standard Codex review applies).
-- Merge into `agent/bootstrap-research-monorepo`.
+- Merge into the then-default branch, `agent/bootstrap-research-monorepo`
+  (historical; the current default branch is `main`).
 
 ## Non-goals
 
@@ -325,12 +326,12 @@ modified `lake-manifest.json` but never committed cleanly.
 
 ### Next steps
 
-If commit 4 CI goes green → merge PR #32, start Phase 2 (source
-adaptation, per-file per the existing plan above).
-
-If commit 4 CI surfaces `CollatzResearch.*` errors → Phase 2 begins
-immediately; iterate per-file per the existing plan; the per-file
-expected-breakages table above becomes the starting checklist.
+**Resolved (2026-10-31):** PR #32 merged as `98831ae`; the source
+adaptation that followed included the `String.split` update in
+`CoverageTree.lean` (`1a405cf`). The repository is now pinned to Lean
+v4.33.0 and Mathlib `db584cd6d46c92f209a44c0f1c829460d327499d`.
+The preceding conditional plan is retained only as the historical record of
+the bump rollout.
 
 ### 02c/03c parallel
 
@@ -348,7 +349,8 @@ reference drift observed during the 02c/03c proof-bearing PR work
 (2026-08-16 session). PR #32 opened the same day and entered
 Phase 1 (infrastructure-only). See "Implementation log (PR #32)"
 above for the commit-by-commit narrative. **Phase 1 status**:
-4th commit pending; Phase 2 (source adaptation) pending.
+completed. PR #32 merged; the required source adaptation was completed
+in the follow-on commits recorded above.
 
 ## Follow-on work
 
@@ -379,6 +381,7 @@ The bump PR is acceptable when:
 8. `MEMORY.md` and `README.md` reflect the new toolchain.
 9. Codex review approves the final PR.
 
-**Close criterion**: PR merged into `agent/bootstrap-research-monorepo`;
-this story doc updated with the actual breakage summary and
-resolution.
+**Close criterion (historical)**: PR merged into
+`agent/bootstrap-research-monorepo`; this story doc updated with the actual
+breakage summary and resolution. The branch history has since been reconciled
+onto the current default branch, `main`.

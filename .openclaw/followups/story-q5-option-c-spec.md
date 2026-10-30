@@ -2,7 +2,8 @@
 
 **Date:** 2026-09-06T15:56:40Z (revised per reviewer round 3)
 **Author:** OpenClaw agent (architectural disposition + spec update)
-**Status:** DRAFT (Stage 1 of staged Option B implementation, per Justin message_id 23317; revised per message_id 23323)
+**Status:** IMPLEMENTED — historical design record. The staged work completed
+through v2b.9 in PR #99 (`4309cab`); see the outcome note below.
 **Branch:** `story-q5-per-tree-with-projection` (off post-PR-81 merge base `71b1e6e`)
 **Tracking:** https://github.com/johrenberger/collatz-research/issues/82
 
@@ -191,6 +192,14 @@ The revised sequencing is shorter because the per-tree reachability is inherited
 - Stage 4 = v2b.6 + v2b.7 implementation (gated on Stage 3 kernel-clean + review)
 - Stage 5 = v2b.8 tests (gated on Stage 4 kernel-clean + review)
 
+### Outcome (2026-10-31)
+
+Stages 2–5 were completed. In particular, v2b.6
+`routing_partition_leaf_certificate` and v2b.7
+`per_leaf_available_bounded_of_check` landed, and PR #99 (`4309cab`)
+added concrete per-leaf discharge tests for both. The staged plan above
+is retained as historical context, not as pending work.
+
 ## Architectural decision rationale (revised)
 
 **Why thin wrapper over `RoutingPartitionCertificateData`:**
@@ -215,7 +224,7 @@ The revised sequencing is shorter because the per-tree reachability is inherited
 - Stage 1 is docs-only (no Lean code changes) — fully reversible by closing the PR.
 - The architectural decision (revised Option C) is logged in `.openclaw/followups/story-2-arch-disposition.md` + this file + Issue #82.
 
-## Open questions for Justin's spec review (revised)
+## Resolved questions from the original spec review
 
 The 5 original questions are now resolved by the reviewer's recommendations:
 - **Q1 (resolved):** Single-field `BoundedInputCertificateTree` wrapping `RoutingPartitionCertificateData` (no `checkPerLeaf`).
@@ -223,5 +232,7 @@ The 5 original questions are now resolved by the reviewer's recommendations:
 - **Q3 (resolved):** Per-tree path with intermediate `routing_partition_leaf_certificate` (no direct path).
 - **Q4 (resolved):** Use existing `RoutingPartitionCertificateWire` (no new wire types).
 
-**Remaining question (new):**
-1. **`routing_partition_leaf_certificate` proof shape:** Does the construction from per-tree reachability + per-leaf routing directly parallel `RoutingPartitionCertificate_sound` + `descend_orbit_complete` (PR #29)? Or are there subtleties about per-leaf routing lookup against `claimRegistry` (e.g., how does the leaf `l` find its corresponding entry in `claimRegistry`)? Worth pre-staging a proof sketch before Stage 4 implementation.
+**Q5 (resolved in v2b.6/v2b.7):** The per-tree reachability and routing
+construction was implemented as `routing_partition_leaf_certificate`, with
+the constructive availability alias `per_leaf_available_bounded_of_check`.
+Its concrete per-leaf discharge is covered by the PR #99 tests.
