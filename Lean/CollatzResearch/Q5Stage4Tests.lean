@@ -362,4 +362,13 @@ noncomputable def twoLeaf_per_leaf_available_bounded_of_check
     twoLeafRoutingPartition_registry
     l hl (routingPartitionTwoLeafTree_verified l hl)
 
+/-- The canonical two-leaf fixture's accepted routing-partition certificate
+    proves the bounded concrete input `2` reaches one. Its even witness is
+    `[2, 7, 11, 17, 13, 5, 1]`, whose terminal value satisfies the existing
+    `singleton 1` claim; no new claim shape or general API is involved. -/
+theorem twoLeafRoutingPartition_reaches_one_two : ReachesOne 2 := by
+  exact RoutingPartitionCertificate_sound routingPartitionTwoLeafTree
+    twoLeafRoutingPartition (by native_decide)
+    twoLeafRoutingPartition_claim_reaches_one 2 (by decide) (by decide)
+
 end CollatzResearch
