@@ -23,21 +23,31 @@ literals, counted bullet-form holes, and reconciled the recorded allowances to
 an exact baseline of 3 / 1 / 2 holes. A later review found two remaining
 defects in that repair.
 
-**A lexical scan is not an oracle.** A custom elaborator can build Lean's
-`sorry` term without the word appearing in the source at all:
+**A lexical scan is not an oracle.** A custom elaborator can build an
+admitted term without any admission token appearing in the source at all.
+The regression fixture builds the admitted constant by joining string
+fragments, so the file contains no occurrence of the substring that names
+it, in any casing:
 
 ```lean
+import Lean
+
 open Lean Elab Term in
 elab "redacted" : term => do
-  let e ← Lean.Meta.mkSorry (Lean.mkConst ``True) (synthetic := false)
-  pure e
+  let admitted := Lean.Name.mkSimple ("sorr" ++ "yAx")
+  let value : Lean.Expr :=
+    Lean.mkApp2 (Lean.mkConst admitted [0]) (Lean.mkConst ``True) (Lean.mkConst ``true)
+  pure value
+
+theorem sneaky : True := redacted
 ```
 
 Lean accepts the resulting declaration and reports it as using `sorry`; a
-scan of the source text cannot see it. The same holds for a synthesised
-`axiom` or `opaque` command. Any claim that a source scan detects *all*
-admitted proofs is therefore false, and the gate may not be described that
-way.
+scan of the source text cannot see it, whether it matches whole words or
+substrings and whether it is case-sensitive or not. The same holds for a
+synthesised `axiom` or `opaque` command. Any claim that a source scan
+detects *all* admitted proofs is therefore false, and the gate may not be
+described that way.
 
 **The reserved-keyword claim was wrong.** The first repair counted `sorry`,
 `admit`, `sorryAx`, `axiom`, and `opaque` as "reserved Lean keywords". Only

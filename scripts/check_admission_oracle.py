@@ -17,7 +17,6 @@ modifier forms of `axiom` and `opaque`, and the legal Lean identifiers
 from __future__ import annotations
 
 import importlib.util
-import re
 import shutil
 import sys
 import tempfile
@@ -29,15 +28,20 @@ assert _SPEC and _SPEC.loader
 _CHECK = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_CHECK)
 
-# A custom elaborator that synthesises a `sorry` term.  The word `sorry`
-# never appears in this source, so no lexical scan of the file can see the
-# admission -- only Lean can.
+# A custom elaborator that synthesises an admitted term. The admitted
+# constant is named by joining string fragments, so this fixture's source
+# contains no occurrence of the substring that names it, in any casing: a
+# lexical scan of the file -- whether it matches whole words or substrings,
+# and whether it is case-sensitive or not -- cannot find the admission. Only
+# Lean can, and Lean reports it.
 MACRO_SORRY = """import Lean
 
 open Lean Elab Term in
 elab "redacted" : term => do
-  let e ← Lean.Meta.mkSorry (Lean.mkConst ``True) (synthetic := false)
-  pure e
+  let admitted := Lean.Name.mkSimple ("sorr" ++ "yAx")
+  let value : Lean.Expr :=
+    Lean.mkApp2 (Lean.mkConst admitted [0]) (Lean.mkConst ``True) (Lean.mkConst ``true)
+  pure value
 
 theorem sneaky : True := redacted
 """
@@ -144,10 +148,10 @@ def main() -> int:
         workdir = Path(tmp)
         for name, source, expected_sorry, expected_lexical in CASES:
             failures.extend(run_case(name, source, expected_sorry, expected_lexical, workdir))
-    if re.search(r"\bsorry\b", MACRO_SORRY):
+    if "sorry" in MACRO_SORRY.lower():
         failures.append(
-            "the macro fixture must not contain the word `sorry` in its source: "
-            "a lexical scan of it must not be able to find the admission"
+            "the macro fixture must not contain the admission substring in any "
+            "casing: a lexical scan of it must not be able to find the admission"
         )
     if failures:
         print("\n".join(failures), file=sys.stderr)

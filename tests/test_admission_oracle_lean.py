@@ -6,7 +6,6 @@ pytest cases for `make test`.
 """
 
 import importlib.util
-import re
 import shutil
 from pathlib import Path
 
@@ -35,5 +34,5 @@ def test_admission_oracle_case(tmp_path, name, source, expected_sorry, expected_
 
 @skip_if_no_lake
 def test_macro_fixture_is_invisible_to_a_lexical_scan() -> None:
-    """The macro fixture must not contain the word `sorry` in its source."""
-    assert not re.search(r"\bsorry\b", _MODULE.MACRO_SORRY)
+    """The fixture must not contain the admission substring in any casing."""
+    assert "sorry" not in _MODULE.MACRO_SORRY.lower()
