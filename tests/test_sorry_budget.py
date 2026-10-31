@@ -33,6 +33,13 @@ def test_counts_opaque_declarations() -> None:
     assert _MODULE.count_admissions("private opaque escapeHatch : True\n") == 1
 
 
+def test_ignores_quoted_identifiers() -> None:
+    # «sorry» is a user-chosen identifier, not the keyword.
+    assert _MODULE.count_admissions("def «sorry» : Nat := 1\n") == 0
+    assert _MODULE.count_admissions("def «opaque» : Nat := 1\n") == 0
+    assert _MODULE.count_admissions("def x : Nat := «sorry»\n") == 0
+
+
 def test_counts_admissions_inside_interpolation_holes() -> None:
     source = 'def interpolated : String := s!"{(by exact (sorry : Nat))}"\n'
     assert _MODULE.count_admissions(source) == 1
