@@ -5,7 +5,9 @@ An admission is an unproven obligation in Lean source: a `sorry` hole, an
 `admit` placeholder, an `axiom` declaration, or a direct use of `sorryAx`.
 Only code positions count. Lean block comments (nested), line comments, and
 string literals are stripped first, so prose never counts while a
-bullet-form hole does.
+bullet-form hole does. `axiom` is a reserved Lean keyword, so every
+occurrence of it in code is a declaration -- including the `private axiom`
+and `protected axiom` modifier forms.
 
 The recorded budget in `docs/lean-sorry-budget.json` is an exact baseline,
 not a ceiling. Every tracked file must hold exactly the number of
@@ -36,8 +38,7 @@ ROOT = Path(__file__).parents[1]
 BASELINE = ROOT / "docs" / "lean-sorry-budget.json"
 SCHEMA_VERSION = 2
 
-ADMISSION = re.compile(r"\b(?:sorry|sorryAx|admit)\b")
-AXIOM = re.compile(r"^[ \t]*axiom\b", re.MULTILINE)
+ADMISSION = re.compile(r"\b(?:sorry|sorryAx|admit|axiom)\b")
 
 
 def strip_comments_and_strings(src: str) -> str:
@@ -90,7 +91,7 @@ def strip_comments_and_strings(src: str) -> str:
 def count_admissions(text: str) -> int:
     """Count admitted proof holes in Lean source."""
     code = strip_comments_and_strings(text)
-    return len(ADMISSION.findall(code)) + len(AXIOM.findall(code))
+    return len(ADMISSION.findall(code))
 
 
 def main() -> int:

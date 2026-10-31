@@ -22,6 +22,12 @@ def test_counts_admit_and_axiom_holes() -> None:
     assert _MODULE.count_admissions("axiom foo : True\n") == 1
 
 
+def test_counts_axiom_modifier_forms() -> None:
+    assert _MODULE.count_admissions("private axiom hidden : True\n") == 1
+    assert _MODULE.count_admissions("protected axiom hidden : True\n") == 1
+    assert _MODULE.count_admissions("namespace X\nprotected axiom hidden : True\nend X\n") == 1
+
+
 def test_ignores_comments_and_strings() -> None:
     source = (
         "-- sorry\n"
