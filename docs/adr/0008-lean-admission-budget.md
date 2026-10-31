@@ -24,12 +24,19 @@ read as if nothing were outstanding.
 
 ## Decision
 
-- Count admission holes in code positions: `sorry`, `admit`, `sorryAx`, and
-  `axiom` declarations. Strip Lean block comments (nested), line comments, and
-  string literals before counting, so prose never counts. `axiom` is a reserved
-  Lean keyword, so every occurrence of it in code is a declaration; matching it
-  as a word covers the `private axiom` and `protected axiom` modifier forms,
-  which a line-anchored pattern would miss.
+- Count admission holes in code positions: `sorry`, `admit`, `sorryAx`,
+  `axiom`, and `opaque` declarations. Strip Lean block comments (nested), line
+  comments, and string literals before counting, so prose never counts. These
+  five are reserved Lean keywords, so every occurrence of one in code is a
+  declaration; matching them as words covers the `private axiom`,
+  `protected axiom`, and `private opaque` modifier forms, which a line-anchored
+  pattern would miss. `opaque` is included because it hides the value from the
+  kernel: it is discharged through an `Inhabited`/`Nonempty` instance, and for
+  a proposition `Nonempty p` is classically equivalent to `p`, so an opaque
+  declaration can hide a proposition proof from review.
+- Scan the code inside interpolated string holes (`s!"..."`). Those holes hold
+  Lean expressions, so a `sorry` in one is a real admission that Lean itself
+  reports; discarding the whole literal would hide it.
 - Treat `docs/lean-sorry-budget.json` as an exact baseline. More holes than
   recorded is new proof debt and fails; fewer holes than recorded is a stale
   record and fails, because the baseline must be lowered in the same change

@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "unit": "admission holes (sorry / admit / axiom) in code positions",
+  "unit": "admission holes (sorry / admit / sorryAx / axiom / opaque) in code positions",
   "expected": {
     "Lean/CollatzResearch/Affine.lean": 0,
     "Lean/CollatzResearch/Certificate.lean": 3,

@@ -1,13 +1,25 @@
 #!/usr/bin/env python3
 """Reject increases in tracked Lean proof admissions.
 
-An admission is an unproven obligation in Lean source: a `sorry` hole, an
-`admit` placeholder, an `axiom` declaration, or a direct use of `sorryAx`.
-Only code positions count. Lean block comments (nested), line comments, and
-string literals are stripped first, so prose never counts while a
-bullet-form hole does. `axiom` is a reserved Lean keyword, so every
-occurrence of it in code is a declaration -- including the `private axiom`
-and `protected axiom` modifier forms.
+An admission is a declaration Lean accepted without checking its content:
+a `sorry` hole, an `admit` placeholder, an `axiom` declaration, a direct
+use of `sorryAx`, or an `opaque` declaration. Only code positions count.
+Lean block comments (nested), line comments, and string literals are
+stripped first, so prose never counts while a bullet-form hole does.
+
+`sorry`, `admit`, `sorryAx`, `axiom`, and `opaque` are reserved Lean
+keywords, so every occurrence of them in code is a declaration -- including
+the `private axiom`, `protected axiom`, and `private opaque` modifier
+forms. `opaque` is counted because it hides the value from the kernel: it
+is discharged through an `Inhabited`/`Nonempty` instance, and for a
+proposition `Nonempty p` is classically equivalent to `p`, so an opaque
+declaration can hide a proposition proof from review.
+
+Interpolated string literals (`s!"..."` and friends) embed Lean code in
+`{...}` holes, so those holes are scanned as code while the surrounding
+literal text is discarded. Without that, a `sorry` inside an interpolation
+hole would be invisible even though Lean itself reports "declaration uses
+`sorry`" for it.
 
 The recorded budget in `docs/lean-sorry-budget.json` is an exact baseline,
 not a ceiling. Every tracked file must hold exactly the number of
@@ -38,33 +50,99 @@ ROOT = Path(__file__).parents[1]
 BASELINE = ROOT / "docs" / "lean-sorry-budget.json"
 SCHEMA_VERSION = 2
 
-ADMISSION = re.compile(r"\b(?:sorry|sorryAx|admit|axiom)\b")
+ADMISSION = re.compile(r"\b(?:sorry|sorryAx|admit|axiom|opaque)\b")
+
+
+def _scan_string(src: str, i: int, interpolated: bool) -> tuple[int, str]:
+    """Scan a string literal starting at the opening quote.
+
+    Returns the index just past the literal and the code it contributes.
+    A plain literal contributes nothing. An interpolated literal contributes
+    the code of its holes, with comments and nested literals stripped.
+    """
+    n = len(src)
+    out: list[str] = []
+    i += 1
+    while i < n:
+        ch = src[i]
+        if ch == "\\":
+            i += 2
+            out.append(" ")
+            continue
+        if ch == '"':
+            i += 1
+            return i, "".join(out)
+        if interpolated and ch == "{":
+            if src[i + 1 : i + 2] == "{":
+                # Escaped literal brace, not a hole.
+                i += 2
+                out.append("  ")
+                continue
+            hole, i = _scan_hole(src, i)
+            out.append(strip_comments_and_strings(hole))
+            continue
+        out.append(" ")
+        i += 1
+    return i, "".join(out)
+
+
+def _scan_hole(src: str, i: int) -> tuple[str, int]:
+    """Scan an interpolation hole starting at a brace. Returns text and index."""
+    n = len(src)
+    depth = 1
+    start = i + 1
+    i += 1
+    while i < n:
+        two = src[i : i + 2]
+        if two == "/-":
+            inner = 1
+            j = i + 2
+            while j < n and inner:
+                if src.startswith("/-", j):
+                    inner += 1
+                    j += 2
+                elif src.startswith("-/", j):
+                    inner -= 1
+                    j += 2
+                else:
+                    j += 1
+            i = j
+            continue
+        if two == "--":
+            j = src.find("\n", i)
+            i = n if j < 0 else j
+            continue
+        if src[i] == '"':
+            j, _ = _scan_string(src, i, src[i - 1 : i] == "!")
+            i = j
+            continue
+        if src[i] == "{":
+            depth += 1
+            i += 1
+            continue
+        if src[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[start:i], i + 1
+            i += 1
+            continue
+        i += 1
+    return src[start:i], i
 
 
 def strip_comments_and_strings(src: str) -> str:
-    """Return src with comments and string literals blanked out.
+    """Return src with comments and string literals reduced to code only.
 
-    Block comments nest in Lean, so they are matched by depth. A string
-    literal is consumed whole, so a comment marker or a quote inside it
-    cannot start a comment or end the string early.
+    Lean block comments nest, line comments run to end of line, and plain
+    string literals hold data only. Interpolated string literals embed Lean
+    code in holes, so those holes are kept as code.
     """
     out: list[str] = []
     i = 0
     n = len(src)
     while i < n:
-        if src[i] == '"':
-            i += 1
-            while i < n:
-                if src[i] == "\\":
-                    i += 2
-                    continue
-                if src[i] == '"':
-                    i += 1
-                    break
-                i += 1
-            out.append(" ")
-            continue
-        if src.startswith("/-", i):
+        two = src[i : i + 2]
+        if two == "/-":
             depth = 1
             i += 2
             while i < n and depth:
@@ -78,10 +156,19 @@ def strip_comments_and_strings(src: str) -> str:
                     i += 1
             out.append(" ")
             continue
-        if src.startswith("--", i):
+        if two == "--":
             j = src.find("\n", i)
             i = n if j < 0 else j
             out.append(" ")
+            continue
+        if two == '!"':
+            # Interpolated literal: the identifier prefix ends in a bang.
+            i, text = _scan_string(src, i + 1, True)
+            out.append(text)
+            continue
+        if src[i] == '"':
+            i, text = _scan_string(src, i, False)
+            out.append(text)
             continue
         out.append(src[i])
         i += 1

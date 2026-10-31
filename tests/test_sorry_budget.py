@@ -28,6 +28,18 @@ def test_counts_axiom_modifier_forms() -> None:
     assert _MODULE.count_admissions("namespace X\nprotected axiom hidden : True\nend X\n") == 1
 
 
+def test_counts_opaque_declarations() -> None:
+    assert _MODULE.count_admissions("opaque escapeHatch : True\n") == 1
+    assert _MODULE.count_admissions("private opaque escapeHatch : True\n") == 1
+
+
+def test_counts_admissions_inside_interpolation_holes() -> None:
+    source = 'def interpolated : String := s!"{(by exact (sorry : Nat))}"\n'
+    assert _MODULE.count_admissions(source) == 1
+    assert _MODULE.count_admissions('def plain : String := "sorry"\n') == 0
+    assert _MODULE.count_admissions('def ok : String := s!"{1}"\n') == 0
+
+
 def test_ignores_comments_and_strings() -> None:
     source = (
         "-- sorry\n"
