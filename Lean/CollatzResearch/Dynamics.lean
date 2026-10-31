@@ -11,8 +11,10 @@ odd domain.
 This file contains only definitions and elementary interface lemmas.
 It makes no convergence, cycle-exclusion, or global descent claim.
 
-**Proof status (2026-08-10, Story 02b/03b attempt):**
-`standardStep_positive` and `acceleratedStep_positive_of_odd` use `sorry`.
+**Proof status:**
+`standardStep_positive` and `acceleratedStep_positive_of_odd` are proved
+(PRs #37 and #38). This file holds no admitted proofs. The original
+attempt and its blockers are recorded below for provenance.
 Attempted approaches and blockers:
 
 1. `standardStep_positive` (even branch `0 < n / 2` from `n` positive even):

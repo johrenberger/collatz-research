@@ -1,11 +1,12 @@
 {
-  "schema_version": 1,
-  "allowed": {
+  "schema_version": 2,
+  "unit": "admission holes (sorry / admit / axiom) in code positions",
+  "expected": {
     "Lean/CollatzResearch/Affine.lean": 0,
-    "Lean/CollatzResearch/Certificate.lean": 1,
+    "Lean/CollatzResearch/Certificate.lean": 3,
     "Lean/CollatzResearch/CoverageTree.lean": 1,
-    "Lean/CollatzResearch/Dynamics.lean": 2,
-    "Lean/CollatzResearch/Equivalence.lean": 2,
+    "Lean/CollatzResearch/Dynamics.lean": 0,
+    "Lean/CollatzResearch/Equivalence.lean": 0,
     "Lean/CollatzResearch/Importer.lean": 2,
     "Lean/CollatzResearch/Q5RoutingPartition.lean": 0
   }

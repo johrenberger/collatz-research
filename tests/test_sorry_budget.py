@@ -10,3 +10,29 @@ _SPEC.loader.exec_module(_MODULE)
 
 def test_current_tracked_admissions_stay_within_budget() -> None:
     assert _MODULE.main() == 0
+
+
+def test_counts_bullet_form_hole() -> None:
+    source = "theorem t : True := by\n  \u00b7 sorry\n"
+    assert _MODULE.count_admissions(source) == 1
+
+
+def test_counts_admit_and_axiom_holes() -> None:
+    assert _MODULE.count_admissions("theorem t : True := by\n  admit\n") == 1
+    assert _MODULE.count_admissions("axiom foo : True\n") == 1
+
+
+def test_ignores_comments_and_strings() -> None:
+    source = (
+        "-- sorry\n"
+        "/- sorry -/\n"
+        "/-! sorry -/\n"
+        "/-- sorry -/\n"
+        'theorem t : String := "sorry"\n'
+    )
+    assert _MODULE.count_admissions(source) == 0
+
+
+def test_ignores_words_that_only_contain_an_admission() -> None:
+    assert _MODULE.count_admissions("theorem t : Nat := sorryCount\n") == 0
+    assert _MODULE.count_admissions("theorem t : Nat := 0 -- sorryAx\n") == 0
