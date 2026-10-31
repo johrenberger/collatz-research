@@ -27,18 +27,18 @@ Concrete contents:
 - Structural witness predicates and interface lemmas: complete.
 - `Valid` requires odd-positive start (P1 from PR #10 Codex review): matches
   Python's `accelerated_step`, which rejects even or non-positive inputs.
-- `acceleratedStep_odd_of_odd` states odd-preservation for one accelerated step;
-  admitted via `sorry` because the underlying chain through
-  `Nat.factorization_div` / `Nat.factorization_pow` is the same Mathlib work
-  blocking `Dynamics.lean::acceleratedStep_positive_of_odd`. Tracked as part of
-  the Story 02c/03c Mathlib workstream, not Story 06b.
+- `acceleratedStep_odd_of_odd` states odd-preservation for one accelerated step.
+  It was relocated to `Basic.lean` and proved there (PR #31), so it is no longer
+  an admission in this file.
 - `DescentWitness.trajectory_odd` is the consequence along the full trajectory
   (induction on `steps` using `acceleratedStep_odd_of_odd`).
-- **1 `sorry` admitted** in `acceleratedStep_odd_of_odd` (propagating through
-  `trajectory_odd`). The release-relevant Lean modules carry 7 `sorry` total:
-  4 in `Dynamics.lean` + `Equivalence.lean` (Story 02b/03b), 2 in `Affine.lean`
-  (Story 04), and 1 in this file (odd-preservation; same Mathlib blocker as
-  `Dynamics.lean`).
+- **3 `sorry` admitted**, all in `check_certificate_sound`: the parser-derived
+  constraints `0 < r.start`, `Odd r.start`, and `r.target < r.start`. The
+  release-relevant Lean modules carry 6 admissions in total: 3 in this file,
+  2 in `Importer.lean` (`parseV1Record`, `parseJsonl`), and 1 in
+  `CoverageTree.lean` (`coverage_tree_soundness_orbit`). Per-file counts are
+  recorded in `docs/lean-sorry-budget.json` and enforced by
+  `scripts/check_sorry_budget.py`.
 -/
 
 namespace CollatzResearch
@@ -136,10 +136,11 @@ checks the Python checker performs:
 
 **Current status (Story 06b step 1.4):** the shape is fixed
 (`ImportedRecord → Prop`) and `check_certificate_sound` is
-non-trivial. Component (c) is encoded below; components (a) and (b)
-are admitted as `sorry` placeholders pending the parser
-(`Importer.lean`) and the SHA-256 FFI (`Digest.lean`). Each
-placeholder is tracked in the file header; the **anti-circularity
+non-trivial. Component (c) is encoded below; components (a) and (b) are not
+yet encoded, and the three parser-derived constraints they would
+supply are admitted as `sorry` in `check_certificate_sound`, pending
+the parser (`Importer.lean`) and the SHA-256 FFI (`Digest.lean`). Each
+admission is tracked in `docs/lean-sorry-budget.json`; the **anti-circularity
 property** holds by construction: the hypothesis is
 `r : ImportedRecord`, not `w : DescentWitness`, so the bridge
 proof *cannot* discharge itself via `Valid`. -/
@@ -169,9 +170,11 @@ projection from `Valid` (which is what the original PR #10
 `Valid.sound` was, and which the Codex P0 review flagged).
 
 **Current status.** The theorem shape is correct. The proof is
-admitted as `sorry` because the components of `LeanAccepts` (parser,
-digest, trajectory) are themselves `sorry` placeholders. The
-anti-circularity shape is preserved: when those placeholders are
+admitted as three `sorry` holes: the parser-derived constraints
+`0 < r.start`, `Odd r.start`, and `r.target < r.start`. Component (c)
+of `LeanAccepts` (the trajectory recomputation) is encoded and proved
+above; components (a) (parser) and (b) (digest) are not yet encoded.
+The anti-circularity shape is preserved: when those admissions are
 filled in, the proof will need to rebuild `Valid` from
   - `0 < r.start` from the v1.0 schema constraint,
   - `Odd r.start` from the schema constraint (the parser rejects
