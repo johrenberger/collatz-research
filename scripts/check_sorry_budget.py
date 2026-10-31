@@ -8,9 +8,11 @@ Lean block comments (nested), line comments, and string literals are
 stripped first, so prose never counts while a bullet-form hole does.
 
 `sorry`, `admit`, `sorryAx`, `axiom`, and `opaque` are reserved Lean
-keywords, so every occurrence of them in code is a declaration -- including
-the `private axiom`, `protected axiom`, and `private opaque` modifier
-forms. `opaque` is counted because it hides the value from the kernel: it
+keywords, so outside a quoted identifier (`«sorry»`) every occurrence of
+one in code is a declaration -- including the `private axiom`,
+`protected axiom`, and `private opaque` modifier forms. A quoted identifier
+is a user-chosen name and is skipped. `opaque` is counted because it hides the value
+from the kernel: it
 is discharged through an `Inhabited`/`Nonempty` instance, and for a
 proposition `Nonempty p` is classically equivalent to `p`, so an opaque
 declaration can hide a proposition proof from review.
@@ -79,7 +81,10 @@ def _scan_string(src: str, i: int, interpolated: bool) -> tuple[int, str]:
                 out.append("  ")
                 continue
             hole, i = _scan_hole(src, i)
-            out.append(strip_comments_and_strings(hole))
+            # Separate from adjacent literal text: without the spaces the
+            # hole content would be glued onto the preceding characters and
+            # a leading keyword would miss its word boundary.
+            out.append(" " + strip_comments_and_strings(hole) + " ")
             continue
         out.append(" ")
         i += 1
@@ -165,6 +170,13 @@ def strip_comments_and_strings(src: str) -> str:
             # Interpolated literal: the identifier prefix ends in a bang.
             i, text = _scan_string(src, i + 1, True)
             out.append(text)
+            continue
+        if src[i] == "«":
+            # Quoted identifier: a user-chosen name, not the keyword.
+            j = src.find("»", i + 1)
+            j = n if j < 0 else j + 1
+            out.append(" " * (j - i))
+            i = j
             continue
         if src[i] == '"':
             i, text = _scan_string(src, i, False)

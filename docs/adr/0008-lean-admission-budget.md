@@ -27,10 +27,11 @@ read as if nothing were outstanding.
 - Count admission holes in code positions: `sorry`, `admit`, `sorryAx`,
   `axiom`, and `opaque` declarations. Strip Lean block comments (nested), line
   comments, and string literals before counting, so prose never counts. These
-  five are reserved Lean keywords, so every occurrence of one in code is a
-  declaration; matching them as words covers the `private axiom`,
-  `protected axiom`, and `private opaque` modifier forms, which a line-anchored
-  pattern would miss. `opaque` is included because it hides the value from the
+  five are reserved Lean keywords, so outside a quoted identifier every
+  occurrence of one in code is a declaration; matching them as words covers
+  the `private axiom`, `protected axiom`, and `private opaque` modifier forms,
+  which a line-anchored pattern would miss. A quoted identifier («sorry») is a
+  user-chosen name and is skipped. `opaque` is included because it hides the value from the
   kernel: it is discharged through an `Inhabited`/`Nonempty` instance, and for
   a proposition `Nonempty p` is classically equivalent to `p`, so an opaque
   declaration can hide a proposition proof from review.
