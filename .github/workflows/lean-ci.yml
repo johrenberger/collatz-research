@@ -49,9 +49,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Enforce Lean admission budget
-        run: python3 scripts/check_sorry_budget.py
-
       - name: Build and validate Lean
         uses: leanprover/lean-action@v1
         with:
@@ -154,6 +151,21 @@ jobs:
       - name: Build Q5 Stage-4 tests module
         if: success()
         run: lake build CollatzResearch.Q5Stage4Tests
+
+      # The admission budget is counted from Lean's own diagnostics, so it
+      # has to run after the Lean build: elaborating a file loads its
+      # imports from the build cache.
+      - name: Enforce Lean admission budget
+        if: success()
+        run: python3 scripts/check_sorry_budget.py
+
+      # Regression coverage for the admission oracle: a `sorry` that a
+      # custom elaborator synthesises without the word appearing in the
+      # source, the modifier forms of `axiom`/`opaque`, and the legal Lean
+      # identifiers `admit` and `sorryAx`.
+      - name: Admission oracle regression checks
+        if: success()
+        run: python3 scripts/check_admission_oracle.py
 
       # Final status reporter. Runs `if: always()` so it executes on
       # every terminal state (success, failure, cancelled). Prints a

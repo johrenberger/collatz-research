@@ -32,13 +32,16 @@ Concrete contents:
   an admission in this file.
 - `DescentWitness.trajectory_odd` is the consequence along the full trajectory
   (induction on `steps` using `acceleratedStep_odd_of_odd`).
-- **3 `sorry` admitted**, all in `check_certificate_sound`: the parser-derived
-  constraints `0 < r.start`, `Odd r.start`, and `r.target < r.start`. The
-  release-relevant Lean modules carry 6 admissions in total: 3 in this file,
-  2 in `Importer.lean` (`parseV1Record`, `parseJsonl`), and 1 in
-  `CoverageTree.lean` (`coverage_tree_soundness_orbit`). Per-file counts are
-  recorded in `docs/lean-sorry-budget.json` and enforced by
-  `scripts/check_sorry_budget.py`.
+- **1 admitted declaration**, containing 3 `sorry` holes, in
+  `check_certificate_sound`: the parser-derived constraints `0 < r.start`,
+  `Odd r.start`, and `r.target < r.start`. The release-relevant Lean
+  modules carry 4 admitted declarations in total: 1 in this file, 2 in
+  `Importer.lean` (`parseV1Record`, `parseJsonl`), and 1 in
+  `CoverageTree.lean` (`coverage_tree_soundness_orbit`). The enforced unit
+  is the admitted declaration, because that is the granularity at which
+  Lean reports an admission; the hole count is recorded here in prose.
+  Per-file counts are recorded in `docs/lean-sorry-budget.json` and
+  enforced by `scripts/check_sorry_budget.py`.
 -/
 
 namespace CollatzResearch

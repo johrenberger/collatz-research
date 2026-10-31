@@ -1,13 +1,17 @@
 {
-  "schema_version": 2,
-  "unit": "admission holes (sorry / admit / sorryAx / axiom / opaque) in code positions",
+  "schema_version": 3,
+  "unit": "admitted declarations per file: Lean's own `hasSorry` diagnostics (declarations referencing `sorryAx`) plus `axiom`/`opaque` declarations",
   "expected": {
     "Lean/CollatzResearch/Affine.lean": 0,
-    "Lean/CollatzResearch/Certificate.lean": 3,
+    "Lean/CollatzResearch/Certificate.lean": 1,
     "Lean/CollatzResearch/CoverageTree.lean": 1,
     "Lean/CollatzResearch/Dynamics.lean": 0,
     "Lean/CollatzResearch/Equivalence.lean": 0,
     "Lean/CollatzResearch/Importer.lean": 2,
     "Lean/CollatzResearch/Q5RoutingPartition.lean": 0
+  },
+  "not_elaborated": {
+    "Lean/CollatzResearch/BoundedInputCertificateParser.lean": "pre-existing parse errors under Lean 4.33; no module imports it, so it is outside the trusted chain",
+    "Lean/CollatzResearch/BoundedInputCertificateParserTests.lean": "imports BoundedInputCertificateParser, which does not parse under Lean 4.33"
   }
 }

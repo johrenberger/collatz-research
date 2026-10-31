@@ -1,58 +1,80 @@
 #!/usr/bin/env python3
-"""Reject increases in tracked Lean proof admissions.
+"""Enforce the exact Lean admission budget from Lean's own diagnostics.
 
-An admission is a declaration Lean accepted without checking its content:
-a `sorry` hole, an `admit` placeholder, an `axiom` declaration, a direct
-use of `sorryAx`, or an `opaque` declaration. Only code positions count.
-Lean block comments (nested), line comments, and string literals are
-stripped first, so prose never counts while a bullet-form hole does.
+The budget in `docs/lean-sorry-budget.json` is an exact per-file baseline of
+admitted declarations. Two components feed the count.
 
-`sorry`, `admit`, `sorryAx`, `axiom`, and `opaque` are reserved Lean
-keywords, so outside a quoted identifier (`«sorry»`) every occurrence of
-one in code is a declaration -- including the `private axiom`,
-`protected axiom`, and `private opaque` modifier forms. A quoted identifier
-is a user-chosen name and is skipped. `opaque` is counted because it hides the value
-from the kernel: it
-is discharged through an `Inhabited`/`Nonempty` instance, and for a
-proposition `Nonempty p` is classically equivalent to `p`, so an opaque
-declaration can hide a proposition proof from review.
+1. `sorry` and `sorryAx` admissions are counted from Lean's own report.
+   Elaborating a file with `lake env lean --json <file>` makes Lean emit one
+   `hasSorry` diagnostic for every declaration that references `sorryAx` --
+   the same signal Lean prints as "declaration uses sorry". Reading Lean's
+   report instead of scanning the source text is what makes this gate sound:
+   a custom elaborator can synthesise a `sorry` term without the word ever
+   appearing in the source, and only Lean can see that. The count is per
+   *declaration*: Lean reports one diagnostic per declaration, so three holes
+   inside one declaration count as one admitted declaration.
 
-Interpolated string literals (`s!"..."` and friends) embed Lean code in
-`{...}` holes, so those holes are scanned as code while the surrounding
-literal text is discarded. Without that, a `sorry` inside an interpolation
-hole would be invisible even though Lean itself reports "declaration uses
-`sorry`" for it.
+2. `axiom` and `opaque` declarations are counted from the source text. Lean
+   emits no diagnostic for them, and they are reserved Lean keywords, so a
+   word-boundary match in a code position identifies the declaration --
+   including the `private axiom`, `protected axiom` and `private opaque`
+   modifier forms. Comments and string literals are stripped before matching.
 
-The recorded budget in `docs/lean-sorry-budget.json` is an exact baseline,
-not a ceiling. Every tracked file must hold exactly the number of
-admissions recorded for it, and every Lean file that is not tracked must
-hold none:
+`admit` and `sorryAx` are NOT reserved Lean keywords: `def admit : Nat := 1`
+and `namespace User def sorryAx : Nat := 1` are legal Lean programs. The
+lexical component therefore never counts them, and a real `sorryAx` use is
+caught by the Lean diagnostic instead.
 
-  * more admissions than recorded: new proof debt, rejected;
-  * fewer admissions than recorded: stale record, rejected (lower the
-    recorded budget in the same change that closed the admissions).
+A file that Lean cannot elaborate at all is listed in the `not_elaborated`
+section of the budget together with the reason. Such a file is outside the
+trusted chain -- nothing can import a module that does not elaborate -- so
+only the lexical component applies to it. The list is checked in both
+directions: a file that newly stops elaborating fails the gate, and a
+recorded file that elaborates again fails the gate until its entry is
+removed and the recorded budget is updated.
 
-Counting unit: one admission hole. The Lean warning for a sorry-bearing
-declaration counts declarations, so three holes in one declaration produce
-one warning; this counter reports three, which is the number of unproven
-obligations the project tracks.
+The project has to be built before the gate runs: `lake env lean <file>`
+elaborates that one file and loads its imports from the build cache, so a
+file whose imports are not built fails the gate with an elaboration error.
+
+The recorded budget is an exact baseline, not a ceiling:
+
+  * more admitted declarations than recorded: new proof debt, rejected;
+  * fewer than recorded: stale record, rejected (lower the recorded budget in
+    the same change that closed the admissions).
 
 Schema versions:
-  1: line-anchored `sorry` count. Blind to bullet-form holes, blind to
-     comments and strings, and tolerant of per-file headroom.
-  2: exact hole baseline over code positions (current).
+  1: line-anchored `sorry` count.
+  2: exact hole baseline over code positions (lexical only).
+  3: exact admitted-declaration baseline; `sorry`/`sorryAx` counted from
+     Lean's own `hasSorry` diagnostics, `axiom`/`opaque` counted lexically.
 """
 
+from __future__ import annotations
+
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 BASELINE = ROOT / "docs" / "lean-sorry-budget.json"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
-ADMISSION = re.compile(r"\b(?:sorry|sorryAx|admit|axiom|opaque)\b")
+# Lean's severity tag for a declaration that references `sorryAx`.
+SORRY_KIND = "hasSorry"
+
+# `axiom` and `opaque` are reserved Lean keywords.
+KEYWORD_DECLARATION = re.compile(r"\b(?:axiom|opaque)\b")
+
+LEAN_ROOT = ROOT / "Lean"
+
+DEFAULT_JOBS = 2
+DEFAULT_TIMEOUT = 900
 
 
 def _scan_string(src: str, i: int, interpolated: bool) -> tuple[int, str]:
@@ -171,9 +193,9 @@ def strip_comments_and_strings(src: str) -> str:
             i, text = _scan_string(src, i + 1, True)
             out.append(text)
             continue
-        if src[i] == "«":
+        if src[i] == "\u00ab":
             # Quoted identifier: a user-chosen name, not the keyword.
-            j = src.find("»", i + 1)
+            j = src.find("\u00bb", i + 1)
             j = n if j < 0 else j + 1
             out.append(" " * (j - i))
             i = j
@@ -187,10 +209,70 @@ def strip_comments_and_strings(src: str) -> str:
     return "".join(out)
 
 
-def count_admissions(text: str) -> int:
-    """Count admitted proof holes in Lean source."""
+def count_keyword_declarations(text: str) -> int:
+    """Count the lexically detectable admitted declarations in Lean source.
+
+    Only `axiom` and `opaque` are counted here. `sorry` and `sorryAx` are
+    counted from Lean's own diagnostics instead, because a lexical scan
+    cannot see a `sorry` that an elaborator synthesised.
+    """
     code = strip_comments_and_strings(text)
-    return len(ADMISSION.findall(code))
+    return len(KEYWORD_DECLARATION.findall(code))
+
+
+def lean_sorry_declarations(path: Path, timeout: int) -> tuple[int, list[str]]:
+    """Elaborate one file with Lean and count its `hasSorry` diagnostics.
+
+    Returns the number of admitted declarations Lean reported, plus a list
+    of problems that make that number unreliable (an elaboration error, or a
+    Lean invocation that failed outright).
+    """
+    try:
+        proc = subprocess.run(
+            ["lake", "env", "lean", "--json", str(path)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return 0, [f"{path.name}: Lean elaboration timed out after {timeout}s"]
+    except OSError as exc:
+        return 0, [f"{path.name}: could not run Lean: {exc}"]
+
+    count = 0
+    problems: list[str] = []
+    for line in proc.stdout.splitlines() + proc.stderr.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(message, dict):
+            continue
+        if message.get("kind") == SORRY_KIND:
+            count += 1
+        elif message.get("severity") == "error":
+            position = message.get("pos") or {}
+            problems.append(
+                f"{message.get('fileName', path.name)}:"
+                f"{position.get('line', '?')}:{position.get('column', '?')}: "
+                f"{message.get('data', 'elaboration error')}"
+            )
+    if not problems and proc.returncode != 0:
+        problems.append(f"{path.name}: Lean exited with status {proc.returncode}")
+    return count, problems
+
+
+def _int_env(name: str, default: int) -> int:
+    """Read a positive integer from the environment, falling back to default."""
+    try:
+        value = int(os.environ.get(name, default))
+    except ValueError:
+        return default
+    return value if value > 0 else default
 
 
 def main() -> int:
@@ -198,30 +280,68 @@ def main() -> int:
     version = baseline.get("schema_version")
     if version != SCHEMA_VERSION:
         print(
-            f"unsupported Lean admission budget schema {version!r}" f" (expected {SCHEMA_VERSION})",
+            f"unsupported Lean admission budget schema {version!r} " f"(expected {SCHEMA_VERSION})",
             file=sys.stderr,
         )
         return 2
     expected = baseline["expected"]
-    actual: dict[str, int] = {}
-    for path in sorted((ROOT / "Lean").rglob("*.lean")):
-        rel = path.relative_to(ROOT).as_posix()
-        count = count_admissions(path.read_text(encoding="utf-8"))
-        if count:
-            actual[rel] = count
+    not_elaborated = baseline.get("not_elaborated", {})
+
+    if shutil.which("lake") is None:
+        print(
+            "the Lean admission budget needs `lake` on PATH; "
+            "install the Lean toolchain named in lean-toolchain",
+            file=sys.stderr,
+        )
+        return 2
+
+    timeout = _int_env("LEAN_ADMISSION_TIMEOUT", DEFAULT_TIMEOUT)
+    jobs = min(_int_env("LEAN_ADMISSION_JOBS", DEFAULT_JOBS), os.cpu_count() or 1)
 
     failures: list[str] = []
+    paths = sorted(LEAN_ROOT.rglob("*.lean"))
+    known = {path.relative_to(ROOT).as_posix() for path in paths}
+    for rel in sorted(not_elaborated):
+        if rel not in known:
+            failures.append(f"{rel}: recorded as not elaborable but the file does not exist")
+
+    actual: dict[str, int] = {}
+    if not failures:
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            results = list(pool.map(lambda p: lean_sorry_declarations(p, timeout), paths))
+        for path, (count, problems) in zip(paths, results, strict=True):
+            rel = path.relative_to(ROOT).as_posix()
+            lexical = count_keyword_declarations(path.read_text(encoding="utf-8"))
+            if problems:
+                if rel not in not_elaborated:
+                    failures.extend(problems)
+                    continue
+                # A recorded non-elaborable module: the oracle cannot see
+                # inside it, so only the lexical component applies.
+                total = lexical
+            else:
+                if rel in not_elaborated:
+                    failures.append(
+                        f"{rel}: the budget records this file as not elaborable, "
+                        "but Lean elaborates it now (drop the entry and "
+                        "update the recorded budget)"
+                    )
+                    continue
+                total = count + lexical
+            if total:
+                actual[rel] = total
+
     for rel, count in sorted(actual.items()):
         if rel not in expected:
-            failures.append(f"{rel}: {count} admissions are not tracked in the budget")
+            failures.append(f"{rel}: {count} admitted declarations are not tracked in the budget")
         elif count > expected[rel]:
             failures.append(
-                f"{rel}: {count} admissions exceed the recorded budget "
+                f"{rel}: {count} admitted declarations exceed the recorded budget "
                 f"{expected[rel]} (new proof debt)"
             )
         elif count < expected[rel]:
             failures.append(
-                f"{rel}: {count} admissions but the recorded budget is "
+                f"{rel}: {count} admitted declarations but the recorded budget is "
                 f"{expected[rel]} (lower the recorded budget)"
             )
     for rel, count in sorted(expected.items()):
