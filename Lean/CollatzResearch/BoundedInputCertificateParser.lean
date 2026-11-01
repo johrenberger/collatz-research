@@ -290,11 +290,11 @@ partial def parseStringContent (acc : List Char) : List Char →
   | '\\' :: '"' :: rest => parseStringContent ('"' :: acc) rest
   | '\\' :: '\\' :: rest => parseStringContent ('\\' :: acc) rest
   | '\\' :: '/' :: rest => parseStringContent ('/' :: acc) rest
-  | '\\' :: 'u' :: rest =>
+  | '\\' :: 'u' :: rest => do
     let (n, rest) ← parseHex4 rest
     if 0xD800 ≤ n ∧ n ≤ 0xDFFF then .error .surrogateInUnicodeEscape
-    else if let some c := Char.ofNat? n then
-      parseStringContent (c :: acc) rest
+    else if n < 0x110000 then
+      parseStringContent (Char.ofNat n :: acc) rest
     else
       .error (.invalidEscape s!"invalid unicode codepoint U+{n}")
   | '\\' :: c :: _ => .error (.invalidEscape s!"\\{c}")
@@ -319,11 +319,13 @@ partial def parseValue : List Char → Except ParseError (JsonValue × List Char
     let cs := skipWs cs
     match cs with
     | 't' :: _ | 'f' :: _ | 'n' :: _ => parseLiteral cs
-    | '"' :: _ => parseString cs
+    | '"' :: _ => do
+      let (s, rest) ← parseString cs
+      pure (.string s, rest)
     | '[' :: rest => parseArray [] (skipWs rest)
     | '{' :: rest => parseObject [] (skipWs rest)
     | c :: _ =>
-      if '0' ≤ c ∧ c ≤ '9' then
+      if '0' ≤ c ∧ c ≤ '9' then do
         let (n, rest) ← parseNum cs
         .ok (.num n, rest)
       else
@@ -336,7 +338,7 @@ partial def parseArray (items : List JsonValue) : List Char →
     let cs := skipWs cs
     match cs with
     | ']' :: rest => .ok (.array items.reverse, rest)
-    | _ =>
+    | _ => do
       let (v, rest) ← parseValue cs
       let rest := skipWs rest
       match rest with
@@ -353,7 +355,7 @@ partial def parseObject (entries : List (String × JsonValue)) :
     let cs := skipWs cs
     match cs with
     | '}' :: rest => .ok (.object entries.reverse, rest)
-    | _ =>
+    | _ => do
       let (key, rest) ← parseString cs
       let rest := skipWs rest
       let (_, rest) ← expectCharRest ':' rest

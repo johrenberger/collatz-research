@@ -65,21 +65,25 @@ namespace CollatzResearch
 
 /-! ## Test helpers -/
 
-def Except.isOk : Except ε α → Bool
-  | .ok _ => true
-  | _ => false
+/-- True iff the parse failed with exactly the given error category. Keeps the
+    rejection-category assertion kernel-checked without needing a
+    `DecidableEq` instance for the whole wire payload. -/
+def rejectedWith {α : Type} (r : Except ParseError α) (e : ParseError) : Bool :=
+  match r with
+  | .error e' => e' == e
+  | .ok _ => false
+
 
 /-! ## POSITIVE: valid producer fixture parses correctly -/
 
 /-- POSITIVE — valid producer fixture (N=1, claim `.singleton 1`,
     trajectory `[1]`). Matches PR #62 v5 scenario A. -/
-example : (parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"singleton\",\"n\":1}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"0:0-0\"}," ++
-    "\"trajectory\":[1]}]}").isOk = true := by
+    "\"trajectory\":[1]}]}")).isOk = true := by
   native_decide
 
 /-! ## P1 #2 — Strict JSON parsing (rejections) -/
@@ -87,301 +91,269 @@ example : (parseBoundedInputCertificateWire
 /-- R1 — malformed JSON (unbalanced brace: missing closing brace).
     The parser tries to read the first key as a string, so the
     actual rejection is `.expectedChar '"'` on the literal 'm'. -/
-example : parseBoundedInputCertificateWire "{malformed}" = .error (.expectedChar '"' "'m'") := by
+example : rejectedWith (parseBoundedInputCertificateWire ("{malformed}")) (.expectedChar '"' "'m'") = true := by
   native_decide
 
 /-- R2 — leading zero in number (N=01). Per strict JSON, integers
     cannot have leading zeros (only "0" itself is allowed). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":01," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error .leadingZeroNumber := by
+    "\"trajectory\":[1]}]}")) .leadingZeroNumber = true := by
   native_decide
 
 /-- R3 — duplicate top-level key (`schemaVersion` appears twice). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.duplicateKey "schemaVersion" "$") := by
+    "\"trajectory\":[1]}]}")) (.duplicateKey "schemaVersion" "$") = true := by
   native_decide
 
 /-! ## P1 #1 — Schema constraints (rejections) -/
 
 /-- R4 — wrong schema version (`"2.0"` instead of `"1.0"`). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"2.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"2.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.unsupportedSchemaVersion "2.0") := by
+    "\"trajectory\":[1]}]}")) (.unsupportedSchemaVersion "2.0") = true := by
   native_decide
 
 /-- R5 — missing required field `claim`. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.missingField "claim") := by
+    "\"trajectory\":[1]}]}")) (.missingField "claim") = true := by
   native_decide
 
 /-- R6 — wrong type for `schemaVersion` (int instead of string).
     v4: changed from `.missingField "schemaVersion"` (v3, which conflated
     absent with wrong type) to `.wrongTypeAt "string" "$.schemaVersion"`.
     Per Codex review `PRR_kwDOTuMD788AAAABLVa5sw` P2. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":42," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":42," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.wrongTypeAt "string" "$.schemaVersion") := by
+    "\"trajectory\":[1]}]}")) (.wrongTypeAt "string" "$.schemaVersion") = true := by
   native_decide
 
 /-- R5b — missing required field `schemaVersion`. Complements R6:
     R6 covers wrong-type (key present, wrong JSON type); R5b covers
     missing (key absent). v4 per Codex review
     `PRR_kwDOTuMD788AAAABLVa5sw` P2 (split absent from wrong type). -/
-example : parseBoundedInputCertificateWire
-    "{\"claim\":{\"type\":\"empty\"}," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.missingField "schemaVersion") := by
+    "\"trajectory\":[1]}]}")) (.missingField "schemaVersion") = true := by
   native_decide
 
 /-- R5c — missing required field `N`. Complements R8 (zero value). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.missingField "N") := by
+    "\"trajectory\":[1]}]}")) (.missingField "N") = true := by
   native_decide
 
 /-- R5d — missing required field `rawWitnesses`. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
-    "\"N\":1}" = .error (.missingField "rawWitnesses") := by
+    "\"N\":1}")) (.missingField "rawWitnesses") = true := by
   native_decide
 
 /-- R5e — missing required field `l` inside a witness. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
-    "{\"trajectory\":[1]}]}" = .error (.missingField "l") := by
+    "{\"trajectory\":[1]}]}")) (.missingField "l") = true := by
   native_decide
 
 /-- R5f — missing required field `leafId` inside `l`. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.missingField "leafId") := by
+    "\"trajectory\":[1]}]}")) (.missingField "leafId") = true := by
   native_decide
 
 /-- R5g — missing required field `leafProperty` inside `l`. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.missingField "leafProperty") := by
+    "\"trajectory\":[1]}]}")) (.missingField "leafProperty") = true := by
   native_decide
 
 /-- R5h — missing required field `trajectory` inside a witness. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
-    "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}}]}" =
-    .error (.missingField "trajectory") := by
+    "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}}]}")) (.missingField "trajectory") = true := by
   native_decide
 
 /-- R6b — wrong type for `N` (string instead of non-negative integer).
     v4 per Codex review `PRR_kwDOTuMD788AAAABLVa5sw` P2. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":\"x\"," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.wrongTypeAt "non-negative integer" "$.N") := by
+    "\"trajectory\":[1]}]}")) (.wrongTypeAt "non-negative integer" "$.N") = true := by
   native_decide
 
 /-- R6c — wrong type for `claim` (number instead of object).
     `parseFiniteOrbitClaim` delegates the wrong-type case to
     `.notAnObject "claim"`, which is in the WRONG_TYPE category
     (consistent with `.wrongTypeAt` for top-level scalar fields). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":42," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.notAnObject "claim") := by
+    "\"trajectory\":[1]}]}")) (.notAnObject "claim") = true := by
   native_decide
 
 /-- R6d — wrong type for `rawWitnesses` (string instead of array). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
-    "\"rawWitnesses\":\"x\"}" = .error (.wrongTypeAt "non-empty array" "$.rawWitnesses") := by
+    "\"rawWitnesses\":\"x\"}")) (.wrongTypeAt "non-empty array" "$.rawWitnesses") = true := by
   native_decide
 
 /-- R6e — wrong type for `leafId` (number instead of string). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":42,\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" =
-    .error (.wrongTypeAt "string" "rawWitnesses[0].l.leafId") := by
+    "\"trajectory\":[1]}]}")) (.wrongTypeAt "string" "rawWitnesses[0].l.leafId") = true := by
   native_decide
 
 /-- R6f — wrong type for `leafProperty` (number instead of string). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":42}," ++
-    "\"trajectory\":[1]}]}" =
-    .error (.wrongTypeAt "string" "rawWitnesses[0].l.leafProperty") := by
+    "\"trajectory\":[1]}]}")) (.wrongTypeAt "string" "rawWitnesses[0].l.leafProperty") = true := by
   native_decide
 
 /-- R6g — wrong type for `trajectory` (string instead of array). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":\"x\"}]}" =
-    .error (.wrongTypeAt "non-empty array" "rawWitnesses[0].trajectory") := by
+    "\"trajectory\":\"x\"}]}")) (.wrongTypeAt "non-empty array" "rawWitnesses[0].trajectory") = true := by
   native_decide
 
 /-- R7 — unknown nested field inside `claim` (`extra` not in schema). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"singleton\",\"n\":1,\"extra\":1}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.unknownField "extra" "claim") := by
+    "\"trajectory\":[1]}]}")) (.unknownField "extra" "claim") = true := by
   native_decide
 
 /-- R7b — unknown nested field inside witness `l` (`bogus` not in schema). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"singleton\",\"n\":1}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\",\"bogus\":1}," ++
-    "\"trajectory\":[1]}]}" = .error (.unknownField "bogus" "rawWitnesses[0].l") := by
+    "\"trajectory\":[1]}]}")) (.unknownField "bogus" "rawWitnesses[0].l") = true := by
   native_decide
 
 /-- R8 — numeric lower bound violated: `N = 0` (must be ≥ 1). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":0," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error .nMustBePositive := by
+    "\"trajectory\":[1]}]}")) .nMustBePositive = true := by
   native_decide
 
 /-- R8b — numeric lower bound violated: singleton `n = 0`. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"singleton\",\"n\":0}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error .singletonNMustBePositive := by
+    "\"trajectory\":[1]}]}")) .singletonNMustBePositive = true := by
   native_decide
 
 /-- R8c — numeric lower bound violated: bounded `K = 0`. -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"bounded\",\"K\":0}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error .boundedKMustBePositive := by
+    "\"trajectory\":[1]}]}")) .boundedKMustBePositive = true := by
   native_decide
 
 /-- R9 — empty `leafId` (must be non-empty string). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error .emptyLeafId := by
+    "\"trajectory\":[1]}]}")) .emptyLeafId = true := by
   native_decide
 
 /-- R10 — empty `trajectory` array (must have ≥ 1 entry). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[]}]}" = .error .emptyTrajectory := by
+    "\"trajectory\":[]}]}")) .emptyTrajectory = true := by
   native_decide
 
 /-- R11 — zero trajectory entry (must be ≥ 1). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[0]}]}" = .error (.trajectoryEntryMustBePositive 0) := by
+    "\"trajectory\":[0]}]}")) (.trajectoryEntryMustBePositive 0) = true := by
   native_decide
 
 /-- R12 — unsupported claim tag (`{"type":"interval"}` is not a
     FiniteOrbitClaim constructor). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"interval\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
-    "\"trajectory\":[1]}]}" = .error (.unknownClaimTag "interval") := by
+    "\"trajectory\":[1]}]}")) (.unknownClaimTag "interval") = true := by
   native_decide
 
 /-- R13 — top-level is not a JSON object (it's an array). -/
-example : parseBoundedInputCertificateWire "[]" = .error (.notAnObject "$") := by
+example : rejectedWith (parseBoundedInputCertificateWire ("[]")) (.notAnObject "$") = true := by
   native_decide
 
 /-- R14 — unknown top-level field (`debug` not in schema v1.0). -/
-example : parseBoundedInputCertificateWire
-    "{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
     "\"claim\":{\"type\":\"empty\"}," ++
     "\"N\":1," ++
     "\"rawWitnesses\":[" ++
     "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"p\"}," ++
     "\"trajectory\":[1]}]," ++
-    "\"debug\":1}" = .error (.unknownField "debug" "$") := by
+    "\"debug\":1}")) (.unknownField "debug" "$") = true := by
   native_decide
 
 /-! ## P1 (v3) — ASCII-only contract on `leafId` / `leafProperty`
@@ -394,25 +366,23 @@ producer `_validate_ascii_identifier`). The parser enforces this via
 /-- R15 — non-ASCII char in `leafId` (U+00E9 LATIN SMALL LETTER E
     WITH ACUTE = 0xE9). Mirrors the v2 surrogate-pair bug: a UTF-8
     byte sequence the parser used to accept silently. -/
-example : parseBoundedInputCertificateWire
-    ("{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
      "\"claim\":{\"type\":\"empty\"}," ++
      "\"N\":1," ++
      "\"rawWitnesses\":[" ++
      "{\"l\":{\"leafId\":\"" ++ s!"{Char.ofNat 0xE9}" ++
        "\",\"leafProperty\":\"p\"}," ++
-     "\"trajectory\":[1]}]}") = .error (.nonAsciiChar "rawWitnesses[0].l.leafId" 0xE9) := by
+     "\"trajectory\":[1]}]}")) (.nonAsciiChar "rawWitnesses[0].l.leafId" 0xE9) = true := by
   native_decide
 
 /-- R16 — non-ASCII char in `leafProperty` (U+00E9 = 0xE9). -/
-example : parseBoundedInputCertificateWire
-    ("{\"schemaVersion\":\"1.0\"," ++
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\"," ++
      "\"claim\":{\"type\":\"empty\"}," ++
      "\"N\":1," ++
      "\"rawWitnesses\":[" ++
      "{\"l\":{\"leafId\":\"L\",\"leafProperty\":\"" ++ s!"{Char.ofNat 0xE9}" ++
        "\"}," ++
-     "\"trajectory\":[1]}]}") = .error (.nonAsciiChar "rawWitnesses[0].l.leafProperty" 0xE9) := by
+     "\"trajectory\":[1]}]}")) (.nonAsciiChar "rawWitnesses[0].l.leafProperty" 0xE9) = true := by
   native_decide
 
 /-- R17 — surrogate half in `\uXXXX` escape (U+D83D = 0xD83D, the
@@ -421,10 +391,7 @@ example : parseBoundedInputCertificateWire
     these pairs from non-BMP input. v3's ASCII-only contract makes
     the producer reject such input upstream; the parser still rejects
     it defensively. -/
-example : parseBoundedInputCertificateWire
-    (String.mk
-      "{\"schemaVersion\":\"1.0\",\"claim\":{\"type\":\"empty\"},\"N\":1,\"rawWitnesses\":[{\"l\":{\"leafId\":\"\\uD83D\",\"leafProperty\":\"p\"},\"trajectory\":[1]}]}".data) =
-    .error .surrogateInUnicodeEscape := by
+example : rejectedWith (parseBoundedInputCertificateWire ("{\"schemaVersion\":\"1.0\",\"claim\":{\"type\":\"empty\"},\"N\":1,\"rawWitnesses\":[{\"l\":{\"leafId\":\"\\uD83D\",\"leafProperty\":\"p\"},\"trajectory\":[1]}]}")) .surrogateInUnicodeEscape = true := by
   native_decide
 
 end CollatzResearch

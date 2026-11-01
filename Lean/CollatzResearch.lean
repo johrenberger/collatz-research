@@ -21,6 +21,13 @@ import CollatzResearch.Residues
 -- 3 modules stay on the conditional-CI path. The parser-fixup commits
 -- from PR #80 are kept as defensive hygiene (they help conditional CI
 -- even without root-import).
+--
+-- Story #1c repairs `BoundedInputCertificateParser.lean` for Lean 4.33.0,
+-- so the parser and its test module are root imports below and are inside
+-- the trusted chain. The escalation's diagnosis was wrong: the blocker was
+-- term-level `let (x, y) ← e` (a parse error in Lean 4.33), not the
+-- `mutual` block. `EquivalenceHelpersTests` is the one orphan that stays
+-- outside the root import.
 import CollatzResearch.Importer
 import CollatzResearch.CoverageTree
 import CollatzResearch.BoundedInputCertificateData
@@ -37,3 +44,5 @@ import CollatzResearch.LeafClaimTests
 import CollatzResearch.FiniteOrbitClaimTests
 import CollatzResearch.CoverageTreeOrbitTests
 import CollatzResearch.DynamicsHelpersTests
+import CollatzResearch.BoundedInputCertificateParser
+import CollatzResearch.BoundedInputCertificateParserTests
