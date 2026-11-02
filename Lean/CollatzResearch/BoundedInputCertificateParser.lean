@@ -76,6 +76,31 @@ Two findings, addressed in v4:
     field rejection (top-level `schemaVersion`/`N`/`rawWitnesses`
     and witness-level `l`/`trajectory`).
 
+### Story #1c repair (PR #104, Lean 4.33)
+This module did not parse under Lean 4.33, so it and its test module were
+recorded in the admission budget`not_elaborated` section and sat
+outside the trusted chain. Three things blocked elaboration:
+
+  1. Term-level `let (x, y) <- e` (in `parseStringContent`,
+     `parseValue`, `parseArray`, `parseObject`) is a parse error in
+     4.33. The same binders are legal inside a `do` block, so each
+     affected arm gained `do` and kept the identical bindings.
+  2. `Char.ofNat?` does not exist in Lean 4.33 core. The \uXXXX
+     arm now bounds the codepoint with `n < 0x110000` and uses
+     `Char.ofNat`. The reachable behaviour is unchanged: `parseHex4`
+     reads exactly four hex digits, so `n <= 0xFFFF` always and the
+     `n < 0x110000` branch is defensive; surrogate halves are still
+     rejected first, with `.surrogateInUnicodeEscape`.
+  3. The `"` arm of `parseValue` had a return-type mismatch: it
+     produced `String` where `JsonValue` was required (no coercion
+     exists). The arm now wraps the parsed string as
+     `JsonValue.string`. This one changed the shape of the parsed
+     value, not just its syntax; it is called out here because it is the
+     class of change a reviewer of a trust boundary wants flagged.
+
+The `ParseError` taxonomy is untouched by this repair: 27 constructors,
+same names, same argument types, same `toString` rendering.
+
 ## Honest correction from the v2 review reply
 
 The v2 review reply claimed: "Each assertion checks the documented
@@ -84,7 +109,8 @@ match — not just `.isError`." Codex inspected the actual file
 (`BoundedInputCertificateParserTests.lean:17-209`) and disproved this:
 the tests only checked `.isError`. The review reply overstated what
 was implemented. v3 fixes this honestly by pattern-matching on the
-`ParseError` constructor itself (kernel-checked via `native_decide`),
+`ParseError` constructor itself (compiler-evaluated via `native_decide` --
+which rests on the core native-decide axiom, not kernel-checked --),
 not by adding brittle `String.startsWith` assertions.
 
 Trust boundary (per Q5 v5 spec § 4.3.1a):
@@ -126,7 +152,8 @@ inductive JsonValue where
 
     The Q5 PR #3 v3 contract: every rejection site constructs one of
     these values. Test assertions pattern-match on the constructor
-    (kernel-checked), not on the `toString` rendering. -/
+    (compiler-evaluated via `native_decide`, not kernel-checked), not on
+    the `toString` rendering. -/
 inductive ParseError where
   | unexpectedEof
   | expectedChar (expected : Char) (found : String)
@@ -290,11 +317,11 @@ partial def parseStringContent (acc : List Char) : List Char →
   | '\\' :: '"' :: rest => parseStringContent ('"' :: acc) rest
   | '\\' :: '\\' :: rest => parseStringContent ('\\' :: acc) rest
   | '\\' :: '/' :: rest => parseStringContent ('/' :: acc) rest
-  | '\\' :: 'u' :: rest =>
+  | '\\' :: 'u' :: rest => do
     let (n, rest) ← parseHex4 rest
     if 0xD800 ≤ n ∧ n ≤ 0xDFFF then .error .surrogateInUnicodeEscape
-    else if let some c := Char.ofNat? n then
-      parseStringContent (c :: acc) rest
+    else if n < 0x110000 then
+      parseStringContent (Char.ofNat n :: acc) rest
     else
       .error (.invalidEscape s!"invalid unicode codepoint U+{n}")
   | '\\' :: c :: _ => .error (.invalidEscape s!"\\{c}")
@@ -319,11 +346,13 @@ partial def parseValue : List Char → Except ParseError (JsonValue × List Char
     let cs := skipWs cs
     match cs with
     | 't' :: _ | 'f' :: _ | 'n' :: _ => parseLiteral cs
-    | '"' :: _ => parseString cs
+    | '"' :: _ => do
+      let (s, rest) ← parseString cs
+      pure (.string s, rest)
     | '[' :: rest => parseArray [] (skipWs rest)
     | '{' :: rest => parseObject [] (skipWs rest)
     | c :: _ =>
-      if '0' ≤ c ∧ c ≤ '9' then
+      if '0' ≤ c ∧ c ≤ '9' then do
         let (n, rest) ← parseNum cs
         .ok (.num n, rest)
       else
@@ -336,7 +365,7 @@ partial def parseArray (items : List JsonValue) : List Char →
     let cs := skipWs cs
     match cs with
     | ']' :: rest => .ok (.array items.reverse, rest)
-    | _ =>
+    | _ => do
       let (v, rest) ← parseValue cs
       let rest := skipWs rest
       match rest with
@@ -353,7 +382,7 @@ partial def parseObject (entries : List (String × JsonValue)) :
     let cs := skipWs cs
     match cs with
     | '}' :: rest => .ok (.object entries.reverse, rest)
-    | _ =>
+    | _ => do
       let (key, rest) ← parseString cs
       let rest := skipWs rest
       let (_, rest) ← expectCharRest ':' rest

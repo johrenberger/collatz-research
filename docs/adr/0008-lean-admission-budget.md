@@ -125,10 +125,12 @@ read as if nothing were outstanding.
   controls how many files are elaborated at once (default 2, capped by the
   CPU count); each elaboration holds its own copy of the Mathlib
   environment, so raising it trades memory for wall-clock time.
-- `Lean/CollatzResearch/BoundedInputCertificateParser.lean` does not parse
-  under Lean 4.33 and nothing imports it, so it and its test module are
-  recorded in `not_elaborated`. They carry no admissions, and the lexical
-  component still covers them. Repairing them is separate work.
+- `Lean/CollatzResearch/BoundedInputCertificateParser.lean` did not parse
+  under Lean 4.33 and nothing imported it, so it and its test module were
+  recorded in `not_elaborated`. Story #1c repaired the parser, so both
+  modules now elaborate with zero admitted declarations, are root imports
+  of `Lean/CollatzResearch.lean`, and are tracked in `expected` at 0.
+  The `not_elaborated` section is now empty.
 - The budget schema moves to version 3 because the unit changed from
   admission holes to admitted declarations, and because the `sorry` count now
   comes from Lean instead of from the source text.
