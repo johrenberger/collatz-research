@@ -67,3 +67,5 @@
 | Nontrivial cycle exclusion | Not started | — | No claim |
 
 Update this table in the same change as any theorem addition. "Checked" means `lake build` succeeds against pinned dependencies. "Pending" means the definition is in place but the proof is incomplete (tracked as `sorry` in the Lean file).
+
+The two unclaimed rows above are specified in [convergence-frontier.md](convergence-frontier.md): what the repo has formalized, which hypothesis carries the Collatz content in each reachability theorem, which evidence the Lean kernel can check, and the bounded work packets that close the closable part.

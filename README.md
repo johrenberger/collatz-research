@@ -18,6 +18,8 @@ T(n) = (3n + 1) / 2^{v_2(3n+1)}.
 
 See [docs/mathematical-model.md](docs/mathematical-model.md), [docs/trust-model.md](docs/trust-model.md), and [docs/theorem-status.md](docs/theorem-status.md).
 
+The gap between what the project has formalized and a global convergence claim — what is proven, what is assumed, and what is still open — is specified in [docs/convergence-frontier.md](docs/convergence-frontier.md).
+
 ## Quick start (workstation)
 
 Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/), and the Lean version in `lean-toolchain`.
