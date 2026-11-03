@@ -1,8 +1,10 @@
 # Convergence frontier
 
-**Status:** Draft for maintainer approval (NT-5). This document changes no
-theorem, no claim level, and no trust boundary.
-**Base commit:** `3f28799` (`main`).
+**Status:** Approved and merged - PR #105 (squash commit `515a8d52`,
+2026-11-03). This document changes no theorem, no claim level, and no trust
+boundary.
+**Base commit:** `3f28799` (`main`) - the repository state this document
+describes.
 
 It states precisely where the formalization stops, separates what is
 mechanically closable from what is open mathematics, and proposes the bounded
@@ -369,6 +371,12 @@ plan:
 ```
 
 ## 9. Open decisions for the maintainer
+
+**These four decisions remain open.** Merging this specification approved the
+document; it did not resolve any of the questions below. A work packet that
+depends on one of them must not begin until that decision is made - which
+covers WP-CF-2, WP-CF-3 and WP-CF-5. WP-CF-1 depends on none of them, and
+WP-CF-4 and WP-CF-5 *are* the decisions themselves.
 
 These are architectural or mathematical choices, so per the repository's own
 review-gate rules they are maintainer decisions rather than autonomous scope:
