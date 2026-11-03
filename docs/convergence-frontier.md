@@ -364,7 +364,7 @@ plan:
     - "WP-CF-3: per-leaf availability for one concrete tree, with the companion theorem's hypothesis discharged rather than assumed"
 
   known_design_decisions:
-    - "WP-CF-2: which evidence tier is acceptable for reachability witnesses at k >= 1 - kernel-checkable only, native_decide, or hand-proved per instance"
+    - "WP-CF-2: DECIDED 2026-11-04 (ADR 0009) - the evidence tier for reachability witnesses at k >= 1 is kernel-checkable, restricted to claims whose terminal value is 1; no reachability theorem evaluates an orbit equation, and native_decide stays admissible for data-side obligations only"
     - "WP-CF-4: coverage_tree_soundness_orbit's documented promotion path is refutable on current definitions; choose deletion, predicate redefinition, or an added hypothesis"
     - "WP-CF-5: retire versus complete the legacy v1.0 descent-certificate path"
     - "Whether the .interval claim shape is funded at all, given its infinite obligation"
@@ -372,19 +372,26 @@ plan:
 
 ## 9. Open decisions for the maintainer
 
-**These four decisions remain open.** Merging this specification approved the
-document; it did not resolve any of the questions below. A work packet that
-depends on one of them must not begin until that decision is made - which
-covers WP-CF-2, WP-CF-3 and WP-CF-5. WP-CF-1 depends on none of them, and
-WP-CF-4 and WP-CF-5 *are* the decisions themselves.
+**Decision 1 is now made; three remain open.** Merging this specification
+approved the document; it did not resolve any of the questions below. A work
+packet that depends on an open decision must not begin until that decision is
+made. Decision 1 (the evidence tier for reachability witnesses) was taken on
+2026-11-04 and is recorded in
+[ADR 0009](adr/0009-reachability-evidence-tier.md): the tier is kernel-checkable,
+restricted to claims whose terminal value is 1, and no reachability theorem
+evaluates an orbit equation. That decision unblocks WP-CF-2 and, through it,
+WP-CF-3. Decisions 2, 3 and 4 below remain open and still gate WP-CF-4 and
+WP-CF-5.
 
 These are architectural or mathematical choices, so per the repository's own
 review-gate rules they are maintainer decisions rather than autonomous scope:
 
 1. **Evidence tier for reachability witnesses** (WP-CF-2) - the substantive
-   question. Keep every result kernel-checkable by restricting claims to a
-   terminal value of 1, accept `native_decide` and say so in the trust model,
-   or hand-prove orbit equations per instance.
+   question. **DECIDED 2026-11-04 - see
+   [ADR 0009](adr/0009-reachability-evidence-tier.md).** The tier is
+   kernel-checkable, restricted to claims whose terminal value is 1; no
+   reachability theorem evaluates an orbit equation; `native_decide` remains
+   admissible for data-side obligations only, unchanged.
 2. **`coverage_tree_soundness_orbit`** (WP-CF-4) - the documented route to
    closing its `sorry` does not hold (section 7.1). Delete, redefine, or add a
    hypothesis?
