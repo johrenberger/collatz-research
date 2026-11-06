@@ -91,7 +91,7 @@ per instance.
 - **`native_decide` remains admissible for data-side obligations**, exactly as
   it is today, and is unaffected by this record. The existing data-side sites
   stay disclosed as they are: `ValidTree depthTwoTree` and `IsComplete
-  depthTwoTree` in `Q5Integration.lean:292-293`, and the parser's `ParseError`
+  depthTwoTree` in `Q5Integration.lean:315-316`, and the parser's `ParseError`
   constructor in `BoundedInputCertificateParser.lean:112-113` and `:155`,
   which already state in prose that this "rests on the core native-decide
   axiom, not kernel-checked". A certificate's Boolean acceptance is a
