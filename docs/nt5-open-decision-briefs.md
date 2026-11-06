@@ -154,11 +154,24 @@ the current state rather than an open question about the architecture:
   and `parse_leaf_claim` decodes a legacy `"2:1-1"` property into it.
 
 The obligation is what makes `.interval` expensive. For a `.interval`
-claim, `LeafClaim.Holds x` is `lo ≤ x % period ∧ x % period ≤ hi` — an
-**infinite** predicate over inputs. The `claim_reaches_one` obligation of
-`LeafCertificate` is `∀ x, claim.Holds x → ReachesOne x`, so a populated
-`.interval` claim demands that every member of an infinite residue class
-reaches 1. That is not a per-instance obligation in any bounded sense.
+claim, `LeafClaim.Holds x` is `lo ≤ x % period ∧ x % period ≤ hi`. The
+`claim_reaches_one` obligation of `LeafCertificate` is
+`∀ x, claim.Holds x → ReachesOne x`.
+
+The infinite-obligation statement is about **well-formed** intervals as
+carried by a `LeafCertificate`, and it is worth being exact about that:
+
+- The public `LeafClaim` constructor permits malformed intervals —
+  `.interval 0 0 0` or `.interval 2 2 1` are constructible directly — and
+  such a claim denotes a finite or empty set, not an infinite one.
+- A `LeafCertificate` cannot carry one: its `well_formed` field requires
+  `LeafClaim.WellFormed`, which for `.interval period lo hi` is
+  `period > 0 ∧ lo ≤ hi ∧ hi < period`.
+- So for every `.interval` claim a `LeafCertificate` can actually carry,
+  the residue set is non-empty and the class is infinite, and
+  `claim_reaches_one` demands that **every** member of it reaches 1.
+
+That is not a per-instance obligation in any bounded sense.
 
 Two facts bound what can be funded:
 
@@ -172,24 +185,26 @@ Two facts bound what can be funded:
    all.
 
 The current `LeafCertificate` type takes a `LeafClaim` and therefore
-*permits* an `.interval` claim structurally, while the obligations it carries
-make populating one an unbounded commitment. That gap is the actual decision.
+*permits* a `.interval` claim structurally, while the obligations it carries
+make populating a well-formed one an unbounded commitment. That gap is the
+actual decision.
 
 ### The options
 
 | Option | What it does | What it commits to |
 |---|---|---|
 | **(a) Leave unused** | Keep `.interval` excluded from the orbit-aware path (already true) and state in the trust model and the affected docstrings that it is not funded. | The `.interval` constructor stays in `LeafClaim` for legacy decoding, and the repository states plainly that it carries no funded reachability obligation. No new obligation is created. |
-| **(b) Fund per instance** | Populate `.interval` claims for specific residue classes. | Each funded `.interval` claim requires proving that an infinite residue class reaches 1. That is the same unbounded obligation as decision 1's rejected option (c), and it does not compose with a certificate pipeline. |
+| **(b) Fund per instance** | Populate well-formed `.interval` claims for specific residue classes. | Each funded `.interval` claim requires proving that an infinite residue class reaches 1. That is the same unbounded obligation as decision 1's rejected option (c), and it does not compose with a certificate pipeline. |
 | **(c) Remove `.interval` from `LeafClaim`** | Delete the constructor. | Breaks legacy `"2:1-1"` property decoding, the `LeafClaimTests.lean` scenarios that exercise it, and the Python-side `lean_interval`/`leaf_in_interval` helpers that mirror it. A cross-language change for a shape with no funded user. |
 
 ### The recommendation
 
 **(a) Leave unused**, and record it: state in the trust model that
 `.interval` claims are not funded, and note in the `LeafClaim`
-docstring that the `LeafCertificate` obligations make populating one an
-unbounded commitment. This matches what ADR 0009 already implies for the
-other non-terminal-value shapes, and it costs no new obligation.
+docstring that the `LeafCertificate` obligations make populating a
+well-formed one an unbounded commitment. This matches what ADR 0009 already
+implies for the other non-terminal-value shapes, and it costs no new
+obligation.
 
 Option (c) is the only one that removes the gap structurally, but it costs a
 cross-language breaking change for a shape with no funded user — and option
@@ -219,7 +234,7 @@ the Lean and Python claim types and their tests.
 | The legacy path has no Lean SHA-256 module | `ls Lean/CollatzResearch/Digest.lean` (absent); the Python digest is in `canonical.py` |
 | `tests/test_checker_lean.py` depends on `CollatzResearch.Certificate` | The generated Lean fixture's `import CollatzResearch.Certificate` |
 | `FiniteOrbitClaim` excludes `.interval`; `LeafClaim` retains it | The inductive definitions and their constructor sets in `CoverageTree.lean` |
-| The `.interval` obligation is infinite | `LeafClaim.Holds` and `LeafCertificate.claim_reaches_one` as defined in `CoverageTree.lean` |
+| The `.interval` obligation is infinite **for well-formed intervals** | `LeafClaim.Holds` and `LeafCertificate.claim_reaches_one` in `CoverageTree.lean`; malformed intervals are excluded by the certificate's `well_formed` field, which requires `LeafClaim.WellFormed` (`period > 0 ∧ lo ≤ hi ∧ hi < period`) |
 
 ---
 
