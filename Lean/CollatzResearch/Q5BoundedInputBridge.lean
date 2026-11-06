@@ -145,4 +145,123 @@ theorem transitionOk_implies_step_forall (x : Nat) (w : CertWitness x)
   intro i hi
   exact transitionOk_implies_step x w hTrans i hi
 
+/-- **WP-CF-1 — the terminal-value-1 instance.** An accepted witness whose
+    claim is a terminal-value-1 claim yields `ReachesOne x` with **no
+    reachability hypothesis** and **no `native_decide`**.
+
+    This is the theorem that makes the ADR 0009 evidence tier consequential.
+    The tier admits a reachability witness exactly when the certificate's
+    terminal value is 1, and this theorem closes that case.
+
+    **What is assumed.** `hclaim : ∀ y, claim.Holds y → y = 1` says the
+    claim is a terminal-value-1 claim: the only orbit state it admits is
+    `1` itself. `FiniteOrbitClaim.singleton 1` is the canonical instance
+    (see `checkCertWitness_singleton_one_reaches_one` below). No
+    hypothesis asserts that anything reaches 1.
+
+    **The two witnesses, kept apart.** They are distinct facts and this
+    proof does not conflate them:
+
+    - The **source's** orbit equality `accelerated_orbit x k = 1` is
+      established at the witness index the certificate supplies — `k =
+      length - 1` for a trajectory witness — by rewriting
+      (`trajectory_index` inside `terminal_claim_transport`). The orbit
+      is never evaluated at any index.
+    - The **claimed terminal value** `1` has its own zero-step
+      reachability witness, `ReachesOne 1` at `k := 0`, closed by
+      `accelerated_orbit_zero 1`.
+
+    The composition `orbit_predecessor_reaches_one` then yields
+    `ReachesOne x` with source witness index `(length - 1) + 0`.
+
+    **Trust boundary.** Unchanged. No orbit equation is evaluated, no
+    `native_decide` appears in the proof, and the admission budget is
+    untouched. The acceptance hypothesis `hcheck` is a data-side
+    Boolean check; what this theorem adds is that its *reachability*
+    consequence is kernel-checked. -/
+theorem checkCertWitness_terminal_value_one_reaches_one
+    (x : Nat) (claim : FiniteOrbitClaim) (t : CoverageTree) (l : CoverageLeaf)
+    (w : CertWitness x)
+    (hcheck : checkCertWitness x claim t l w = true)
+    (hclaim : ∀ y, claim.Holds y → y = 1) :
+    ReachesOne x := by
+  -- Decompose acceptance into its five conjuncts.
+  obtain ⟨hAnchor, _, _, hTerminal, hTransition⟩ :=
+    (checkCertWitness_decompose x claim t l w).mp hcheck
+  -- The per-step `acceleratedStep` relation, from the transition fold.
+  have hTrans : ∀ i, i + 1 < (w.trajectory).length →
+      (w.trajectory)[i + 1]! = acceleratedStep ((w.trajectory)[i]!) :=
+    transitionOk_implies_step_forall x w hTransition
+  -- The terminal value satisfies the claim.
+  unfold terminalClaimOk at hTerminal
+  cases hl : w.trajectory.getLast? with
+  | none =>
+      simp [hl] at hTerminal
+  | some last =>
+      have hlast : decide (claim.Holds last) = true := by
+        simpa [hl] using hTerminal
+      have hHolds : claim.Holds last := of_decide_eq_true hlast
+      -- The trajectory is non-empty: its `getLast?` is `some last`.
+      have hne : w.trajectory ≠ [] := by
+        intro h
+        rw [h] at hl
+        simp at hl
+      have hpos : 0 < w.trajectory.length := List.length_pos_iff.mpr hne
+      -- Bridge the terminal value to the indexed form that
+      -- `terminal_claim_transport` consumes.
+      have hLast : claim.Holds (w.trajectory[w.trajectory.length - 1]!) := by
+        have hidx : w.trajectory.length - 1 < w.trajectory.length := by
+          omega
+        rw [getElem!_pos w.trajectory (w.trajectory.length - 1) hidx]
+        rw [← List.getLast_eq_getElem hne]
+        have hget : w.trajectory.getLast hne = last := by
+          rw [List.getLast?_eq_some_getLast hne] at hl
+          exact Option.some.inj hl
+        rw [hget]
+        exact hHolds
+      -- Transport the terminal claim to the source's orbit state.
+      have hOrbitClaim :
+          claim.Holds (accelerated_orbit x (w.trajectory.length - 1)) :=
+        terminal_claim_transport x w claim hAnchor hTrans hLast
+      -- The claim obligation: the only admitted state is 1, and 1 reaches
+      -- 1 in zero steps.
+      have hClaim : ∀ y, claim.Holds y → ReachesOne y := by
+        intro y hy
+        have hy1 : y = 1 := hclaim y hy
+        subst hy1
+        exact ⟨0, accelerated_orbit_zero 1⟩
+      exact orbit_predecessor_reaches_one x (w.trajectory.length - 1)
+        (accelerated_orbit x (w.trajectory.length - 1)) rfl
+        (hClaim _ hOrbitClaim)
+
+/-- **WP-CF-1, canonical instance.** The terminal-value-1 claim
+    `FiniteOrbitClaim.singleton 1` yields reachability from an accepted
+    witness with no reachability hypothesis.
+
+    The claim obligation `∀ y, claim.Holds y → y = 1` holds by
+    construction for this shape, so it is discharged here rather than
+    assumed. -/
+theorem checkCertWitness_singleton_one_reaches_one
+    (x : Nat) (t : CoverageTree) (l : CoverageLeaf) (w : CertWitness x)
+    (hcheck : checkCertWitness x (FiniteOrbitClaim.singleton 1) t l w = true) :
+    ReachesOne x :=
+  checkCertWitness_terminal_value_one_reaches_one x (FiniteOrbitClaim.singleton 1)
+    t l w hcheck (by
+      intro y hy
+      simpa [FiniteOrbitClaim.Holds] using hy)
+
+/-- **WP-CF-1 regression.** The theorem is not merely stated: it is used
+    by a downstream derivation, so a change that broke it would fail this
+    example at compile time.
+
+    The source `x = 2` reaches 1 at the certificate's witness index
+    `length - 1`, which for the canonical two-leaf even trajectory
+    `[2, 7, 11, 17, 13, 5, 1]` is `k = 6` — not at `k := 0`; the
+    `k := 0` witness belongs to the claimed terminal value `1`. -/
+example (t : CoverageTree) (l : CoverageLeaf)
+    (w : CertWitness 2)
+    (hcheck : checkCertWitness 2 (FiniteOrbitClaim.singleton 1) t l w = true) :
+    ReachesOne 2 :=
+  checkCertWitness_singleton_one_reaches_one 2 t l w hcheck
+
 end CollatzResearch
