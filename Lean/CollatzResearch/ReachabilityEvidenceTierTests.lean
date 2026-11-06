@@ -56,10 +56,13 @@ example : ∀ y, (FiniteOrbitClaim.empty).Holds y → False := by
   exact hy
 
 /-- Scenario 2: `.singleton 1` is the canonical terminal-value-1 claim.
-    Its `Holds` reduces to `y = 1`, so the reachability conclusion
-    `ReachesOne y` is obtained by rewriting and closing the orbit at
-    `k := 0` with `accelerated_orbit_zero` (an `rfl` lemma). No orbit
-    equation is evaluated and no `native_decide` is used. -/
+    Its `Holds` reduces to `y = 1`, so the obligation discharged here is
+    `ReachesOne y` with `y = 1` — the CLAIMED VALUE's own reachability,
+    closed at `k := 0` by `accelerated_orbit_zero` (an `rfl` lemma).
+
+    This is distinct from a source's orbit equation, which is established
+    at the certificate's witness index (see `Q5Integration.lean`). No
+    orbit equation is evaluated here and no `native_decide` is used. -/
 example : ∀ y, (FiniteOrbitClaim.singleton 1).Holds y → ReachesOne y := by
   intro y hy
   change y = 1 at hy

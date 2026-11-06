@@ -373,12 +373,16 @@ noncomputable def twoLeaf_per_leaf_available_bounded_of_check
     `singleton 1` claim; no new claim shape or general API is involved.
 
     **Evidence tier (ADR 0009).** The reachability conclusion
-    (`ReachesOne 2`) is kernel-checked: it comes from the
-    terminal-value-1 witness above, transported by
-    `RoutingPartitionCertificate_sound`. The `native_decide` use in this
-    proof is a data-side obligation (certificate acceptance), which the
-    tier leaves admissible; no reachability conclusion is discharged that
-    way. -/
+    (`ReachesOne 2`) is kernel-checked, and it is worth keeping the two
+    witnesses apart: the SOURCE's orbit equality is established at the
+    witness index the certificate supplies — `length - 1` of the even
+    witness `[2, 7, 11, 17, 13, 5, 1]`, so `k = 6`, transported
+    symbolically by `terminal_claim_transport` — while the claimed
+    TERMINAL value `1` carries its own zero-step witness (`ReachesOne 1`
+    at `k := 0`) from the theorem above. Neither orbit is evaluated. The
+    `native_decide` use in this proof is a data-side obligation
+    (certificate acceptance), which the tier leaves admissible; no
+    reachability conclusion is discharged that way. -/
 theorem twoLeafRoutingPartition_reaches_one_two : ReachesOne 2 := by
   exact RoutingPartitionCertificate_sound routingPartitionTwoLeafTree
     twoLeafRoutingPartition (by native_decide)

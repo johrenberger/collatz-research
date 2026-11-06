@@ -447,11 +447,15 @@ end LeafClaim
     reachability evidence tier. A claim whose `Holds` reduces to `y = 1`
     (the terminal-value-1 shape, canonically `FiniteOrbitClaim.singleton
     1`) carries an unconditional, kernel-checkable reachability witness
-    (`k := 0`). Shapes that do not reduce to `y = 1` (`.singleton n` for
-    `n != 1`, `.bounded K`) carry no unconditional reachability witness
-    under this tier: closing the orbit from a terminal value `y != 1`
-    would require evaluating `acceleratedStep`, which is not
-    kernel-reducible. `.interval` remains excluded by construction.
+    for the value it claims — `ReachesOne 1`, witnessed at `k := 0` by
+    `accelerated_orbit_zero`. (That witness is about the claimed value
+    `1`; a source's own orbit equation is a separate fact, established at
+    the certificate's witness index — see `Q5Integration.lean`.) Shapes
+    that do not reduce to `y = 1` (`.singleton n` for `n != 1`,
+    `.bounded K`) carry no unconditional reachability witness under this
+    tier: closing the orbit from a terminal value `y != 1` would require
+    evaluating `acceleratedStep`, which is not kernel-reducible.
+    `.interval` remains excluded by construction.
     Regression: `ReachabilityEvidenceTierTests.lean`.
     See `docs/adr/0009-reachability-evidence-tier.md`.
 

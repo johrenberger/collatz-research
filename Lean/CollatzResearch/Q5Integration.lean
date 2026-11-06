@@ -74,9 +74,15 @@ premise `0 < x` is `False`, so the certificate is silent.
 Every `ReachesOne` conclusion reached through this module is
 kernel-checked. The reachability path never evaluates an orbit
 equation: `trajectory_index` (Lemma 3) and `terminal_claim_transport`
-(Lemma 4) transport the witness's values symbolically, and the orbit
-equation `accelerated_orbit x k = 1` is closed at `k := 0` from
-`accelerated_orbit_zero` when the terminal value is 1.
+(Lemma 4) transport the witness's values symbolically.
+
+Two distinct facts meet here, and the tier statement must not conflate
+them. The **source** orbit equality `accelerated_orbit x k = 1` is
+established at the witness index the certificate supplies — for a
+trajectory witness, `k = length - 1` — by rewriting, never by evaluating
+the orbit. The **terminal value** `1` has its own zero-step reachability
+witness, `ReachesOne 1` at `k := 0`, closed by `accelerated_orbit_zero`.
+That second fact is about the value `1`, not about the source's orbit.
 
 A reachability witness is admissible only when the certificate's
 terminal value is 1 — that is, when the claim's `Holds` reduces to
@@ -631,8 +637,12 @@ preservation — `terminal_claim_transport` takes `hAnchor`,
     conclusion off orbit evaluation: the terminal value is rewritten to
     `accelerated_orbit x (length - 1)` without computing it. Under the
     tier the conclusion is used only for claims whose `Holds` reduces to
-    `y = 1`, where the orbit equation is closed at `k := 0` by
-    `accelerated_orbit_zero`.
+    `y = 1`; that turns the transported terminal value into the source's
+    orbit equality `accelerated_orbit x (length - 1) = 1`, at the witness
+    index the certificate supplied. The terminal value `1` separately has
+    its own zero-step reachability witness (`ReachesOne 1` at `k := 0`,
+    from `accelerated_orbit_zero`) — a fact about the value `1`, not about
+    the source's orbit equation.
 
     Plan dependency: was intended to feed Lemma 5 (soundness
     assembly), but Lemma 5 is removed per the v2b.2 Codex P0
