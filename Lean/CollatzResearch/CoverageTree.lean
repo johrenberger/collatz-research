@@ -153,7 +153,20 @@ theorem accelerated_orbit_compose (x : Nat) (k k' : Nat) :
     rw [Nat.add_succ, accelerated_orbit_succ, accelerated_orbit_succ, ih]
 
 /-- `ReachesOne n` iff applying `acceleratedStep` repeatedly to `n`
-    eventually reaches 1. (Story 07c / round-5, 07c-2.) -/
+    eventually reaches 1. (Story 07c / round-5, 07c-2.)
+
+    **Evidence tier (ADR 0009).** Every `ReachesOne` conclusion in this
+    repository is kernel-checked: the Lean kernel remains the final
+    checker for reachability, and no reachability theorem evaluates an
+    orbit equation. A reachability witness is admissible only when the
+    certificate's terminal value is 1 — that is, when the claim's
+    `Holds` reduces to `y = 1` (`FiniteOrbitClaim.singleton 1` is the
+    canonical instance). The orbit equation is transported symbolically
+    (`trajectory_index` and `terminal_claim_transport` in
+    `Q5Integration.lean`), never computed. `native_decide` remains
+    admissible for data-side obligations only; it may never discharge a
+    reachability conclusion. See `docs/adr/0009-reachability-evidence-tier.md`
+    and `docs/trust-model.md`. -/
 def ReachesOne (n : Nat) : Prop := ∃ k, accelerated_orbit n k = 1
 
 /-- Orbit-predecessor closure: if some future state of `x`'s orbit
@@ -430,6 +443,18 @@ end LeafClaim
     construction; `LeafClaim` retains `.interval` for residue-only
     routing.
 
+    **Evidence tier (ADR 0009).** The claim shape is the record of the
+    reachability evidence tier. A claim whose `Holds` reduces to `y = 1`
+    (the terminal-value-1 shape, canonically `FiniteOrbitClaim.singleton
+    1`) carries an unconditional, kernel-checkable reachability witness
+    (`k := 0`). Shapes that do not reduce to `y = 1` (`.singleton n` for
+    `n != 1`, `.bounded K`) carry no unconditional reachability witness
+    under this tier: closing the orbit from a terminal value `y != 1`
+    would require evaluating `acceleratedStep`, which is not
+    kernel-reducible. `.interval` remains excluded by construction.
+    Regression: `ReachabilityEvidenceTierTests.lean`.
+    See `docs/adr/0009-reachability-evidence-tier.md`.
+
     (Story Q4 / PR #57.) -/
 inductive FiniteOrbitClaim where
   | empty                       -- no orbit states
@@ -445,7 +470,11 @@ namespace FiniteOrbitClaim
 
     Note: `y` is a `Nat` value that the **caller** interprets as an
     orbit state (e.g., `accelerated_orbit x k` for some `k`); the
-    predicate itself is just a structural match. -/
+    predicate itself is just a structural match.
+
+    Under the ADR 0009 evidence tier, `Holds y` for `.singleton 1`
+    reduces to `y = 1`, which is exactly the terminal-value-1 condition
+    that makes a reachability witness kernel-checkable. -/
 def Holds (c : FiniteOrbitClaim) (y : Nat) : Prop :=
   match c with
   | .empty => False

@@ -43,6 +43,7 @@ import CollatzResearch.Q5Stage4Tests
 import CollatzResearch.LeafClaimTests
 import CollatzResearch.FiniteOrbitClaimTests
 import CollatzResearch.CoverageTreeOrbitTests
+import CollatzResearch.ReachabilityEvidenceTierTests
 import CollatzResearch.DynamicsHelpersTests
 import CollatzResearch.BoundedInputCertificateParser
 import CollatzResearch.BoundedInputCertificateParserTests
