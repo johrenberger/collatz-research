@@ -401,6 +401,11 @@ review-gate rules they are maintainer decisions rather than autonomous scope:
 4. **`.interval` claims** - fund them per instance, or leave the claim type
    unused, as `FiniteOrbitClaim` already excludes it?
 
+Decision briefs for decisions 2, 3 and 4 - the evidence, the options, and a
+recommendation for each - are in
+[docs/nt5-open-decision-briefs.md](nt5-open-decision-briefs.md). It is a
+brief, not a decision: each of the three still needs the maintainer's call.
+
 ## 10. Non-goals
 
 - Asserting global convergence or nontrivial cycle exclusion.
