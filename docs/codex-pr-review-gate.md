@@ -41,7 +41,11 @@ at that same SHA, and no unresolved P0/P1 finding. It is not merge authority.
    known limitations, validation evidence, and head SHA.
 3. Start an isolated Codex reviewer session from that handoff. It may read the
    PR, diff, CI evidence, and review threads, and may post a review; it must
-   not edit source, push, resolve a thread, or merge.
+   not edit source, push, resolve a thread, or merge. Run `one reviewer per
+   head SHA`: never start a second reviewer for a SHA that is already under
+   review, and never start reviewers in parallel for the same PR. Each
+   additional reviewer re-reads the repository and the diff from scratch, and
+   that fan-out is the dominant token cost of this gate.
 4. Fetch submitted reviews and inline threads. Ignore a review of any SHA
    other than the current head for merge-gate purposes.
 5. Classify findings:
@@ -67,11 +71,34 @@ architecture/mathematical decision, create the project diagnostic and escalate
 with the reviewed SHAs, review URLs, findings, hypotheses, validation output,
 and last-green commit.
 
+Each round after the first resumes the same reviewer session rather than
+opening a fresh one, and presents it the new head SHA together with its own
+prior findings. A fresh reviewer re-reads the repository and the diff from
+scratch, so resuming the existing session is what keeps the review rounds
+affordable: the round count is not the cost driver, reviewer reuse is. Start a
+fresh reviewer only when the previous session cannot be resumed, or when a P0
+calls for a genuinely independent second opinion.
+
 ## Internal reviewer handoff
 
 The implementation session emits the review handoff immediately after a
 successful PR create or update operation. The lifecycle receipt is the source
 of truth: a provider abort may not create a duplicate reviewer task.
+
+While it waits, the implementation session waits by event, not by polling.
+Each poll is a fresh model turn that re-transmits the whole conversation
+context, so a poll loop over a known command costs a full context re-send per
+iteration. Probe once; if there is no decision-relevant result, register the
+completion event and yield. When a blocking wait is unavoidable, issue one
+call that owns its result so the wait completes in a single turn.
+
+The implementation session's operational context is a per-packet working
+budget, not a session-lifetime accumulation. At each PR milestone — PR
+opened, review round landed, or PR merged — persist the delivery checkpoint
+and end that packet's working loop, starting the next packet in a fresh
+session restored from the checkpoint. A session that spans several packets
+re-sends the accumulated history on every turn, and the resulting
+context-limit failure lands on whichever packet happened to be running.
 
 The isolated reviewer returns a durable receipt containing the PR number,
 reviewed full SHA, review round, model identity, verdict, finding summary, and
