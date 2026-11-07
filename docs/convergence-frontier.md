@@ -284,7 +284,7 @@ plan:
 
   work_packets:
     - id: "WP-CF-1"
-      objective: "Prove the terminal-is-1 instance: from a checkCertWitness-accepted trajectory whose terminal value is 1, conclude ReachesOne x, using checkCertWitness_decompose, transitionOk_implies_step_forall, trajectory_index and terminal_claim_transport, with the kernel-checked witness k := 0 (accelerated_orbit_zero 1). No native_decide in the proof."
+      objective: "Prove the terminal-is-1 instance: from a checkCertWitness-accepted trajectory whose terminal value is 1, conclude ReachesOne x, using checkCertWitness_decompose, transitionOk_implies_step_forall, trajectory_index and terminal_claim_transport, with no reachability hypothesis and no native_decide. Two witnesses are distinct here: the SOURCE's orbit equality is established at the certificate's witness index (length - 1) by rewriting, never by evaluating the orbit, while the CLAIMED terminal value 1 has its own zero-step reachability witness ReachesOne 1 at k := 0 (accelerated_orbit_zero 1)."
       type: proof
       dependencies: []
       allowed_files:
