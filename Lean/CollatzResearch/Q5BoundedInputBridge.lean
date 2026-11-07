@@ -49,6 +49,19 @@ The Lemmas 5 + 6 step is deferred; the `transitionOk` → per-pair
 `acceleratedStep` bridge (this module) is independently kernel-clean
 and closes the v2b.1 piece of the v2b P0 finding.
 
+## Reachability evidence tier (ADR 0009)
+
+This module is data-side: it turns the verifier's `transitionOk = true`
+fold into per-pair `acceleratedStep` facts. Those facts are the per-step
+hypotheses that the symbolic transport (`trajectory_index`,
+`terminal_claim_transport`) consumes on the reachability path. No orbit
+equation is evaluated here, and `native_decide` is not used.
+
+The reachability conclusion that these facts feed is kernel-checkable only
+under the ADR 0009 terminal-value-1 tier: the claim's `Holds` must reduce
+to `y = 1`. See `docs/adr/0009-reachability-evidence-tier.md` and
+`docs/trust-model.md`.
+
 ## Lessons applied (Q4 v3 + Q5 v2b.2 + META)
 
 - **Q4 v3 (`: Type` sort):** no `: Type`-valued structures introduced.
@@ -136,6 +149,12 @@ theorem transitionOk_implies_step (x : Nat) (w : CertWitness x)
 
     Convenience wrapper for the curry-friendly form used by any future
     v2b.4 (soundness assembly) re-attempt.
+
+    **Evidence tier (ADR 0009).** Data-side bridge: it produces the
+    per-step `acceleratedStep` facts that the symbolic transport consumes
+    on the reachability path. It evaluates no orbit equation, and the
+    reachability conclusion it supports is kernel-checkable only under
+    the terminal-value-1 tier.
 
     Kernel-clean (no `sorry` / `admit` / `axiom`). -/
 theorem transitionOk_implies_step_forall (x : Nat) (w : CertWitness x)
