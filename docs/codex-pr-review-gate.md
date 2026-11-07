@@ -45,7 +45,10 @@ at that same SHA, and no unresolved P0/P1 finding. It is not merge authority.
    head SHA`: never start a second reviewer for a SHA that is already under
    review, and never start reviewers in parallel for the same PR. Each
    additional reviewer re-reads the repository and the diff from scratch, and
-   that fan-out is the dominant token cost of this gate.
+   the audit measured that fresh-review fan-out as the dominant cost of this
+   gate. The one exception is the serial P0 second opinion in *Bounded
+   remediation*, which starts only after the first review of that SHA has
+   completed — so two reviewers never hold the same SHA at the same time.
 4. Fetch submitted reviews and inline threads. Ignore a review of any SHA
    other than the current head for merge-gate purposes.
 5. Classify findings:
@@ -76,10 +79,16 @@ opening a fresh one, and presents it the new head SHA together with its own
 prior findings. Resumption is keyed by the continuation handle in the prior
 round's receipt, so it does not depend on the round-inclusive idempotency key
 being reused. A fresh reviewer re-reads the repository and the diff from
-scratch, so resuming the existing session is what keeps the review rounds
-affordable: the round count is not the cost driver, reviewer reuse is. Start a
-fresh reviewer only when the handle cannot be resumed, or when a P0 calls for a
+scratch, and the audit measured that fresh-review fan-out — 20 reviewer
+sessions under one parent, 1,141,499 tokens — as the dominant cost of this
+gate, so resuming the existing session is what bounds it. Start a fresh
+reviewer only when the handle cannot be resumed, or when a P0 calls for a
 genuinely independent second opinion.
+
+That P0 second opinion is **serial, not parallel**: it starts only after the
+first review of the same SHA has completed and been classified, so it never
+puts two reviewers on one SHA at once, and it is recorded as its own
+round-keyed handoff linked to the prior round's receipt and findings.
 
 ## Internal reviewer handoff
 
