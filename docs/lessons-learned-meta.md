@@ -290,12 +290,15 @@ Per the Q4 v3 spec table:
 | `.bounded K` | `accelerated_orbit x k ≤ K` | Finite enumeration: `∀ y ≤ K, ReachesOne y` | Per-bound — needs all `y ≤ K` trajectory certificates |
 | `.interval _ _ _` | NOT APPLICABLE | N/A | Out of Q5+ scope (handled by Q3 v4 `LeafCertificate` + `coverage_tree_soundness_cert`) |
 
+**ADR 0009 update (2026-11-04) — the tier bounds this table.** The reachability evidence tier is kernel-checkable, restricted to claims whose terminal value is 1. The `.singleton n` row's "single trajectory check" is kernel-checkable only when `n = 1`; for `n != 1` the tier supplies no unconditional reachability witness, because closing the orbit from a terminal value `y != 1` would require evaluating `acceleratedStep`, which is not kernel-reducible. The `.bounded K` row is unbounded in the same way and is per-instance at best. Decision record: `docs/adr/0009-reachability-evidence-tier.md`.
+
 ### 3.5 Trust boundary hygiene
 
 - **Python tests** in `tests/test_coverage_tree.py` are **UNTRUSTED RUNTIME EVIDENCE**, not formal Lean substitution (per MEMORY.md note + PR #55 v3 spec § "Restoring the direct Lean D1 regression is a separate workstream")
 - **The depth-two discriminator** (scenario 5 `descendOrbit depthTwoTree 5 0 = some D1` as Lean assertion) is DEFERRED — Lean 4 toolchain can't compile-check the recursive `descendFromOrbit` (uses `acceleratedStep` → `twoAdicValuation` → `Nat.factorization`, opaque to kernel reduction). The discriminator IS covered via scenario 6 (theorem + `OrbitRoute` witness at theorem level) + Python runtime tests.
 - **Q5+ Lean proofs of verifier soundness** must be kernel-checked, not Python-evidenced. The `Enforce Lean admission budget` step will catch any new admission.
 - **Per the recommended architecture** (§ 3.1): Python can be buggy without entering the trusted computing base. The verifier soundness theorem is the only bridge from Python output to Lean-checked result.
+- **Reachability evidence tier (ADR 0009, 2026-11-04):** every `ReachesOne` conclusion is kernel-checked and no reachability theorem evaluates an orbit equation — the orbit equation is transported symbolically (`trajectory_index`, `terminal_claim_transport`). A reachability witness is admissible only when the certificate's terminal value is 1, i.e. when the claim's `Holds` reduces to `y = 1` (`FiniteOrbitClaim.singleton 1` is the canonical instance). `native_decide` stays admissible for data-side obligations only and may never discharge a reachability conclusion. The tier narrows what may be claimed; it does not weaken the checker, so the trust boundary above is unchanged. Record: `docs/adr/0009-reachability-evidence-tier.md`; regression: `Lean/CollatzResearch/ReachabilityEvidenceTierTests.lean`.
 
 ### 3.6 Q5+ execution order (suggested, per the recommended architecture)
 
