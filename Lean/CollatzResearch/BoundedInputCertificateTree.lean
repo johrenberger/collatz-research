@@ -378,4 +378,52 @@ noncomputable def per_leaf_available_bounded_of_check
   routing_partition_leaf_certificate t tree hcheck hClaimReachesOne
     hRegistry l hl hver
 
+
+/-- **Terminal-value-one per-leaf availability (ADR 0009 tier).**
+
+    The terminal-value-one counterpart of
+    `routing_partition_leaf_certificate`: the general per-registry
+    REACHABILITY hypothesis
+    (`entry.claim.Holds y → ReachesOne y`) is REPLACED by the data-side
+    claim-shape hypothesis that every registered entry carries
+    `FiniteOrbitClaim.singleton 1`.  The reachability obligation is then
+    discharged by `terminal_value_one_claim_obligation`, which reduces
+    the claimed value to `y = 1` and supplies `ReachesOne 1` at
+    `k := 0` via `accelerated_orbit_zero 1`.
+
+    The claimed terminal value's zero-step witness and the source's own
+    orbit equality at the certificate's witness index remain distinct
+    facts (ADR 0009); neither orbit is evaluated.
+
+    Trust boundary: no orbit equation is evaluated, no `native_decide` is
+    used, and no reachability hypothesis is assumed. -/
+noncomputable def routing_partition_leaf_certificate_terminal_value_one
+    (t : CoverageTree) (tree : BoundedInputCertificateTree t)
+    (hcheck : checkBoundedCertificateTree t tree = true)
+    (htier : ∀ entry ∈ tree.certData.wire.claimRegistry,
+      entry.claim = FiniteOrbitClaim.singleton 1)
+    (hRegistry : ∀ l, l ∈ t.leaves → verified t l →
+      ∃ entry ∈ tree.certData.wire.claimRegistry, entry.leaf = l)
+    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l) :
+    BoundedInputOrbitCertificate t l tree.certData.wire.N :=
+  routing_partition_leaf_certificate t tree hcheck
+    (terminal_value_one_claim_obligation tree.certData.wire.claimRegistry htier)
+    hRegistry l hl hver
+
+/-- Alias of `routing_partition_leaf_certificate_terminal_value_one`,
+    mirroring `per_leaf_available_bounded_of_check`.  Per-leaf
+    availability is now stated in terms of a terminal-value-one witness
+    rather than an assumed per-claim reachability obligation. -/
+noncomputable def per_leaf_available_bounded_of_check_terminal_value_one
+    (t : CoverageTree) (tree : BoundedInputCertificateTree t)
+    (hcheck : checkBoundedCertificateTree t tree = true)
+    (htier : ∀ entry ∈ tree.certData.wire.claimRegistry,
+      entry.claim = FiniteOrbitClaim.singleton 1)
+    (hRegistry : ∀ l, l ∈ t.leaves → verified t l →
+      ∃ entry ∈ tree.certData.wire.claimRegistry, entry.leaf = l)
+    (l : CoverageLeaf) (hl : l ∈ t.leaves) (hver : verified t l) :
+    BoundedInputOrbitCertificate t l tree.certData.wire.N :=
+  routing_partition_leaf_certificate_terminal_value_one t tree hcheck htier
+    hRegistry l hl hver
+
 end CollatzResearch

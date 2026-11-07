@@ -388,4 +388,54 @@ theorem twoLeafRoutingPartition_reaches_one_two : ReachesOne 2 := by
     twoLeafRoutingPartition (by native_decide)
     twoLeafRoutingPartition_claim_reaches_one 2 (by decide) (by decide)
 
+
+/-- **WP-CF-3 concrete instance: per-leaf availability for the canonical
+    two-leaf tree, with the per-claim reachability obligation DISCHARGED
+    rather than assumed.**
+
+    This is the composition end of the ADR 0009 tier.  The general
+    `per_leaf_available_bounded_of_check` demands a per-registry
+    reachability hypothesis
+    (`entry.claim.Holds y → ReachesOne y`); here that hypothesis is
+    replaced by the data-side registry check
+    `checkTerminalValueOneClaims`, whose soundness
+    (`checkTerminalValueOneClaims_sound`) yields the claim-shape fact
+    that every registered entry carries `FiniteOrbitClaim.singleton 1`.
+    The reachability obligation is then discharged by
+    `terminal_value_one_claim_obligation`.
+
+    The check `checkTerminalValueOneClaims twoLeafRoutingPartition.wire.claimRegistry = true`
+    is a data-side obligation (claim SHAPE, not orbit), so it is closed
+    by `decide` rather than `native_decide`; the per-tree acceptance
+    check remains the one admissible `native_decide` use.
+
+    **Evidence tier (ADR 0009).** `Holds` reduces to `y = 1`,
+    `ReachesOne 1` is closed at `k := 0` with `accelerated_orbit_zero`,
+    and the proof evaluates no orbit equation.  The source's own orbit
+    equality at the certificate's witness index and the claimed terminal
+    value's zero-step witness remain distinct facts. -/
+noncomputable def twoLeaf_per_leaf_available_bounded_of_check_terminal_value_one
+    (l : CoverageLeaf) (hl : l ∈ routingPartitionTwoLeafTree.leaves) :
+    BoundedInputOrbitCertificate routingPartitionTwoLeafTree
+      l twoLeafRoutingPartition.wire.N :=
+  per_leaf_available_bounded_of_check_terminal_value_one
+    routingPartitionTwoLeafTree
+    { certData := twoLeafRoutingPartition }
+    (by native_decide)
+    (checkTerminalValueOneClaims_sound
+      twoLeafRoutingPartition.wire.claimRegistry (by decide))
+    twoLeafRoutingPartition_registry
+    l hl (routingPartitionTwoLeafTree_verified l hl)
+
+/-- **WP-CF-3 concrete instance: global routing-partition soundness for the
+    canonical two-leaf fixture, with the general reachability hypothesis
+    REPLACED rather than assumed.**  The tier hypothesis is discharged by
+    the data-side registry check. -/
+theorem twoLeafRoutingPartition_sound_terminal_value_one :
+    ∀ (x : Nat), 0 < x → x ≤ twoLeafRoutingPartition.wire.N → ReachesOne x :=
+  RoutingPartitionCertificate_sound_terminal_value_one
+    routingPartitionTwoLeafTree twoLeafRoutingPartition (by native_decide)
+    (checkTerminalValueOneClaims_sound
+      twoLeafRoutingPartition.wire.claimRegistry (by decide))
+
 end CollatzResearch
