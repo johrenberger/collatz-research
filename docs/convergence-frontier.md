@@ -214,16 +214,18 @@ declaration count as one). Current state:
 
 | File | Baseline | Admitted declaration |
 | --- | --- | --- |
-| `Lean/CollatzResearch/Certificate.lean` | 1 | `check_certificate_sound` (`:191`) - bullet holes at `:204`, `:205`, `:208` |
-| `Lean/CollatzResearch/CoverageTree.lean` | 1 | `coverage_tree_soundness_orbit` (`:849`, `sorry` at `:855`) |
-| `Lean/CollatzResearch/Importer.lean` | 2 | `parseV1Record` (`:93`), `parseJsonl` (`:100`) |
+| `Lean/CollatzResearch/CoverageTree.lean` | 1 | `coverage_tree_soundness_orbit` (`:882`, `sorry` at `:888`) |
 
-Two of the three files' debt belongs to the **legacy v1.0 descent-certificate
-path** (`Certificate.lean` / `Importer.lean`), which the current Q5
-routing-partition architecture bypasses. `check_certificate_sound` also depends
-on a SHA-256 digest whose Lean module (`Digest.lean`) **does not exist in
-`main`**; only the Python side computes it
-(`python/collatz_research/canonical.py`).
+The **legacy v1.0 descent-certificate path**
+(`Certificate.lean` / `Importer.lean`) is retired (decision 3, taken 2026-11-07):
+the current Q5 routing-partition architecture bypasses it, and
+`check_certificate_sound` depended on a SHA-256 digest whose Lean module
+(`Digest.lean`) **does not exist in `main`**; only the Python side computes it
+(`python/collatz_research/canonical.py`). The **proven** witness infrastructure
+the retired files carried is not discarded but relocated to
+`Lean/CollatzResearch/DescentWitness.lean` (`DescentWitness`,
+`DescentWitness.Valid`, and its `ends_at` / `strict_descent` / `start_pos_odd` /
+`trajectory_odd` lemmas).
 
 ### 7.1 The documented promotion path for `coverage_tree_soundness_orbit` is refutable
 
@@ -366,13 +368,13 @@ plan:
   known_design_decisions:
     - "WP-CF-2: DECIDED 2026-11-04 (ADR 0009) - the evidence tier for reachability witnesses at k >= 1 is kernel-checkable, restricted to claims whose terminal value is 1; no reachability theorem evaluates an orbit equation, and native_decide stays admissible for data-side obligations only"
     - "WP-CF-4: coverage_tree_soundness_orbit's documented promotion path is refutable on current definitions; choose deletion, predicate redefinition, or an added hypothesis"
-    - "WP-CF-5: retire versus complete the legacy v1.0 descent-certificate path"
+    - "WP-CF-5: DECIDED 2026-11-07 (ADR 0010) - the legacy v1.0 Lean descent-certificate path is retired; the proven witness infrastructure it carried (DescentWitness, DescentWitness.Valid and its ends_at/strict_descent/start_pos_odd/trajectory_odd lemmas) is relocated to Lean/CollatzResearch/DescentWitness.lean rather than deleted, so no proven descent lemma is lost"
     - "Whether the .interval claim shape is funded at all, given its infinite obligation"
 ```
 
 ## 9. Open decisions for the maintainer
 
-**Decision 1 is now made; three remain open.** Merging this specification
+**Decisions 1 and 3 are now made; two remain open.** Merging this specification
 approved the document; it did not resolve any of the questions below. A work
 packet that depends on an open decision must not begin until that decision is
 made. Decision 1 (the evidence tier for reachability witnesses) was taken on
@@ -380,8 +382,11 @@ made. Decision 1 (the evidence tier for reachability witnesses) was taken on
 [ADR 0009](adr/0009-reachability-evidence-tier.md): the tier is kernel-checkable,
 restricted to claims whose terminal value is 1, and no reachability theorem
 evaluates an orbit equation. That decision unblocks WP-CF-2 and, through it,
-WP-CF-3. Decisions 2, 3 and 4 below remain open and still gate WP-CF-4 and
-WP-CF-5.
+WP-CF-3. Decision 3 (the legacy v1.0 path) was taken on 2026-11-07 and is recorded in
+[ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md): the Lean v1.0
+bridge is retired, and the **proven** witness infrastructure it carried is
+relocated to `Lean/CollatzResearch/DescentWitness.lean` rather than deleted.
+Decisions 2 and 4 below remain open and still gate WP-CF-4.
 
 These are architectural or mathematical choices, so per the repository's own
 review-gate rules they are maintainer decisions rather than autonomous scope:
@@ -397,7 +402,10 @@ review-gate rules they are maintainer decisions rather than autonomous scope:
    hypothesis?
 3. **The legacy v1.0 path** (WP-CF-5) - retire `Importer.lean` /
    `Certificate.lean` as superseded, or complete them (which requires a Lean
-   SHA-256 module that does not exist)?
+   SHA-256 module that does not exist)? **DECIDED 2026-11-07 - retire, with the
+   proven witness infrastructure RELOCATED to
+   `Lean/CollatzResearch/DescentWitness.lean` rather than deleted.** See
+   [ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md).
 4. **`.interval` claims** - fund them per instance, or leave the claim type
    unused, as `FiniteOrbitClaim` already excludes it?
 

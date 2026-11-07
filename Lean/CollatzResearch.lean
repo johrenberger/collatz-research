@@ -1,6 +1,6 @@
 import CollatzResearch.Affine
 import CollatzResearch.Basic
-import CollatzResearch.Certificate
+import CollatzResearch.DescentWitness
 import CollatzResearch.Dynamics
 import CollatzResearch.Equivalence
 import CollatzResearch.Residues
@@ -28,7 +28,6 @@ import CollatzResearch.Residues
 -- term-level `let (x, y) ← e` (a parse error in Lean 4.33), not the
 -- `mutual` block. `EquivalenceHelpersTests` is the one orphan that stays
 -- outside the root import.
-import CollatzResearch.Importer
 import CollatzResearch.CoverageTree
 import CollatzResearch.BoundedInputCertificateData
 import CollatzResearch.Q5Integration
