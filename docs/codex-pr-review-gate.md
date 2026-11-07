@@ -41,7 +41,14 @@ at that same SHA, and no unresolved P0/P1 finding. It is not merge authority.
    known limitations, validation evidence, and head SHA.
 3. Start an isolated Codex reviewer session from that handoff. It may read the
    PR, diff, CI evidence, and review threads, and may post a review; it must
-   not edit source, push, resolve a thread, or merge.
+   not edit source, push, resolve a thread, or merge. Run `one reviewer per
+   head SHA`: never start a second reviewer for a SHA that is already under
+   review, and never start reviewers in parallel for the same PR. Each
+   additional reviewer re-reads the repository and the diff from scratch, and
+   the audit measured that fresh-review fan-out as the dominant cost of this
+   gate. The one exception is the serial P0 second opinion in *Bounded
+   remediation*, which starts only after the first review of that SHA has
+   completed — so two reviewers never hold the same SHA at the same time.
 4. Fetch submitted reviews and inline threads. Ignore a review of any SHA
    other than the current head for merge-gate purposes.
 5. Classify findings:
@@ -67,17 +74,62 @@ architecture/mathematical decision, create the project diagnostic and escalate
 with the reviewed SHAs, review URLs, findings, hypotheses, validation output,
 and last-green commit.
 
+Each round after the first resumes the same reviewer session rather than
+opening a fresh one, and presents it the new head SHA together with its own
+prior findings. Resumption is keyed by the continuation handle in the prior
+round's receipt, so it does not depend on the round-inclusive idempotency key
+being reused. A fresh reviewer re-reads the repository and the diff from
+scratch, and the audit measured that fresh-review fan-out — 20 reviewer
+sessions under one parent, 1,141,499 tokens — as the dominant cost of this
+gate, so resuming the existing session is what bounds it. Start a fresh
+reviewer only when the handle cannot be resumed, or when a P0 calls for a
+genuinely independent second opinion.
+
+That P0 second opinion is **serial, not parallel**: it starts only after the
+first review of the same SHA has completed and been classified, so it never
+puts two reviewers on one SHA at once, and it is recorded as its own
+round-keyed handoff linked to the prior round's receipt and findings.
+
 ## Internal reviewer handoff
 
 The implementation session emits the review handoff immediately after a
 successful PR create or update operation. The lifecycle receipt is the source
 of truth: a provider abort may not create a duplicate reviewer task.
 
+While it waits, the implementation session waits by event, not by polling.
+The rule that holds regardless of how the model is routed is: probe once, and
+if there is no decision-relevant result, register the completion event and
+yield rather than probing again; when a blocking wait is unavoidable, issue one
+call that owns its result so the wait completes in a single turn. A repeated
+poll also extends the conversation, and how much prior context each
+continuation re-sends depends on the model's routing and caching, so treat the
+context-re-send cost as route-dependent rather than as a guaranteed full
+re-transmission.
+
+The implementation session's operational context is a per-packet working
+budget, not a session-lifetime accumulation. At each PR milestone — PR
+opened, review round landed, or PR merged — persist the delivery checkpoint
+and end that packet's working loop, starting the next packet in a fresh
+session restored from the checkpoint. A session that spans several packets
+accumulates history, and that history may be re-sent on each turn depending
+on routing and caching, so the resulting context-limit failure lands on
+whichever packet happened to be running.
+
 The isolated reviewer returns a durable receipt containing the PR number,
-reviewed full SHA, review round, model identity, verdict, finding summary, and
-GitHub review URL. The implementation session treats this receipt—not a chat
-claim—as the transition from `AWAITING_CODEX_REVIEW` to either
-`CODEX_CHANGES_REQUESTED` or `CODEX_APPROVED`.
+reviewed full SHA, review round, model identity, verdict, finding summary,
+GitHub review URL, and the reviewer session's continuation handle — the
+identifier that names the isolated reviewer session so a later round can
+resume that same session. The implementation session treats this receipt—not a
+chat claim—as the transition from `AWAITING_CODEX_REVIEW` to either
+`CODEX_CHANGES_REQUESTED` or `CODEX_APPROVED`. The handle is what makes
+"resume the same reviewer" mechanically checkable rather than aspirational: a
+later round creates its own handoff with its own round-inclusive idempotency
+key, and that handoff records the continuation handle from the prior round's
+receipt together with that round's findings. The two rounds therefore remain
+distinct handoffs while designating one reviewer session. A fresh reviewer is
+used only when the handle cannot be resumed or when a P0 calls for the serial
+independent second opinion defined in *Bounded remediation*; that exception is
+governed there, not here.
 
 GitHub posts through the maintainer's connected identity, so the review body
 must begin with `Generated by independent OpenClaw Codex review` and include
