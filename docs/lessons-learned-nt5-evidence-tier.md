@@ -281,7 +281,7 @@ docstrings keep them apart.
 - **Decisions 2, 3, 4** await the maintainer. PR #109 carries the briefs.
 - **WP-CF-3** (per-leaf availability for one concrete tree) is unblocked by
   decision 1 and is the next packet on the critical path.
-- The frontier document's WP-CF-1 wording still says "the kernel-checked
-  witness k := 0 (accelerated_orbit_zero 1)", which is the same conflation
-  §3.2 corrected in the docstrings. Worth reconciling in a follow-up so the
-  plan text and the shipped theorem agree.
+- The frontier document's WP-CF-1 objective carried the same "the
+  kernel-checked witness k := 0 (accelerated_orbit_zero 1)" wording that
+  §3.2 corrected in the docstrings. This document's PR reconciles it, so
+  the plan text and the theorem shipped in PR #110 agree.
