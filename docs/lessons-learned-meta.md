@@ -1,6 +1,6 @@
 # Lessons Learned — Meta Synthesis Across All Arcs (02c/03c + 07c-2 + Q3 + Q4 + Q5)
 
-**Status:** Meta doc; companion to `docs/lessons-learned-07c-2.md` (PR #50, 07c-2 arc), `docs/lessons-learned-q4-bounded-orbit.md` (PR #59, Q4 arc), and `docs/lessons-learned-q5-external-certificates.md` (Q5 arc). All arc-specific lessons-learned docs in master at `437225f` (pre-Q5) + Q5 additions via this PR.
+**Status:** Meta doc; companion to `docs/lessons-learned-07c-2.md` (PR #50, 07c-2 arc), `docs/lessons-learned-q4-bounded-orbit.md` (PR #59, Q4 arc), `docs/lessons-learned-q5-external-certificates.md` (Q5 arc), and `docs/lessons-learned-nt5-evidence-tier.md` (NT-5 arc). All arc-specific lessons-learned docs in master at `437225f` (pre-Q5) + Q5 additions via this PR.
 
 **Scope:** Cross-cutting synthesis across 5 arcs (17 PRs total: 02c/03c PRs #30–#48, 07c-2 PRs #36 + #49–#51, Q3 PRs #52–#54, Q4 PRs #55–#59, Q5 PRs #61–#69). Q5 PRs MERGED 2026-08-28 through 2026-09-04; PR #64 retitled post-merge to reflect v2b partial state (Lemmas 5–6 REMOVED per Codex P0).
 
