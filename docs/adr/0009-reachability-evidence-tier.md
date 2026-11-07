@@ -23,7 +23,7 @@ The decision turns on why those two facts sit together. `ReachesOne` is
 defined as
 
 ```
-ReachesOne n := ∃ k, accelerated_orbit n k = 1      -- CoverageTree.lean:157
+ReachesOne n := ∃ k, accelerated_orbit n k = 1      -- CoverageTree.lean:170
 ```
 
 so a reachability conclusion needs an orbit that reaches 1. A certificate
@@ -31,14 +31,14 @@ supplies the orbit's VALUES; it does not supply the equation `accelerated_orbit
 x k = <value>` as something the kernel can evaluate. The kernel-side chain
 transports that equality instead:
 
-- `trajectory_index` (`Q5Integration.lean:535`) proves
+- `trajectory_index` (`Q5Integration.lean:570`) proves
   `trajectory[k]! = accelerated_orbit x k` by induction, rewriting with
   `accelerated_orbit_zero` (`CoverageTree.lean:123`) and `accelerated_orbit_succ`
   (`CoverageTree.lean:130`). Both are `rfl`; neither evaluates an orbit
   equation.
-- `terminal_claim_transport` (`Q5Integration.lean:604`) rewrites the terminal
+- `terminal_claim_transport` (`Q5Integration.lean:650`) rewrites the terminal
   value to `accelerated_orbit x (length - 1)` and applies the claim's `Holds`.
-- `orbit_predecessor_reaches_one` (`CoverageTree.lean:180`) closes a
+- `orbit_predecessor_reaches_one` (`CoverageTree.lean:193`) closes a
   predecessor's reachability from a successor's.
 
 Now split on the terminal value `y` the certificate attests:
@@ -61,15 +61,15 @@ evaluating an orbit.
 
 This is inhabited, not hypothetical. Two unconditional reachability facts
 already exist and already have this shape: `twoLeafRoutingPartition_claim_reaches_one`
-(`Q5Stage4Tests.lean:252`) and `twoLeafRoutingPartition_reaches_one_two`
-(`Q5Stage4Tests.lean:369`). Both are built on `FiniteOrbitClaim.singleton 1`,
+(`Q5Stage4Tests.lean:257`) and `twoLeafRoutingPartition_reaches_one_two`
+(`Q5Stage4Tests.lean:386`). Both are built on `FiniteOrbitClaim.singleton 1`,
 whose `Holds` reduces to `y = 1`, and the second one concludes `ReachesOne 2` -
 a witness at `k >= 1` - without evaluating an orbit.
 
 The obligations needed to admit such a witness are already kernel-clean:
-`transitionOk_implies_step_forall` (`Q5BoundedInputBridge.lean:141`) turns
+`transitionOk_implies_step_forall` (`Q5BoundedInputBridge.lean:160`) turns
 `transitionOk w = true` into per-step `acceleratedStep` facts, and
-`checkCertWitness_decompose` (`Q5Integration.lean:423`) splits acceptance into
+`checkCertWitness_decompose` (`Q5Integration.lean:453`) splits acceptance into
 its conjuncts.
 
 The three options on the table were: keep every result kernel-checkable by
@@ -91,7 +91,7 @@ per instance.
 - **`native_decide` remains admissible for data-side obligations**, exactly as
   it is today, and is unaffected by this record. The existing data-side sites
   stay disclosed as they are: `ValidTree depthTwoTree` and `IsComplete
-  depthTwoTree` in `Q5Integration.lean:292-293`, and the parser's `ParseError`
+  depthTwoTree` in `Q5Integration.lean:315-316`, and the parser's `ParseError`
   constructor in `BoundedInputCertificateParser.lean:112-113` and `:155`,
   which already state in prose that this "rests on the core native-decide
   axiom, not kernel-checked". A certificate's Boolean acceptance is a
@@ -104,7 +104,7 @@ per instance.
   (`.singleton n` for `n != 1`, `.bounded K`) carry no unconditional
   reachability witness under this tier. `.interval` remains excluded by
   construction (`FiniteOrbitClaim` has no `.interval` constructor,
-  `CoverageTree.lean:434`).
+  `CoverageTree.lean:463`).
 - **The scope of this record is the tier decision only.** It does not assert
   global convergence, does not promote any row of `docs/theorem-status.md`,
   and does not claim that any new declaration is proven. `WP-CF-1`

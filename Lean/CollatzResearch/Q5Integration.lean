@@ -69,6 +69,29 @@ premise `0 < x` is `False`, so the certificate is silent.
   per-leaf `claim_reaches_one` hypothesis, returns the per-leaf
   certificate constructively).
 
+## Reachability evidence tier (ADR 0009)
+
+Every `ReachesOne` conclusion reached through this module is
+kernel-checked. The reachability path never evaluates an orbit
+equation: `trajectory_index` (Lemma 3) and `terminal_claim_transport`
+(Lemma 4) transport the witness's values symbolically.
+
+Two distinct facts meet here, and the tier statement must not conflate
+them. The **source** orbit equality `accelerated_orbit x k = 1` is
+established at the witness index the certificate supplies — for a
+trajectory witness, `k = length - 1` — by rewriting, never by evaluating
+the orbit. The **terminal value** `1` has its own zero-step reachability
+witness, `ReachesOne 1` at `k := 0`, closed by `accelerated_orbit_zero`.
+That second fact is about the value `1`, not about the source's orbit.
+
+A reachability witness is admissible only when the certificate's
+terminal value is 1 — that is, when the claim's `Holds` reduces to
+`y = 1` (`FiniteOrbitClaim.singleton 1` is the canonical instance).
+`native_decide` remains admissible for data-side obligations only (the
+`ValidTree` / `IsComplete` checks and the parser's `ParseError`
+rejection cases); it may never discharge a reachability conclusion. See
+`docs/adr/0009-reachability-evidence-tier.md` and `docs/trust-model.md`.
+
 ## Lessons applied (Q3 v4 + Q4 v3 + META)
 
 - **Pattern 2.10** (conditional companion theorem pattern): explicit
@@ -416,6 +439,13 @@ theorem foldl_and_extract {α : Type u} (ts : List α) (p : α → Bool)
     syntactically equal boolean expressions, so the biconditional
     reduces to `True`.
 
+    **Evidence tier (ADR 0009).** This decomposition splits acceptance
+    into its conjuncts. The `terminalClaimOk` conjunct is the data-side
+    terminal-value check; the reachability conclusion that consumes it
+    is kernel-checkable only under the terminal-value-1 tier (the claim's
+    `Holds` reduces to `y = 1`). No conjunct here evaluates an orbit
+    equation.
+
     Plan dependency: feeds Lemma 3 (trajectory indexing — uses
     `anchorOk` + `transitionOk`) and Lemma 4 (terminal-claim
     transport — uses `terminalClaimOk`). Each conjunct is
@@ -529,6 +559,11 @@ lemma anchorOk_implies_get_zero (x : Nat) (w : CertWitness x)
       `hTrans` closes
       `trajectory[k + 1]! = acceleratedStep trajectory[k]!`.
 
+    **Evidence tier (ADR 0009).** The orbit equation is transported, not
+    evaluated: the induction rewrites with `accelerated_orbit_zero` and
+    `accelerated_orbit_succ` (both `rfl`), so no orbit equation is
+    computed at any `k >= 1`.
+
     Plan dependency: feeds Lemma 4 (terminal-claim transport)
     which substitutes `trajectory[length - 1]` with
     `accelerated_orbit x (length - 1)`. -/
@@ -597,6 +632,17 @@ preservation — `terminal_claim_transport` takes `hAnchor`,
     The proof is a direct application of Lemma 3 with
     `k = length - 1`, then rewriting the `claim.Holds`
     hypothesis. Fully kernel-checked.
+
+    **Evidence tier (ADR 0009).** This is the step that keeps a reachability
+    conclusion off orbit evaluation: the terminal value is rewritten to
+    `accelerated_orbit x (length - 1)` without computing it. Under the
+    tier the conclusion is used only for claims whose `Holds` reduces to
+    `y = 1`; that turns the transported terminal value into the source's
+    orbit equality `accelerated_orbit x (length - 1) = 1`, at the witness
+    index the certificate supplied. The terminal value `1` separately has
+    its own zero-step reachability witness (`ReachesOne 1` at `k := 0`,
+    from `accelerated_orbit_zero`) — a fact about the value `1`, not about
+    the source's orbit equation.
 
     Plan dependency: was intended to feed Lemma 5 (soundness
     assembly), but Lemma 5 is removed per the v2b.2 Codex P0

@@ -248,7 +248,12 @@ private def q5oddEntry : LeafClaimWire :=
     Both registry entries carry `FiniteOrbitClaim.singleton 1`, whose
     `Holds` predicate reduces to `y = 1`; `ReachesOne 1` is witnessed
     by `k := 0`.  Closed and decidable — no `Classical` extraction and
-    no trajectory reasoning. -/
+    no trajectory reasoning.
+
+    **Evidence tier (ADR 0009).** This is the canonical terminal-value-1
+    witness under the tier: `Holds` reduces to `y = 1`, `ReachesOne 1` is
+    closed at `k := 0` with `accelerated_orbit_zero`, and the proof
+    evaluates no orbit equation and uses no `native_decide`. -/
 theorem twoLeafRoutingPartition_claim_reaches_one :
     ∀ (entry : LeafClaimWire),
       entry ∈ twoLeafRoutingPartition.wire.claimRegistry →
@@ -365,7 +370,19 @@ noncomputable def twoLeaf_per_leaf_available_bounded_of_check
 /-- The canonical two-leaf fixture's accepted routing-partition certificate
     proves the bounded concrete input `2` reaches one. Its even witness is
     `[2, 7, 11, 17, 13, 5, 1]`, whose terminal value satisfies the existing
-    `singleton 1` claim; no new claim shape or general API is involved. -/
+    `singleton 1` claim; no new claim shape or general API is involved.
+
+    **Evidence tier (ADR 0009).** The reachability conclusion
+    (`ReachesOne 2`) is kernel-checked, and it is worth keeping the two
+    witnesses apart: the SOURCE's orbit equality is established at the
+    witness index the certificate supplies — `length - 1` of the even
+    witness `[2, 7, 11, 17, 13, 5, 1]`, so `k = 6`, transported
+    symbolically by `terminal_claim_transport` — while the claimed
+    TERMINAL value `1` carries its own zero-step witness (`ReachesOne 1`
+    at `k := 0`) from the theorem above. Neither orbit is evaluated. The
+    `native_decide` use in this proof is a data-side obligation
+    (certificate acceptance), which the tier leaves admissible; no
+    reachability conclusion is discharged that way. -/
 theorem twoLeafRoutingPartition_reaches_one_two : ReachesOne 2 := by
   exact RoutingPartitionCertificate_sound routingPartitionTwoLeafTree
     twoLeafRoutingPartition (by native_decide)
