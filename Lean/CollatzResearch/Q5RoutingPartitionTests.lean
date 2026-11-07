@@ -113,4 +113,46 @@ example : checkRoutingPartitionCertificate routingPartitionTwoLeafTree
     twoLeafRoutingPartition = true := by
   native_decide
 
+/-- **WP-CF-3 data-side regression:** every entry of the canonical
+    two-leaf registry carries the terminal-value-one claim, so the tier
+    check succeeds.  This is a claim-SHAPE obligation, admissible to
+    discharge by evaluation under ADR 0009; it asserts no reachability. -/
+example : checkTerminalValueOneClaims routingPartitionRegistry = true := by
+  decide
+
+/-- **WP-CF-3 negative regression (bounded shape):** a registry entry
+    carrying `FiniteOrbitClaim.bounded 0` is REJECTED by the tier check,
+    because `Holds` reduces to `y ≤ 0`, which admits `y = 0` and so is
+    not the terminal-value-1 shape the tier admits. -/
+example : checkTerminalValueOneClaims
+    [{ leaf := { leafId := "even", leafProperty := "2:0-0" },
+       claim := FiniteOrbitClaim.bounded 0 }] = false := by
+  decide
+
+/-- **WP-CF-3 negative regression (non-unit singleton):** a registry entry
+    carrying `FiniteOrbitClaim.singleton 2` is REJECTED too, because its
+    `Holds` reduces to `y = 2`, not `y = 1`. -/
+example : checkTerminalValueOneClaims
+    [{ leaf := { leafId := "even", leafProperty := "2:0-0" },
+       claim := FiniteOrbitClaim.singleton 2 }] = false := by
+  decide
+
+/-- **WP-CF-3 headline regression:** global routing-partition soundness
+    in the terminal-value-one tier yields `ReachesOne 2` for the
+    canonical fixture, with the general per-registered-claim reachability
+    hypothesis REPLACED (not assumed) by the data-side tier hypothesis.
+
+    **Evidence tier (ADR 0009).** The tier hypothesis is a claim-SHAPE
+    fact, discharged from the data-side registry check; the reachability
+    conclusion is closed by `terminal_value_one_claim_obligation`, which
+    reduces `Holds` to `y = 1` and witnesses `ReachesOne 1` at
+    `k := 0`.  No orbit equation is evaluated and no reachability
+    hypothesis is assumed. -/
+example : ReachesOne 2 :=
+  RoutingPartitionCertificate_sound_terminal_value_one
+    routingPartitionTwoLeafTree twoLeafRoutingPartition (by native_decide)
+    (checkTerminalValueOneClaims_sound
+      twoLeafRoutingPartition.wire.claimRegistry (by decide))
+    2 (by decide) (by decide)
+
 end CollatzResearch
