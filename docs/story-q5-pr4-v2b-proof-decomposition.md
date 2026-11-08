@@ -3,6 +3,34 @@
 Companion to `docs/story-q5-external-certificate-inhabitation.md` (Q5 spec, PR #61).
 Companion to `docs/story-q4-bounded-orbit-certificates.md` (Q4 v3 proof arc).
 
+## Status — arc closed at v2b.9 (2026-11-08)
+
+The v2b sub-arc is closed. v2b.9 landed as PR #99 (merged 2026-10-24, commit
+`4309cab`), and the four open questions below are answered against the code
+that shipped; the answers are in **Open questions — answered**.
+
+Two things this plan states in the present tense were superseded by the Option C
+redesign in §6 before that closure, and are corrected here:
+
+- The `checkBoundedCertificate_sound` goal statement (below) and the Lemma 5
+  assembly in §5 were **withdrawn** by the Codex P0 review of 2026-09-02.
+  `checkBoundedCertificate_sound` has **no declaration in `Lean/`**. Its shipped
+  successor is `checkBoundedCertificateTree_sound`
+  (`Lean/CollatzResearch/BoundedInputCertificateTree.lean:117`), which
+  delegates to `RoutingPartitionCertificate_sound`
+  (`Lean/CollatzResearch/Q5RoutingPartition.lean:318`).
+- The v2b.7 alias shipped under the name `per_leaf_available_bounded_of_check`
+  (`Lean/CollatzResearch/BoundedInputCertificateTree.lean:368`), not
+  `per_leaf_available_bounded_of_tree`; the module docstring at
+  `BoundedInputCertificateTree.lean:352` records that rename and its reason.
+
+**Closure scope.** The Q5 arc closes on the routing-partition path at the ADR
+0009 reachability evidence tier: the reachability premise that the Option C
+theorems carried as a hypothesis is **discharged by checked evidence rather
+than assumed**, for claims whose terminal value is 1. It does **not** close the
+legacy `checkBoundedCertificate` path, and it asserts neither global
+convergence nor nontrivial-cycle exclusion.
+
 ## Goal
 
 ```
@@ -234,18 +262,19 @@ routing-partition (no new soundness theorem needed):
 - **v2b.1** — Lemmas 1–2 + supporting definitions (kernel-clean in `Q5Integration.lean`)
 - **v2b.2** — Lemma 3 + Lemma 4 (kernel-clean in `Q5Integration.lean` after the v2b.2 Codex P0 fix)
 - **v2b.3** — `transitionOk_implies_step` bridge + `transitionOk_implies_step_forall` (**MERGED** via PR #81 commit `441f878` — kernel-clean)
-- **v2b.4** — `BoundedInputCertificateTree` structure + `checkBoundedCertificateTree` delegation (THIN WRAPPER over `RoutingPartitionCertificateData` + `checkRoutingPartitionCertificate` — kernel-clean delegation; depends on v2b.1–3)
-- **v2b.5** — `checkBoundedCertificateTree_sound` (per-tree reachability; DIRECTLY inherits `RoutingPartitionCertificate_sound`; depends on v2b.4)
-- **v2b.6** — `routing_partition_leaf_certificate` (NEW intermediate extraction — bridges per-tree reachability + per-leaf routing to per-leaf `BoundedInputOrbitCertificate`; depends on v2b.5 + `descend_orbit_complete` (PR #29))
-- **v2b.7** — `per_leaf_available_bounded_of_tree` (alias for v2b.6 — satisfies META § 3.2; depends on v2b.6)
-- **v2b.8** — Tests (per-tree + per-leaf regressions — mirrors PR #75 routing-partition test patterns; depends on v2b.7)
+- **v2b.4** — `BoundedInputCertificateTree` structure + `checkBoundedCertificateTree` delegation (THIN WRAPPER over `RoutingPartitionCertificateData` + `checkRoutingPartitionCertificate` — kernel-clean delegation; depends on v2b.1–3; **MERGED** via PR #85, commit `139ab69`)
+- **v2b.5** — `checkBoundedCertificateTree_sound` (per-tree reachability; DIRECTLY inherits `RoutingPartitionCertificate_sound`; depends on v2b.4; **MERGED** via PR #86, commit `4a3d09e`)
+- **v2b.6** — `routing_partition_leaf_certificate` (NEW intermediate extraction — bridges per-tree reachability + per-leaf routing to per-leaf `BoundedInputOrbitCertificate`; depends on v2b.5 + `descend_orbit_complete` (PR #29); **MERGED** via PR #91, commit `ffd54b6`)
+- **v2b.7** — `per_leaf_available_bounded_of_check` (alias for v2b.6 — satisfies META § 3.2; depends on v2b.6; **MERGED** via PR #92, commit `8255f7a`. Shipped under the spec name, not the `per_leaf_available_bounded_of_tree` name used in the v2b.7 summary — see the naming note at `BoundedInputCertificateTree.lean:352`)
+- **v2b.8** — Tests (per-tree + per-leaf regressions — mirrors PR #75 routing-partition test patterns; depends on v2b.7; **MERGED** via PR #93, commit `bfeb4a1` and PR #96, commit `0a048d9`)
+- **v2b.9** — Concrete per-leaf discharge for v2b.6 + v2b.7 against the canonical two-leaf fixture (`twoLeaf_routing_partition_leaf_certificate` at `Q5Stage4Tests.lean:341`, `twoLeaf_per_leaf_available_bounded_of_check` at `Q5Stage4Tests.lean:358`; **MERGED** via PR #99, commit `4309cab`, 2026-10-24 — kernel-clean, no admitted declarations)
 
-**Staged implementation (Option B per Justin message_id 23317):**
-- Stage 1 = spec doc update (this section + design doc) — **CURRENT**
-- Stage 2 = v2b.4 implementation (gated on Stage 1 approval)
-- Stage 3 = v2b.5 implementation (gated on Stage 2 kernel-clean + GPT-5.6 Terra review)
-- Stage 4 = v2b.6 + v2b.7 implementation (gated on Stage 3 kernel-clean + review)
-- Stage 5 = v2b.8 tests (gated on Stage 4 kernel-clean + review)
+**Staged implementation (Option B per Justin message_id 23317) — all stages landed:**
+- Stage 1 = spec doc update (this section + design doc) — **MERGED** via PR #84, commit `400b7ea`
+- Stage 2 = v2b.4 implementation — **MERGED** via PR #85, commit `139ab69`
+- Stage 3 = v2b.5 implementation — **MERGED** via PR #86, commit `4a3d09e`
+- Stage 4 = v2b.6 + v2b.7 implementation — **MERGED** via PR #91, commit `ffd54b6` and PR #92, commit `8255f7a`
+- Stage 5 = v2b.8 tests — **MERGED** via PR #93, commit `bfeb4a1` and PR #96, commit `0a048d9`; v2b.9 closure — **MERGED** via PR #99, commit `4309cab`
 
 Each sub-commit triggers a Codex review round. PR `story-q5-per-tree-with-projection`
 stays in DRAFT throughout the staged implementation.
@@ -254,22 +283,60 @@ Once GPT-5.6 Terra approves v2b.8 (Stage 5), retitle PR from "v2b Option C revis
 staged implementation" to "v2 — bounded-input integration (closes Q5 4-PR split)" and
 remove from draft. No Q5-end-to-end / Q5-complete claim is allowed before v2b.8.
 
-## Open questions
+*The v2b.8 gate is satisfied: v2b.8 landed via PR #96 and v2b.9 via PR #99. What
+that gate unlocks is the scoped closure recorded in **Status — arc closed at
+v2b.9** above: the routing-partition path closes at the ADR 0009
+terminal-value-one tier. The legacy `checkBoundedCertificate` path still has no
+soundness theorem, and no convergence or cycle-exclusion claim is unlocked.*
 
-1. **Anchor alignment:** Does each witness's `anchor : Nat` field coincide with the
-   `descendOrbit` routing target? If not, Lemma 5 step 6 + Lemma 6 both need an additional
-   bridging lemma. v2a's proof attempt hit this issue.
-2. **`claim` field placement:** Where does `BoundedInputCertificateData` get its
-   `claim : FiniteOrbitClaim` field — witness-level or data-level? PR #62 establishes the
-   verifier structure; need to verify which placement supports the per-leaf certificate
-   construction.
-3. **`wellFormed` field:** Per Q4 v3 Codex run-21858 P2, `BoundedOrbitCertificate` does
-   NOT have a `wellFormed` field. Confirm the same for `BoundedInputOrbitCertificate`
-   (already true in v2a — verified during v2a review).
-4. **Lean 4 indexing notation:** Lemma 3's use of `trajectory[k]!` may need to be
-   re-expressed as `trajectory.get (k ⟨h⟩ : k < length)` depending on Lean 4 version
-   compatibility. PR #62 + PR #63 use both forms; pick whichever matches the
-   existing pattern.
+## Open questions — answered
+
+Each question below is answered against the code that shipped, not against the
+plan that asked it.
+
+1. **Anchor alignment — resolved, and not by the bridging lemma this plan
+   expected.** The `anchor : Nat` field the question presupposes does not
+   exist: `CertWitness` (`Lean/CollatzResearch/BoundedInputCertificateData.lean:108`)
+   carries only `l` and `trajectory`, and the canonical input is the type index
+   `x`. The anchor obligation is discharged at two separate points.
+   `anchorOk` (`Lean/CollatzResearch/Q5Integration.lean:353`) checks that the
+   trajectory head equals `x`, and `trajectory_anchor_orbit_step`
+   (`Lean/CollatzResearch/Q5Stage4Subproofs.lean:274`) proves
+   `w.trajectory[k]! = accelerated_orbit x k` from that anchor check plus the
+   per-step transition relation. The `descendOrbit` routing alignment is a
+   separate obligation, discharged by `sameCoverageLeaf_eq` /
+   `sameCoverageLeaf_congr_eq`
+   (`Lean/CollatzResearch/Q5Stage4Subproofs.lean:134`) together with
+   `registry_unique_of_pairwise_irrefl`
+   (`Lean/CollatzResearch/Q5Stage4Subproofs.lean:191`), and consumed inside
+   `routing_partition_leaf_certificate`
+   (`Lean/CollatzResearch/BoundedInputCertificateTree.lean:179`). The v2a wall
+   was an artifact of the single-leaf design; the routing-partition design
+   routes per canonical slot instead.
+2. **`claim` field placement — leaf-level, in the registry.** The placement
+   that supports the per-leaf construction is one claim per registry entry:
+   `LeafClaimWire` (`Lean/CollatzResearch/BoundedInputCertificateData.lean:306`)
+   pairs a `leaf : CoverageLeaf` with a `claim : FiniteOrbitClaim`, and
+   `RoutingPartitionCertificateWire.claimRegistry`
+   (`Lean/CollatzResearch/BoundedInputCertificateData.lean:313`) carries the
+   list of them. The per-leaf certificate takes `claim := entry_canon.claim`
+   from the canonical registry entry for that leaf
+   (`Lean/CollatzResearch/BoundedInputCertificateTree.lean:211`). The legacy
+   data-level field on `BoundedInputCertificateWire`
+   (`Lean/CollatzResearch/BoundedInputCertificateData.lean:119`) still exists,
+   but it sits on the path this arc closed without.
+3. **`wellFormed` field — confirmed absent.** `BoundedInputOrbitCertificate`
+   (`Lean/CollatzResearch/Q5Integration.lean:175`) has exactly three fields —
+   `claim`, `orbit_hits_claim`, `claim_reaches_one` — and no `wellFormed`
+   field, matching `BoundedOrbitCertificate`
+   (`Lean/CollatzResearch/CoverageTree.lean:695`). The v2a reading was right.
+4. **Lean 4 indexing notation — `trajectory[k]!` was retained.** No
+   re-expression to `trajectory.get (k ⟨h⟩)` was needed.
+   `trajectory_index` (`Lean/CollatzResearch/Q5Integration.lean:570`) states
+   `(w.trajectory)[k]! = accelerated_orbit x k`, and
+   `trajectory_anchor_orbit_step`
+   (`Lean/CollatzResearch/Q5Stage4Subproofs.lean:274`) uses
+   `w.trajectory[k]!` in the same form.
 
 ## Lessons applied (Q3 v4 + Q4 v3 + META)
 

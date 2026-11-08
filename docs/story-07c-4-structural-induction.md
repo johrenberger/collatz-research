@@ -81,17 +81,31 @@ a 3-arg `descendOrbit (t : CoverageTree) (x : Nat) (k : Nat)` that
 delegates to `descendFromOrbit t.maxDepth t.root x k`. The shapes are
 equivalent: master exposes `k` as a parameter; the 07c-3 entry point is
 the special case `k = 0`. This story adopts master's signature so the
-existing `coverage_tree_soundness_orbit` statement (which already uses
-`descendOrbit t x 0`) is not disturbed. BDD scenarios that read
+then-existing `coverage_tree_soundness_orbit` statement (which already used
+`descendOrbit t x 0`) was not disturbed. BDD scenarios that read
 `descendOrbit t x` from the 07c-3 doc use `descendOrbit t x 0` here.
+
+> **Historical (2026-11-08):** `coverage_tree_soundness_orbit` was subsequently
+> deleted by [ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md) (NT-5
+> decision 2, PR #115, commit `fc15920`), and the `CoverageTree.lean`
+> admission baseline dropped from 1 to 0 in that same change. The checked
+> companion `coverage_tree_soundness_orbit_cert`
+> (`Lean/CollatzResearch/CoverageTree.lean:986`) is unaffected.
 
 ### `SatOrbit` is out of scope
 
-Per the 07c-3 spec, `SatOrbit` is not part of this story's contract. The
-existing `coverage_tree_soundness_orbit` theorem (CoverageTree.lean
-line 324) and its `sorry` (line 330) belong to a separate workstream
-(provisional label `07c-5 / dynamics connection`) and are not modified
+Per the 07c-3 spec, `SatOrbit` is not part of this story's contract. At the
+time of this story, the `coverage_tree_soundness_orbit` theorem (CoverageTree.lean
+line 324) and its `sorry` (line 330) belonged to a separate workstream
+(provisional label `07c-5 / dynamics connection`) and were not modified
 here.
+
+> **Historical (2026-11-08):** that theorem and its `sorry` no longer exist.
+> ADR 0011 (PR #115) deleted the theorem rather than discharging it — its
+> documented promotion path was refuted, not merely open — and lowered the
+> `CoverageTree.lean` admission baseline to 0. `SatOrbit` itself is retained
+> (now used by no Lean theorem) as the record of the refuted seam. The
+> 07c-5 successor work is re-scoped under **Follow-on** below.
 
 ## Test-first gate
 
@@ -244,7 +258,8 @@ chooses the proven pattern.
 - No bounded Python computation used as proof authority.
 - No change to the existing structural `coverage_tree_soundness` theorem.
 - No change to `coverage_tree_soundness_orbit` or its `sorry`. That is a
-  separate workstream.
+  separate workstream. *(Historical: both were later deleted by ADR 0011 —
+  see **Follow-on**.)*
 - No `SatOrbit`-shaped additions to `descend_orbit_complete`'s statement.
 
 ## Promotion criteria
@@ -261,3 +276,37 @@ After `formally established`, M4 Finite coverage closes pending 07c-2
 `formally established`. The `coverage_tree_soundness_orbit` `sorry`
 (line 330) is the natural next story (provisional: 07c-5), but is out of
 scope here.
+
+### 07c-5 re-scoped (2026-11-08)
+
+The 07c-5 pointer above names work that no longer exists to be done.
+`coverage_tree_soundness_orbit` and its `sorry` were deleted by
+[ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md) (NT-5 decision 2;
+PR #115, commit `fc15920`, merged 2026-11-07), which also lowered the
+`Lean/CollatzResearch/CoverageTree.lean` admission baseline from 1 to 0 in
+the same change. The reason was not a proof shortage: the theorem's first
+documented promotion blocker — deriving `OrbitAlignedTree t` from
+`ValidTree t ∧ IsComplete t` — is **false on the current definitions**, so
+there was nothing left to prove toward that conclusion. `SatOrbit` and
+`OrbitAlignedTree` are deliberately retained, now used by no Lean theorem, as
+the record of the seam that was refuted. The checked companion
+`coverage_tree_soundness_orbit_cert`
+(`Lean/CollatzResearch/CoverageTree.lean:986`) is unaffected: it concludes
+`OrbitLeafReachesOne t l` from `descend_orbit_complete` plus an explicit
+`BoundedOrbitCertificate` hypothesis, and does not depend on the deleted
+theorem.
+
+The successor work that actually followed this seam is the **reachability
+evidence tier** recorded in
+[ADR 0009](adr/0009-reachability-evidence-tier.md) and shipped as WP-CF-1
+(PR #110) and WP-CF-3 (PR #112): the reachability obligation is discharged by
+checked evidence for claims whose terminal value is 1, rather than assumed or
+proved for an orbit equation the kernel cannot reduce. On that path,
+`per_leaf_available_bounded_of_check_terminal_value_one`
+(`Lean/CollatzResearch/BoundedInputCertificateTree.lean:417`) replaces the
+reachability premise with checked evidence.
+
+What remains open on this seam is stated in
+`docs/convergence-frontier.md` §6 and is unchanged: global convergence and
+nontrivial-cycle exclusion, and reachability for a claim whose terminal value
+is not 1.
