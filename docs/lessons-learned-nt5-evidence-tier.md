@@ -88,7 +88,7 @@ made. Six further PRs carried them to completion:
 - **PR #115** (merged `fc15920`) — decision 2, ADR 0011:
   `coverage_tree_soundness_orbit` deleted; its conclusion had no consumer and
   its documented promotion path was refuted rather than merely open.
-- **PR #116** (head `54717f8`, pending merge) — decision 4, ADR 0012: the
+- **PR #116** (merged `a86e015`) — decision 4, ADR 0012: the
   `.interval` claim shape recorded as unfunded, with the claim type unchanged.
 
 Two consequences of that continuation are worth recording here:
@@ -319,7 +319,7 @@ docstrings keep them apart.
 
 ---
 
-## 6. Open threads
+## 6. Resolved threads
 
 - **Decisions 2, 3, 4** were taken: ADR 0011 (PR #115), ADR 0010 (PR #114) and
   ADR 0012 (PR #116) respectively. PR #109 carries the briefs each call was
