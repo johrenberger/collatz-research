@@ -202,14 +202,19 @@ schedule:
    states it "asserts no global convergence result".
 2. **Nontrivial cycle exclusion** - excluding cycles other than the trivial one.
 
-A third item is *not* open mathematics but is unfunded: the
-`.interval` claim shape (section 5). NT-5 decision 4 records that state
-explicitly rather than leaving it implicit: the shape is retained, no
-`.interval` obligation is funded, and removing the constructor is not
-proposed ([ADR 0012](adr/0012-record-interval-claim-as-unfunded.md)). Its obligation is infinite, but for a
-*fixed* concrete residue class it is a bounded-arithmetic statement about one
-orbit family. It is tractable per instance and out of reach universally - which
-is why it belongs on the open side of the seam rather than in a work packet.
+A third item is a claim shape whose obligation is restricted but still
+infinite, and it is unfunded: the `.interval` claim shape (section 5). NT-5
+decision 4 records that state explicitly rather than leaving it implicit: the
+shape is retained, no `.interval` obligation is funded, and removing the
+constructor is not proposed
+([ADR 0012](adr/0012-record-interval-claim-as-unfunded.md)). For a well-formed
+interval the obligation is `∀ x, claim.Holds x → ReachesOne x` over a non-empty
+infinite residue class, so no finite set of witnesses discharges it. A single
+concrete *input* is a different proposition - `ReachesOne x` for one `x` is an
+existential over `k` - but a concrete residue-*class* claim stays universally
+quantified over infinitely many inputs. That is why no `.interval` obligation is
+funded in this repository, and why the shape belongs on the open side of the
+seam rather than in a work packet.
 
 ## 7. Admitted-sorry ledger, and one finding that changes the plan
 

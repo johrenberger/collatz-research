@@ -67,8 +67,9 @@ code changes.
   descent result. It states which obligations the repository declines to
   fund.
 - The shape stays on the open side of the seam (`docs/convergence-frontier.md`
-  section 6). Funding a concrete instance would be a new maintainer
-  decision, scoped as its own work packet.
+  section 6). Funding a concrete residue class would be a new maintainer
+  decision, scoped as its own work packet, and it would require proving that
+  an infinite class reaches 1.
 
 ## Alternatives considered
 
