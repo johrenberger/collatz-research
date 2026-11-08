@@ -8,11 +8,18 @@ Decision 1 (the evidence tier for reachability witnesses) is **decided** and
 its work packet (WP-CF-2) is in flight in PR #108. This document covers
 decisions 2, 3 and 4.
 
-It is a **decision brief, not a decision.** Each section states the question,
+It was a **decision brief, not a decision.** Each section states the question,
 the evidence for it, the options, and what each option would commit the
 repository to. Nothing here asserts a theorem, promotes a
 `docs/theorem-status.md` row, or claims that any admitted declaration is
 established.
+
+**Update (2026-11-07): decision 3 has since been taken** — see
+[ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md). The maintainer chose
+option (a) with one refinement over the recommendation below: the proven
+witness infrastructure is **relocated** to
+`Lean/CollatzResearch/DescentWitness.lean` rather than deleted, so no proven
+descent lemma is lost. Decisions 2 and 4 remain open.
 
 ---
 
@@ -126,12 +133,25 @@ project — a Lean SHA-256 module is a substantial addition to the trusted
 computing base and should be scoped as its own story rather than as the
 tail of a disposition decision.
 
+**As decided (2026-11-07, ADR 0010): option (a), refined.** The proven witness
+infrastructure is relocated to `Lean/CollatzResearch/DescentWitness.lean`
+rather than deleted, so the `DescentWitness.Valid.ends_at` / `.strict_descent` /
+`.start_pos_odd` and `DescentWitness.trajectory_odd` lemmas survive.
+
 ### What any of these options would need
 
 The change must touch `Importer.lean`, `Certificate.lean`,
 `docs/lean-sorry-budget.json`, the root import list, and
 `tests/test_checker_lean.py`, and must keep both CI gates green (Lean CI
 and Python CI).
+
+As implemented, it also touches `Lean/CollatzResearch/DescentWitness.lean` (new,
+the relocated proven content), `Lean/CollatzResearch/Basic.lean` (a prose
+reference), `docs/theorem-status.md`, `docs/convergence-frontier.md` (the § 7
+ledger and the § 9 decision record), `docs/adr/0010-legacy-v1-descent-certificate-path.md`
+(new), and this brief. The frontier's WP-CF-5 `allowed_files` listed only the
+two retired Lean files and the budget, which is narrower than what the
+recommended option actually requires.
 
 ---
 

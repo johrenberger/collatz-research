@@ -1,9 +1,12 @@
 """Differential checks between the Python checker and Lean trajectory evaluation.
 
 These tests compare the Python checker's accepted certificate output against the
-Lean `CollatzResearch.trajectory` evaluation. They are *supporting evidence* for
-the Lean checker-soundness theorem (`DescentWitness.Valid.sound` in Story 06b),
-not a substitute for the formal Lean-internal bridge.
+Lean `CollatzResearch.trajectory` evaluation (from `CollatzResearch.Basic`). They
+are *supporting evidence* for the Lean-side trajectory behaviour, not a substitute
+for a formal Lean-internal acceptance bridge: the v1.0 Lean bridge is retired
+(see `docs/nt5-open-decision-briefs.md`, decision 3), and the surviving Lean
+witness infrastructure is the structural `DescentWitness` predicates in
+`CollatzResearch.DescentWitness`.
 
 Per the PR #10 Codex review (P1): expand from a single endpoint fixture to a
 deterministic corpus of valid descent certificates, compare full trajectories
@@ -54,8 +57,8 @@ VALID_CORPUS: list[tuple[int, int]] = [
 # Python checker's fail-closed behavior on malformed / non-descent certificates.
 # They live in test_checker.py as part of the mutation-rejection suite; here
 # we list the Python-rejected cases that are most relevant to the Lean
-# boundary (matching the rejection categories defined in Certificate.lean's
-# Valid).
+# boundary (matching the rejection categories defined in
+# DescentWitness.lean's Valid).
 PYTHON_REJECTION_CASES: list[tuple[str, dict, str]] = [
     (
         "even_start_undefined",
@@ -98,7 +101,7 @@ def test_checker_corpus_matches_lean_endpoint(tmp_path, start, steps) -> None:
     lean_file.write_text(
         "\n".join(
             [
-                "import CollatzResearch.Certificate",
+                "import CollatzResearch.Basic",
                 "",
                 f"#eval CollatzResearch.trajectory {checked.start} {checked.steps}",
             ]
@@ -138,7 +141,7 @@ def test_checker_corpus_full_trajectory_matches_lean(tmp_path, start, steps) -> 
     lean_file.write_text(
         "\n".join(
             [
-                "import CollatzResearch.Certificate",
+                "import CollatzResearch.Basic",
                 "",
                 f"#eval [{elements}]",
             ]

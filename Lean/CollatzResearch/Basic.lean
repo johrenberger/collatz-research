@@ -32,7 +32,7 @@ For odd `n`, `3n+1` is even, so `ν₂(3n+1) ≥ 1`. The quotient
 `(3n+1)/2^ν₂(3n+1)` is the maximal odd divisor of `3n+1`, hence odd.
 
 This is the relocated declaration from `Certificate.lean` per the Story 02c/03c
-spec (PR #30); both `Certificate.lean::DescentWitness.trajectory_odd` and
+spec (PR #30); both `DescentWitness.lean::DescentWitness.trajectory_odd` and
 `Equivalence.lean::acceleratedTrajectory_reaches_one_implies_standard` consume
 this version.
 -/
