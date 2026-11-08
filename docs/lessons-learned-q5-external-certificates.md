@@ -1,6 +1,6 @@
 # Lessons Learned — Story Q5 External-Certificates + Routing-Partition (PRs #61 → #62 → #63 → #64 → #66 → #67 → #68 → #69)
 
-**Status:** Arc partial (PRs MERGED 2026-08-28 through 2026-09-04). Soundness theorem (`checkBoundedCertificate_sound`, Lemma 5) and constructive per-leaf availability theorem (`per_leaf_available_bounded_of_check`, Lemma 6) **WITHDRAWN** per Codex P0 review on 2026-09-02. Routing-partition acceptance sub-arc complete.
+**Status:** Arc **closed** on the routing-partition path, at the ADR 0009 terminal-value-one reachability tier (2026-11-08). The Option-A soundness theorem (`checkBoundedCertificate_sound`, Lemma 5) and Option-A constructive per-leaf availability theorem were **WITHDRAWN** per Codex P0 review on 2026-09-02 and remain withdrawn: `checkBoundedCertificate_sound` has **no declaration in `Lean/`**. Their routing-partition successors shipped instead — `checkBoundedCertificateTree_sound` (`Lean/CollatzResearch/BoundedInputCertificateTree.lean:117`), `routing_partition_leaf_certificate` (`:179`), `per_leaf_available_bounded_of_check` (`:368`) — and the reachability premise they carried is **discharged by checked evidence rather than assumed**, for claims whose terminal value is 1 (ADR 0009; WP-CF-1 PR #110, WP-CF-3 PR #112). See §9.
 
 **Scope:** 8 PRs, ~7 calendar days (2026-08-28 to 2026-09-04). Two sub-arcs:
 - **External-certificates / bounded-input integration** (PRs #61, #62, #63, #64, #66): spec → verifier → producer+parser → bounded-input integration → hotfix.
@@ -9,8 +9,9 @@
 **Outcome:**
 - ✅ External-certificate inhabitation: bounded-input side formally established (`BoundedInputOrbitCertificate` structure, `coverage_tree_soundness_orbit_cert_bounded` companion theorem, `per_leaf_available_bounded_of_hCert` hypothesis-eliminator, depthTwoTree conditional type-check example). Soundness theorem + constructive availability withdrawn.
 - ✅ Routing-partition acceptance facts: complete (PRs #67, #68, #69).
-- ✅ No `sorry`/`admit`/`axiom` in final state (`docs/lean-sorry-budget.json` Q5Integration.lean entry reverted to pre-v2b baseline by `760329a`).
-- ❌ End-to-end Q5 closure: NOT achieved (soundness theorem absent). Re-attempt gates documented in §4.
+- ✅ No `sorry`/`admit`/`axiom` in final state (`docs/lean-sorry-budget.json` Q5Integration.lean entry reverted to pre-v2b baseline by `760329a`; `Q5RoutingPartition.lean` is recorded at 0).
+- ✅ Q5 arc closure, **scoped to the routing-partition path at the terminal-value-one tier**: the checker-to-certificate bridge exists on that path, and the per-claim reachability obligation is discharged by checked evidence rather than assumed (§9).
+- ❌ **Not claimed, and not changed by this arc:** global convergence, nontrivial-cycle exclusion, and reachability for any claim whose terminal value is not 1. The two unclaimed rows of `docs/theorem-status.md` are unchanged.
 
 This document captures the Q5 arc structure, the wire/checked split, the list-position identity, the Codex P0 rejection pattern, and the actor pattern (autonomous multi-commit bot work with independent review).
 
@@ -143,6 +144,23 @@ Python serialized evidence → (PR #63 parser)
 
 Producer (Python) + parser (Lean) are UNTRUSTED. Only the Lean verifier + companion theorem enter the TCB. With the soundness theorem withdrawn, the TCB does NOT include a verified bridge from `checkBoundedCertificate = true` to `BoundedInputOrbitCertificate`. Re-attempt requires closing the 4 sorries in Lemma 5 without budget increase.
 
+**This diagram is the legacy single-leaf path, and it is still suspended.** The Q5 arc closed on a different path — the routing-partition architecture of PRs #67–#69 and the Option-C redesign (PRs #84–#99) — which routes per canonical input slot rather than to one fixed leaf:
+
+```
+RoutingPartitionCertificateWire
+                            → RoutingPartitionCertificateData (constructed with its three invariants)
+                            → checkRoutingPartitionCertificate (Bool verifier)
+                            → checkBoundedCertificateTree_sound (PR #86)
+                            → routing_partition_leaf_certificate / per_leaf_available_bounded_of_check (PRs #91, #92)
+                            → BoundedInputOrbitCertificate
+                            → per_leaf_available_bounded_of_check_terminal_value_one (PR #112)
+                            → per-leaf availability with the reachability premise DISCHARGED
+```
+
+One gap in that path is worth stating rather than smoothing over: the routing-partition wire has **no JSON parser and no Python producer yet**. The PR #63 parser produces the legacy `BoundedInputCertificateWire`, and `RoutingPartitionCertificateData` is not built by a decode function — it is constructed directly with the three invariants `witnesses_length_ok`, `registry_unique`, and `witness_claim_registered` as proof fields. The two-leaf fixture is such a direct construction (`Lean/CollatzResearch/Q5VerifierTests.lean:278`). The verification side of the path is complete; the serialization side is not.
+
+That last arrow is the tier discharge: `terminal_value_one_claim_obligation` (`Lean/CollatzResearch/Q5RoutingPartition.lean:227`) proves the per-registry `Holds → ReachesOne` obligation for a registry whose entries all carry `FiniteOrbitClaim.singleton 1`, because `Holds` reduces to `y = 1` and `ReachesOne 1` is witnessed at `k := 0`. It evaluates no orbit equation and uses no `native_decide`.
+
 ### 2.5 The 4-PR split extended to 5-PR (with hotfix)
 
 Q4 v3 established the 4-PR split (spec → foundation → data → theorem → lessons). Q5 extended it with a **hotfix PR** (#66) because the integration tests needed a concrete `CertWitness` representation that an earlier commit had abstracted away. The hotfix was a 1-PR scope, additive, no scope expansion. Future arcs should anticipate this pattern: a hotfix PR is sometimes needed between the data and integration PRs if the data layer gets refactored in a way that breaks integration tests.
@@ -199,6 +217,16 @@ Per the Codex P0 review and PR #64's "Re-attempt gates" section, any future PR t
 
 The decomposition plan is retained in `docs/story-q5-pr4-v2b-proof-decomposition.md` for any future re-attempt to reference.
 
+### 4.1 Disposition of the gates (2026-11-08)
+
+Gate 2 was resolved by **option (b)** — the interface was redesigned around an input-to-leaf routing partition — and that is the path the arc took. The other two gates are moot for the withdrawn Option-A path, because it was never re-attempted: no `sorry` was closed and the admission budget was never raised for it.
+
+- **Gate 1 (4 sorries closed without budget increase):** satisfied vacuously — the Option-A theorem was removed rather than re-attempted, and the Q5Integration.lean budget entry was reverted by `760329a`.
+- **Gate 2 (architectural decision):** resolved as option (b); PRs #67–#69 built the routing-partition architecture and PRs #84–#99 shipped the Option-C wrapper, per-leaf projection, and concrete discharge on top of it.
+- **Gate 3 (Codex review re-opened):** satisfied on the shipped path, with the uneven coverage recorded honestly in §9.2.
+
+The successor path's reachability premise was then discharged rather than assumed, by the terminal-value-one tier of ADR 0009 (WP-CF-1 PR #110, WP-CF-3 PR #112). See §9.
+
 ---
 
 ## 5. Trust boundary
@@ -206,10 +234,12 @@ The decomposition plan is retained in `docs/story-q5-pr4-v2b-proof-decomposition
 - **Producer + parser (PR #63):** UNTRUSTED RUNTIME EVIDENCE.
 - **Verifier (PR #62):** TCB.
 - **Companion theorem (PR #64):** TCB.
-- **Soundness theorem (PR #64 v2b.4):** WITHDRAWN — not in TCB.
+- **Soundness theorem (PR #64 v2b.4, Option A):** WITHDRAWN — not in TCB, and no declaration in `Lean/`.
 - **Routing-partition sub-arc (PRs #67–#69):** TCB (parallel architecture; does not require the withdrawn soundness theorem).
+- **Option-C successors (PRs #86, #91, #92, #99):** TCB — `checkBoundedCertificateTree_sound`, `routing_partition_leaf_certificate`, `per_leaf_available_bounded_of_check`, and the v2b.9 concrete per-leaf discharge.
+- **Tier discharge (PRs #110, #112; ADR 0009):** TCB — `terminal_value_one_claim_obligation` and the terminal-value-one theorem family. No orbit equation is evaluated and `native_decide` remains admissible for data-side obligations only.
 
-The Lean admission budget (`docs/lean-sorry-budget.json`) does not include any Q5 module. The Q5Integration.lean entry was added in commit `8323aa9` (sorry-budget tracker) and reverted in `760329a` (Codex P0/P1 fixes). Net effect: zero `sorry`/`admit`/`axiom` budget increase from Q5.
+The Lean admission budget (`docs/lean-sorry-budget.json`) records **no** Q5 module above 0: `Q5RoutingPartition.lean` is listed at 0, and the Q5Integration.lean entry was added in commit `8323aa9` (sorry-budget tracker) and reverted in `760329a` (Codex P0/P1 fixes). Net effect: zero `sorry`/`admit`/`axiom` budget increase from Q5.
 
 ---
 
@@ -227,9 +257,9 @@ The Lean admission budget (`docs/lean-sorry-budget.json`) does not include any Q
 
 Depends on PR #55–#60 (Q4 META + bounded-orbit infrastructure; all merged), PR #49–#51 (07c-2 conditional companion theorem; all merged), PR #30–#48 (02c/03c dynamics/equivalence; all merged).
 
-Story Q5 closes the Q5 4-PR split (extended to 5-PR with hotfix #66) for the bounded-input integration side. The end-to-end Q5 closure claim is NOT made — the soundness theorem is absent. Re-attempt gates documented in §4.
+Story Q5 closes the Q5 4-PR split (extended to 5-PR with hotfix #66) for the bounded-input integration side. The closure claim is made **at the routing-partition path and at the ADR 0009 terminal-value-one tier** (§9), not on the withdrawn Option-A path: `checkBoundedCertificate_sound` is absent from `Lean/` and stays absent. Re-attempt gates and their disposition are documented in §4 and §4.1.
 
-The routing-partition sub-arc (PRs #67–#69) is complete and provides a parallel architecture for any future Lemma 5 re-attempt that chooses option (b) in §4.2.
+The routing-partition sub-arc (PRs #67–#69) is complete and provided the parallel architecture that option (b) in §4.2 was later built on.
 
 ---
 
@@ -255,3 +285,35 @@ These 2 files had been orphaned from the root import block for ages without the 
 ### 8d. Future CI improvement (open follow-up)
 
 Add a Lean CI step that compiles each `Lean/CollatzResearch/*.lean` file individually as a top-level target (e.g., `lake env lean <file> -c <output>`) **in addition to** the default-target build. The current conditional-jobs path is fragile because it depends on the action's internal pattern-matching against specific filenames. A "compile each file individually" job would catch API drift regardless of which file is orphaned or how the import graph shifts.
+
+---
+
+## 9. 2026-11-08 — Arc closure record
+
+### 9.1 What "closed" means here
+
+The closure is **scoped**, and the scope is the whole content of the claim:
+
+- **Claimed.** On the routing-partition path, an accepted routing-partition certificate yields per-leaf availability, and the per-claim reachability obligation is **discharged by checked evidence rather than assumed** for claims whose terminal value is 1. `terminal_value_one_claim_obligation` (`Lean/CollatzResearch/Q5RoutingPartition.lean:227`) proves `∀ y, entry.claim.Holds y → ReachesOne y` for a registry whose entries all carry `FiniteOrbitClaim.singleton 1`, because `Holds` reduces to `y = 1` and `ReachesOne 1` is witnessed at `k := 0`. The corresponding global theorem is `RoutingPartitionCertificate_sound_terminal_value_one` (`Lean/CollatzResearch/Q5RoutingPartition.lean:346`), and the per-leaf form is `per_leaf_available_bounded_of_check_terminal_value_one` (`Lean/CollatzResearch/BoundedInputCertificateTree.lean:417`). No orbit equation is evaluated; `native_decide` stays confined to data-side obligations. The concrete two-leaf discharge is `twoLeaf_per_leaf_available_bounded_of_check_terminal_value_one` (`Lean/CollatzResearch/Q5Stage4Tests.lean:417`).
+- **Not claimed.** Global convergence and nontrivial-cycle exclusion remain unclaimed; the two unclaimed rows of `docs/theorem-status.md` are unchanged by this arc. Reachability for a claim whose terminal value is **not** 1 remains open — that is the tier boundary ADR 0009 draws, and the `.interval` shape is separately recorded as unfunded by ADR 0012.
+- **Not present.** `checkBoundedCertificate_sound` — the Option-A theorem named in the original Goal — has **no declaration in `Lean/`**. It was withdrawn at the Codex P0 review of 2026-09-02 and was never re-attempted. The closure is made by its routing-partition successors, not by reviving it.
+
+### 9.2 Review coverage on the Q5 arc — reported as it is
+
+The closure rests on hosted Lean CI for every merged PR and on independent review **where a review record exists**. That coverage is uneven, and the record should not be read as uniform:
+
+| PR | GitHub review records | Note |
+| --- | --- | --- |
+| #74, #75, #85, #86, #88, #89, #91, #92, #93, #96, #101 | **0** | merged without a GitHub review record |
+| #99 | 3 | two rounds, both recorded verdicts `approved`, model `openai/gpt-5.6-terra` |
+| #110, #112 | 2 each | the WP-CF-1 and WP-CF-3 tier work |
+
+Two details are worth stating plainly. First, #99's records are all in state `COMMENTED`, not `APPROVED`, because GitHub does not permit the connected maintainer identity to approve its own pull request; the verdict text is in the review bodies. Second, the earlier Q5 sub-arc PRs carry **no** independent review record at all — CI and the admission-budget gate are what backs them.
+
+### 9.3 Relationship to `docs/convergence-frontier.md`
+
+`docs/convergence-frontier.md` discloses its own base: its section 11 states that its structural claims were read from `main` at `3f28799` (2026-11-02). WP-CF-1 (PR #110) and WP-CF-3 (PR #112) landed on 2026-11-07, **after** that base, and they added general — not fixture-local — reachability theorems that discharge the obligation by evidence tier.
+
+The consequence is that the frontier's section 2 line "the only unconditional reachability in `main` is fixture-local", and several of its `file:line` citations, describe the tree at `3f28799` rather than at current `main`. For example, `RoutingPartitionCertificate_sound` is cited at `Q5RoutingPartition.lean:222` and now sits at `:318`, because WP-CF-3 inserted the tier theorems above it.
+
+Refreshing the frontier against current `main` is **follow-up work outside the Q5 closure PR's file scope**, and is recorded here so that the drift is not silently inherited. This PR does not edit the frontier, and does not restate its snapshot as a current claim.
