@@ -357,6 +357,13 @@ def SatOrbit (_t : CoverageTree) (x : Nat) (l : CoverageLeaf) : Prop :=
     `.bounded`) additionally require the future orbit-reduction
     relation (`descendOrbit` + bounded orbit images).
 
+    **`.interval` claims are not funded.** For a well-formed interval the
+    `LeafCertificate.claim_reaches_one` obligation ranges over an
+    infinite residue class, and the reachability evidence tier admits no
+    unconditional reachability witness for such a shape. The constructor is
+    retained for legacy `"2:1-1"` property decoding; see
+    `docs/adr/0012-record-interval-claim-as-unfunded.md`.
+
     (Story Q3 / PR #53.) -/
 inductive LeafClaim where
   | empty                       -- no inputs

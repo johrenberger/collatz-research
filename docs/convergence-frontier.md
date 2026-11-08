@@ -185,6 +185,9 @@ Two structural facts make this the right seam to work along:
    `CoverageTree.lean:339` records that "No `routed_implies_claim` proof exists
    for any claim shape yet - the structural `descend t x = some l → claim.Holds x`
    obligation requires an alignment invariant that is not yet formalized".
+   NT-5 decision 4 records that state as the disposition rather than an open
+   question (ADR 0012): the shape is retained, and no `.interval` obligation
+   is funded.
 
 The open mathematics is therefore concentrated in exactly one shape.
 
@@ -199,11 +202,19 @@ schedule:
    states it "asserts no global convergence result".
 2. **Nontrivial cycle exclusion** - excluding cycles other than the trivial one.
 
-A third item is *not* open mathematics but is currently unfunded: the
-`.interval` claim shape (section 5). Its obligation is infinite, but for a
-*fixed* concrete residue class it is a bounded-arithmetic statement about one
-orbit family. It is tractable per instance and out of reach universally - which
-is why it belongs on the open side of the seam rather than in a work packet.
+A third item is a claim shape whose obligation is restricted but still
+infinite, and it is unfunded: the `.interval` claim shape (section 5). NT-5
+decision 4 records that state explicitly rather than leaving it implicit: the
+shape is retained, no `.interval` obligation is funded, and removing the
+constructor is not proposed
+([ADR 0012](adr/0012-record-interval-claim-as-unfunded.md)). For a well-formed
+interval the obligation is `∀ x, claim.Holds x → ReachesOne x` over a non-empty
+infinite residue class, so no finite set of witnesses discharges it. A single
+concrete *input* is a different proposition - `ReachesOne x` for one `x` is an
+existential over `k` - but a concrete residue-*class* claim stays universally
+quantified over infinitely many inputs. That is why no `.interval` obligation is
+funded in this repository, and why the shape belongs on the open side of the
+seam rather than in a work packet.
 
 ## 7. Admitted-sorry ledger, and one finding that changes the plan
 
@@ -375,12 +386,12 @@ plan:
     - "WP-CF-2: DECIDED 2026-11-04 (ADR 0009) - the evidence tier for reachability witnesses at k >= 1 is kernel-checkable, restricted to claims whose terminal value is 1; no reachability theorem evaluates an orbit equation, and native_decide stays admissible for data-side obligations only"
     - "WP-CF-4: DECIDED 2026-11-07 (ADR 0011) - coverage_tree_soundness_orbit is deleted: its conclusion SatOrbit has no consumer and its documented promotion path is refuted on current definitions; the checked companion coverage_tree_soundness_orbit_cert (OrbitLeafReachesOne) is unaffected"
     - "WP-CF-5: DECIDED 2026-11-07 (ADR 0010) - the legacy v1.0 Lean descent-certificate path is retired; the proven witness infrastructure it carried (DescentWitness, DescentWitness.Valid and its ends_at/strict_descent/start_pos_odd/trajectory_odd lemmas) is relocated to Lean/CollatzResearch/DescentWitness.lean rather than deleted, so no proven descent lemma is lost"
-    - "Whether the .interval claim shape is funded at all, given its infinite obligation"
+    - "NT-5 decision 4: DECIDED 2026-11-08 (ADR 0012) - the .interval claim shape is left unused and recorded as unfunded: the constructor stays in LeafClaim for legacy 2:1-1 property decoding, but no well-formed .interval obligation is funded and the trust model states that no reachability witness is admissible for it"
 ```
 
-## 9. Open decisions for the maintainer
+## 9. Decisions for the maintainer
 
-**Decisions 1, 2 and 3 are now made; one remains open.** Merging this specification
+**All four decisions are now made.** Merging this specification
 approved the document; it did not resolve any of the questions below. A work
 packet that depends on an open decision must not begin until that decision is
 made. Decision 1 (the evidence tier for reachability witnesses) was taken on
@@ -392,8 +403,10 @@ WP-CF-3. Decision 3 (the legacy v1.0 path) was taken on 2026-11-07 and is record
 [ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md): the Lean v1.0
 bridge is retired, and the **proven** witness infrastructure it carried is
 relocated to `Lean/CollatzResearch/DescentWitness.lean` rather than deleted.
-Decision 4 below remains open. It has no work packet: the frontier places
-the `.interval` shape on the open side of the seam (section 6).
+Decision 4 (the `.interval` claim shape) was taken on 2026-11-08 and is recorded in
+[ADR 0012](adr/0012-record-interval-claim-as-unfunded.md): the shape is retained
+but **not funded**, and the trust model says so. It has no work packet: the
+frontier places the `.interval` shape on the open side of the seam (section 6).
 
 These are architectural or mathematical choices, so per the repository's own
 review-gate rules they are maintainer decisions rather than autonomous scope:
@@ -415,12 +428,18 @@ review-gate rules they are maintainer decisions rather than autonomous scope:
    `Lean/CollatzResearch/DescentWitness.lean` rather than deleted.** See
    [ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md).
 4. **`.interval` claims** - fund them per instance, or leave the claim type
-   unused, as `FiniteOrbitClaim` already excludes it?
+   unused, as `FiniteOrbitClaim` already excludes it? **DECIDED 2026-11-08 -
+   leave unused and record it.** See
+   [ADR 0012](adr/0012-record-interval-claim-as-unfunded.md).
 
 Decision briefs for decisions 2, 3 and 4 - the evidence, the options, and a
 recommendation for each - are in
-[docs/nt5-open-decision-briefs.md](nt5-open-decision-briefs.md). It is a
-brief, not a decision: each of the three still needs the maintainer's call.
+[docs/nt5-open-decision-briefs.md](nt5-open-decision-briefs.md). Each section now
+records its outcome: decision 2 in
+[ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md), decision 3 in
+[ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md), and decision 4 in
+[ADR 0012](adr/0012-record-interval-claim-as-unfunded.md). The briefs are kept as
+the record of what each call was made against.
 
 ## 10. Non-goals
 

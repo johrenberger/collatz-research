@@ -1,12 +1,18 @@
-# NT-5 open decisions: briefs for the maintainer
+# NT-5 decisions: briefs for the maintainer
 
-This brief supports the three NT-5 maintainer decisions that remain open in
+This brief supports the three NT-5 maintainer decisions that were open in
 `docs/convergence-frontier.md` § 9, after decision 1 was taken in
 [ADR 0009](adr/0009-reachability-evidence-tier.md).
 
 Decision 1 (the evidence tier for reachability witnesses) is **decided** and
-its work packet (WP-CF-2) is in flight in PR #108. This document covers
+its work packet (WP-CF-2) landed in PR #108. This document covers
 decisions 2, 3 and 4.
+
+**All four decisions have since been taken.** The sections below are
+preserved as the briefs written *before* each call, and each one now records
+its outcome: decision 2 in [ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md),
+decision 3 in [ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md), and
+decision 4 in [ADR 0012](adr/0012-record-interval-claim-as-unfunded.md).
 
 It was a **decision brief, not a decision.** Each section states the question,
 the evidence for it, the options, and what each option would commit the
@@ -21,11 +27,16 @@ witness infrastructure is **relocated** to
 `Lean/CollatzResearch/DescentWitness.lean` rather than deleted, so no proven
 descent lemma is lost. Decision 2 has since been taken as well - see
 [ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md): option (a), delete the
-theorem. Decision 4 remains open.
+theorem. Decision 4 has since been taken as well - see
+[ADR 0012](adr/0012-record-interval-claim-as-unfunded.md): option (a), leave the
+claim type unused and record it. All four NT-5 decisions are now taken.
 
 ---
 
 ## Decision 2 — the disposition of `coverage_tree_soundness_orbit` (WP-CF-4)
+
+**_Decided 2026-11-07 (ADR 0011): option (a), delete the theorem._** The
+section below is the brief as it was written before the call.
 
 ### The question
 
@@ -93,6 +104,10 @@ decision in documents that still describe the old state.
 ---
 
 ## Decision 3 — the disposition of the legacy v1.0 path (WP-CF-5)
+
+**_Decided 2026-11-07 (ADR 0010): option (a), retire the Lean path, with the
+proven witness infrastructure relocated rather than deleted._** The section below is
+the brief as it was written before the call.
 
 ### The question
 
@@ -171,6 +186,9 @@ recommended option actually requires.
 
 ## Decision 4 — whether `.interval` claims are funded
 
+**_Decided 2026-11-08 (ADR 0012): option (a), leave the claim type unused and
+record it._** The section below is the brief as it was written before the call.
+
 ### The question
 
 Fund `.interval` claims per instance, or leave the claim type unused, as
@@ -245,6 +263,12 @@ cross-language breaking change for a shape with no funded user — and option
 (a) closes the same gap by making the obligation explicit rather than
 implicit. Option (b) is the unbounded obligation in a different name.
 
+**As decided (2026-11-08, ADR 0012): option (a).** The `.interval` constructor
+stays in `LeafClaim`, and the repository states that no well-formed
+`.interval` obligation is funded: the trust model records the shape as
+unfunded, the `LeafClaim` docstring records that a well-formed `.interval`
+obligation is unbounded, and no theorem discharges one.
+
 ### What any of these options would need
 
 The change is documentation-level under (a): `docs/trust-model.md` and the
@@ -252,13 +276,20 @@ affected `CoverageTree.lean` docstrings, with a regression that pins
 `.interval`'s exclusion from `FiniteOrbitClaim`. Under (c) it also touches
 the Lean and Python claim types and their tests.
 
+As implemented, it also touches `docs/convergence-frontier.md` (sections 5, 6
+and 9), `docs/theorem-status.md`, this brief, and the new
+`docs/adr/0012-record-interval-claim-as-unfunded.md`. The regression the
+recommendation asks for already exists: `ReachabilityEvidenceTierTests.lean`
+Scenario 5 case-splits over `FiniteOrbitClaim`'s three constructors, so adding a
+fourth breaks it at elaboration time. No new test is needed.
+
 ---
 
 ## How the evidence above was checked
 
 | Claim | How verified |
 | --- | --- |
-| Decisions 1, 2 and 3 are taken; decision 4 is open | `docs/convergence-frontier.md` § 9, read on this branch |
+| All four decisions are taken | `docs/convergence-frontier.md` § 9, read on this branch |
 | ADR 0009 is the decision record for decision 1 | `docs/adr/0009-reachability-evidence-tier.md`, merged in PR #107 |
 | `coverage_tree_soundness_orbit` has no dependent theorem | `grep` over `Lean/`, `python/`, `tests/`, `scripts/`, `docs/` for the bare name, excluding the `_cert` variant |
 | Its conclusion is `SatOrbit`, not `OrbitLeafReachesOne` | The theorem statement in `CoverageTree.lean` |
