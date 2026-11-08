@@ -1,12 +1,16 @@
-# Lessons Learned — NT-5 reachability evidence tier (PRs #105 → #107 → #108 → #109 → #110)
+# Lessons Learned — NT-5 reachability evidence tier (PRs #105 → #116)
 
-**Status:** Arc in progress. Decision 1 (the evidence tier) taken in ADR 0009
-(PR #107) and recorded in PR #108 (WP-CF-2). Decision briefs for decisions 2–4
-landed in PR #109. The terminal-value-1 reachability instance (WP-CF-1) is in
-PR #110. Decisions 2, 3 and 4 remain open maintainer calls.
+**Status:** Arc complete. All four NT-5 decisions have been taken: decision 1
+(the evidence tier) in ADR 0009 (PR #107) and recorded in PR #108 (WP-CF-2);
+decision 2 (the disposition of `coverage_tree_soundness_orbit`) in ADR 0011
+(PR #115); decision 3 (the legacy v1.0 path) in ADR 0010 (PR #114); and
+decision 4 (the `.interval` claim shape) in ADR 0012 (PR #116). Decision briefs
+for decisions 2–4 landed in PR #109; the terminal-value-1 reachability instance
+(WP-CF-1) landed in PR #110.
 
-**Scope:** 5 PRs, 2026-11-05 → 2026-11-07. One arc: one decision recorded,
-two work packets executed, three decisions briefed.
+**Scope:** 5 PRs in the original arc (2026-11-05 → 2026-11-07) plus 6 more in
+its continuation (#111–#116, through 2026-11-08). One arc: four decisions
+recorded, three work packets executed, three decisions briefed and then decided.
 
 **Outcome:**
 - ✅ Decision 1 recorded: the reachability evidence tier is kernel-checkable,
@@ -17,9 +21,13 @@ two work packets executed, three decisions briefed.
 - ✅ WP-CF-1: the tier's first kernel-checked consequence — an accepted
   witness with a terminal-value-1 claim yields `ReachesOne x` with no
   reachability hypothesis and no `native_decide`.
-- ⏸ Decisions 2–4: briefed with evidence, options, and a recommendation each.
-  **Not decided** — they are architectural or mathematical choices reserved to
-  the maintainer.
+- ✅ Decisions 2–4: briefed with evidence, options, and a recommendation each,
+  and all three were later decided by the maintainer — decision 2 in ADR 0011
+  (delete `coverage_tree_soundness_orbit`), decision 3 in ADR 0010 (retire the
+  Lean v1.0 path, relocating its proven witness content rather than deleting
+  it), and decision 4 in ADR 0012 (record `.interval` as unfunded). They were
+  architectural or mathematical choices reserved to the maintainer, and the
+  briefs did not decide them.
 
 ---
 
@@ -49,18 +57,51 @@ covering `.empty`, `.singleton 1`, `.singleton n` for `n != 1`,
 `.bounded K`, and `.interval` excluded by construction. Four review rounds
 (see §3.1).
 
-### PR #109 — decision briefs for decisions 2–4 (open)
+### PR #109 — decision briefs for decisions 2–4 (merged `ff9ed52`)
 
 `docs/nt5-open-decision-briefs.md`: evidence, options, and a recommendation
 per decision, deciding nothing. Three review rounds.
 
-### PR #110 — WP-CF-1, the terminal-value-1 instance (open, draft)
+### PR #110 — WP-CF-1, the terminal-value-1 instance (merged `5854029`)
 
 `checkCertWitness_terminal_value_one_reaches_one` and its canonical
 instance `checkCertWitness_singleton_one_reaches_one`. Makes the tier
 consequential: until this, the tier was recorded but no theorem exercised it.
 
 ---
+
+### 1.1 Arc continuation (PRs #111–#116)
+
+The original five-PR arc above ended with three decisions briefed and none
+made. Six further PRs carried them to completion:
+
+- **PR #111** (merged `936632a0`) — this document itself: the arc record.
+- **PR #112** (merged `79c2550`) — WP-CF-3, per-leaf availability for one
+  concrete tree, discharging the routing-partition reachability obligation by
+  evidence tier.
+- **PR #113** (merged `68ae875`) — the review-gate cost discipline that
+  followed this arc: one reviewer per head SHA, resumption across rounds via a
+  persisted continuation handle, and waiting by event rather than by polling.
+- **PR #114** (merged `6f77191`) — decision 3, ADR 0010: the legacy v1.0 Lean
+  path retired, with its **proven** witness content relocated to
+  `Lean/CollatzResearch/DescentWitness.lean` rather than deleted.
+- **PR #115** (merged `fc15920`) — decision 2, ADR 0011:
+  `coverage_tree_soundness_orbit` deleted; its conclusion had no consumer and
+  its documented promotion path was refuted rather than merely open.
+- **PR #116** (head `54717f8`, pending merge) — decision 4, ADR 0012: the
+  `.interval` claim shape recorded as unfunded, with the claim type unchanged.
+
+Two consequences of that continuation are worth recording here:
+
+- **The briefs did not decide anything, and that was the point.** Each was
+  written before its call and each now carries the outcome of that call:
+  ADR 0011 for decision 2, ADR 0010 for decision 3, ADR 0012 for decision 4.
+  The pre-call text is preserved, because a brief is the record of what the
+  call was made against.
+- **With ADR 0010 and ADR 0011 together, the release-relevant Lean modules
+  carry no admitted declarations at all.** The `CoverageTree.lean` admission
+  baseline went 1 → 0 when the admitted theorem was deleted, and the legacy
+  path's three admissions left with the retired modules.
 
 ## 2. Architectural decisions
 
@@ -265,9 +306,11 @@ docstrings keep them apart.
   introduces, which is what that table's own rule requires.
 - **No convergence claim.** Nothing here asserts global convergence, cycle
   exclusion, or reachability beyond a bounded, accepted certificate.
-- **Decisions 2–4 were not decided.** The brief records options and a
-  recommendation; the decisions remain with the maintainer, and WP-CF-4 and
-  WP-CF-5 remain blocked until they are made.
+- **Decisions 2–4 were not decided by this arc.** The brief records options and
+  a recommendation; the decisions remained with the maintainer, and WP-CF-4 and
+  WP-CF-5 remained blocked until they were made. All three were taken later —
+  decision 3 in ADR 0010 (PR #114), decision 2 in ADR 0011 (PR #115), and
+  decision 4 in ADR 0012 (PR #116).
 - **The review gate was load-bearing.** Every semantic error found in this
   arc (the witness conflation, the stale citations, the unqualified
   `.interval` claim) was found by the independent reviewer, not by
@@ -278,10 +321,12 @@ docstrings keep them apart.
 
 ## 6. Open threads
 
-- **Decisions 2, 3, 4** await the maintainer. PR #109 carries the briefs.
-- **WP-CF-3** (per-leaf availability for one concrete tree) is unblocked by
-  decision 1 and is the next packet on the critical path.
+- **Decisions 2, 3, 4** were taken: ADR 0011 (PR #115), ADR 0010 (PR #114) and
+  ADR 0012 (PR #116) respectively. PR #109 carries the briefs each call was
+  made against.
+- **WP-CF-3** (per-leaf availability for one concrete tree) was unblocked by
+  decision 1 and landed in PR #112.
 - The frontier document's WP-CF-1 objective carried the same "the
   kernel-checked witness k := 0 (accelerated_orbit_zero 1)" wording that
   §3.2 corrected in the docstrings. This document's PR reconciles it, so
-  the plan text and the theorem shipped in PR #110 agree.
+  the plan text and the theorem shipped in PR #110 agree. Resolved in this arc.
