@@ -5,7 +5,7 @@
     "Lean/CollatzResearch/Affine.lean": 0,
     "Lean/CollatzResearch/BoundedInputCertificateParser.lean": 0,
     "Lean/CollatzResearch/BoundedInputCertificateParserTests.lean": 0,
-    "Lean/CollatzResearch/CoverageTree.lean": 1,
+    "Lean/CollatzResearch/CoverageTree.lean": 0,
     "Lean/CollatzResearch/Dynamics.lean": 0,
     "Lean/CollatzResearch/Equivalence.lean": 0,
     "Lean/CollatzResearch/Q5RoutingPartition.lean": 0,
