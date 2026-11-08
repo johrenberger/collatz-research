@@ -429,8 +429,12 @@ review-gate rules they are maintainer decisions rather than autonomous scope:
 
 Decision briefs for decisions 2, 3 and 4 - the evidence, the options, and a
 recommendation for each - are in
-[docs/nt5-open-decision-briefs.md](nt5-open-decision-briefs.md). It is a
-brief, not a decision: each of the three still needs the maintainer's call.
+[docs/nt5-open-decision-briefs.md](nt5-open-decision-briefs.md). Each section now
+records its outcome: decision 2 in
+[ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md), decision 3 in
+[ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md), and decision 4 in
+[ADR 0012](adr/0012-record-interval-claim-as-unfunded.md). The briefs are kept as
+the record of what each call was made against.
 
 ## 10. Non-goals
 

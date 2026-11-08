@@ -1,12 +1,18 @@
 # NT-5 open decisions: briefs for the maintainer
 
-This brief supports the three NT-5 maintainer decisions that remain open in
+This brief supports the three NT-5 maintainer decisions that were open in
 `docs/convergence-frontier.md` § 9, after decision 1 was taken in
 [ADR 0009](adr/0009-reachability-evidence-tier.md).
 
 Decision 1 (the evidence tier for reachability witnesses) is **decided** and
 its work packet (WP-CF-2) landed in PR #108. This document covers
 decisions 2, 3 and 4.
+
+**All four decisions have since been taken.** The sections below are
+preserved as the briefs written *before* each call, and each one now records
+its outcome: decision 2 in [ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md),
+decision 3 in [ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md), and
+decision 4 in [ADR 0012](adr/0012-record-interval-claim-as-unfunded.md).
 
 It was a **decision brief, not a decision.** Each section states the question,
 the evidence for it, the options, and what each option would commit the
@@ -28,6 +34,9 @@ claim type unused and record it. All four NT-5 decisions are now taken.
 ---
 
 ## Decision 2 — the disposition of `coverage_tree_soundness_orbit` (WP-CF-4)
+
+**_Decided 2026-11-07 (ADR 0011): option (a), delete the theorem._** The
+section below is the brief as it was written before the call.
 
 ### The question
 
@@ -95,6 +104,10 @@ decision in documents that still describe the old state.
 ---
 
 ## Decision 3 — the disposition of the legacy v1.0 path (WP-CF-5)
+
+**_Decided 2026-11-07 (ADR 0010): option (a), retire the Lean path, with the
+proven witness infrastructure relocated rather than deleted._** The section below is
+the brief as it was written before the call.
 
 ### The question
 
@@ -172,6 +185,9 @@ recommended option actually requires.
 ---
 
 ## Decision 4 — whether `.interval` claims are funded
+
+**_Decided 2026-11-08 (ADR 0012): option (a), leave the claim type unused and
+record it._** The section below is the brief as it was written before the call.
 
 ### The question
 
