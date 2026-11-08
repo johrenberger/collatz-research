@@ -9,6 +9,14 @@ The v2b sub-arc is closed. v2b.9 landed as PR #99 (merged 2026-10-24, commit
 `4309cab`), and the four open questions below are answered against the code
 that shipped; the answers are in **Open questions — answered**.
 
+**Scope of that closure.** "Closed" here is tier-bounded, not a "Q5 complete"
+claim: the v2b sub-arc closes on the routing-partition path at the ADR 0009
+terminal-value-one tier (see **Closure scope** below), where the reachability
+premise is discharged by checked evidence rather than assumed. It does not close
+the legacy `checkBoundedCertificate` path, and it asserts neither global
+convergence nor nontrivial-cycle exclusion. `docs/convergence-frontier.md` is
+reconciled against current `main` in the same change as this record.
+
 Two things this plan states in the present tense were superseded by the Option C
 redesign in §6 before that closure, and are corrected here:
 
