@@ -1,4 +1,4 @@
-# NT-5 open decisions: briefs for the maintainer
+# NT-5 decisions: briefs for the maintainer
 
 This brief supports the three NT-5 maintainer decisions that were open in
 `docs/convergence-frontier.md` § 9, after decision 1 was taken in

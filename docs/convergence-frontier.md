@@ -384,7 +384,7 @@ plan:
     - "NT-5 decision 4: DECIDED 2026-11-08 (ADR 0012) - the .interval claim shape is left unused and recorded as unfunded: the constructor stays in LeafClaim for legacy 2:1-1 property decoding, but no well-formed .interval obligation is funded and the trust model states that no reachability witness is admissible for it"
 ```
 
-## 9. Open decisions for the maintainer
+## 9. Decisions for the maintainer
 
 **All four decisions are now made.** Merging this specification
 approved the document; it did not resolve any of the questions below. A work
