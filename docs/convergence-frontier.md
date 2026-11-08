@@ -4,7 +4,18 @@
 2026-11-03). This document changes no theorem, no claim level, and no trust
 boundary.
 **Base commit:** `3f28799` (`main`) - the repository state this document
-describes.
+describes. `3f28799` is the state described, **not** the commit that introduced
+this document: the document was introduced by PR #105, whose squash commit is
+`515a8d52` and whose parent is `3f28799`.
+**Reconciled against `main` at `52e5654` (2026-11-08).** Every section was
+re-read against that state. The sections whose claims changed are 1, 2, 3, 5, 7,
+8, 10 and 11; sections 4, 6 and 9 were re-read and stand unchanged. The
+reducibility measurements in section 4 were taken at `3f28799`, and the
+definitions they measure are unchanged at `52e5654`, so they still hold. What
+changed is the *reachability* picture: WP-CF-1 (PR #110) and WP-CF-3 (PR #112)
+landed the ADR 0009 terminal-value-one tier, which discharges the reachability
+premise by evidence tier instead of assuming it. Layer 2' records that; section 3
+records what is still missing.
 
 It states precisely where the formalization stops, separates what is
 mechanically closable from what is open mathematics, and proposes the bounded
@@ -19,77 +30,121 @@ boundary described in [`docs/trust-model.md`](trust-model.md).
 ## 1. The frontier, stated
 
 [`docs/theorem-status.md`](theorem-status.md) records exactly two rows as
-unclaimed (lines 66-67):
+unclaimed (lines 74-75):
 
 | Identifier | Status | Lean location | Claim scope |
 | --- | --- | --- | --- |
 | `Global convergence` | Not started | - | No claim |
 | `Nontrivial cycle exclusion` | Not started | - | No claim |
 
-Every other row is `Checked`, `Defined (predicate)`, or `Admitted (not
-established)`. Those two unclaimed rows are the *stated* frontier. This
+Every other row is `Checked` or one of the `Defined (...)` forms (predicate,
+function, structure, or inductive type); no row is `Admitted`. Those two
+unclaimed rows are the *stated* frontier. This
 document explains what they actually require, and what sits between them and
 the current results.
 
-## 2. The structural pattern: routing is proven, reachability is assumed
+## 2. The structural pattern: routing is proven, reachability is assumed -
+except at the ADR 0009 tier
 
 Every reachability-flavored theorem in `main` has the same two-layer shape.
 
 **Layer 1 - routing and completeness: proven unconditionally.**
 
-- `coverage_tree_soundness` (`CoverageTree.lean:717`) - for a valid, complete
+- `coverage_tree_soundness` (`CoverageTree.lean:758`) - for a valid, complete
   tree, every `x > 0` descends to a verified leaf:
   `∃ l, l ∈ t.leaves ∧ verified t l ∧ descend t x = some l`.
-- `descend_orbit_complete` (`CoverageTree.lean:873`) - the orbit-aware analogue.
-- `orbit_predecessor_reaches_one` (`CoverageTree.lean:180`) - transport: if a
+- `descend_orbit_complete` (`CoverageTree.lean:889`) - the orbit-aware analogue.
+- `orbit_predecessor_reaches_one` (`CoverageTree.lean:193`) - transport: if a
   later orbit state reaches 1, so does the earlier one.
 
 **Layer 2 - reachability: carried as a hypothesis.**
 
 | Theorem | Location | Reachability premise |
 | --- | --- | --- |
-| `coverage_tree_soundness_full` | `CoverageTree.lean:778` | `hLeaf : ∀ l ∈ t.leaves, verified t l → LeafReachesOne t l` |
-| `coverage_tree_soundness_cert` | `CoverageTree.lean:820` | `hCert : ∀ l ∈ t.leaches, verified t l → LeafCertificate t l` |
-| `coverage_tree_soundness_orbit_cert` | `CoverageTree.lean:970` | `hCert : ∀ l ∈ t.leaves, verified t l → BoundedOrbitCertificate t l` |
-| `coverage_tree_soundness_orbit_cert_bounded` | `Q5Integration.lean:194` | `hCert : ... → BoundedInputOrbitCertificate t l N` |
-| `RoutingPartitionCertificate_sound` | `Q5RoutingPartition.lean:222` | `hClaimReachesOne` per registry entry |
+| `coverage_tree_soundness_full` | `CoverageTree.lean:819` | `hLeaf : ∀ l ∈ t.leaves, verified t l → LeafReachesOne t l` |
+| `coverage_tree_soundness_cert` | `CoverageTree.lean:861` | `hCert : ∀ l ∈ t.leaves, verified t l → LeafCertificate t l` |
+| `coverage_tree_soundness_orbit_cert` | `CoverageTree.lean:986` | `hCert : ∀ l ∈ t.leaves, verified t l → BoundedOrbitCertificate t l` |
+| `coverage_tree_soundness_orbit_cert_bounded` | `Q5Integration.lean:217` | `hCert : ... → BoundedInputOrbitCertificate t l N` |
+| `RoutingPartitionCertificate_sound` | `Q5RoutingPartition.lean:318` | `hClaimReachesOne` per registry entry |
 | `checkBoundedCertificateTree_sound` | `BoundedInputCertificateTree.lean:117` | same, by delegation |
 | `routing_trajectory_reaches_one` | `Q5RoutingPartition.lean:105` | `hAnchor`, `hTrans`, `hLast`, `hClaimReachesOne` |
 | `routing_partition_witness_reaches_one` | `Q5RoutingPartition.lean:166` | `hClaimReachesOne` |
-| `routing_partition_certificate_slot_reaches_one` | `Q5RoutingPartition.lean:205` | `hClaimReachesOne` |
+| `routing_partition_certificate_slot_reaches_one` | `Q5RoutingPartition.lean:242` | `hClaimReachesOne` |
 
-These premises are not discharged inside the repository. They are *supplied by
-the caller*. `docs/lessons-learned-meta.md` section 2.11 states this as the
+Outside the ADR 0009 terminal-value-one tier these premises are not discharged
+inside the repository. They are *supplied by the caller*.
+`docs/lessons-learned-meta.md` section 2.11 states this as the
 governing pattern: per-leaf certificate construction is "**external** - supplied
 by the caller at certificate construction time (Python oracle, finite-trajectory
 checker, manual construction)", and the companion theorem "doesn't prove any new
 global Collatz result; it only transports the per-leaf certificate".
 
-**Consequence.** The formalization proves *routing* and proves *transport*. It
-does not prove *reachability for any general input*. The only unconditional
-reachability in `main` is fixture-local:
+**Layer 2' - the ADR 0009 terminal-value-one tier: the premise is discharged,
+not assumed.** Two work packets landed on this seam after `3f28799` and changed
+what the frontier is:
 
-- `twoLeafRoutingPartition_claim_reaches_one` (`Q5Stage4Tests.lean:252`) -
-  holds because both registry entries carry `FiniteOrbitClaim.singleton 1`,
-  whose `Holds` reduces to `y = 1`, and `ReachesOne 1` is witnessed by
-  `k := 0` (`accelerated_orbit 1 0 = 1`).
-- `twoLeafRoutingPartition_reaches_one_two` (`Q5Stage4Tests.lean:369`) -
+- **WP-CF-1** (PR #110) - `checkCertWitness_terminal_value_one_reaches_one`
+  (`Q5BoundedInputBridge.lean:201`) and its canonical instance
+  `checkCertWitness_singleton_one_reaches_one`
+  (`Q5BoundedInputBridge.lean:263`): a `checkCertWitness`-accepted witness whose
+  claim shape reduces to `y = 1` yields `ReachesOne x` with **no reachability
+  hypothesis** and no `native_decide`.
+- **WP-CF-3** (PR #112) - the discharge generalises to whole registries and to
+  the routing-partition path. `terminal_value_one_claim_obligation`
+  (`Q5RoutingPartition.lean:227`) proves
+  `∀ entry ∈ registry, ∀ y, entry.claim.Holds y → ReachesOne y` for **any**
+  registry whose entries carry `FiniteOrbitClaim.singleton 1` - it holds for any
+  such registry, not only the canonical two-leaf fixture.
+  `checkTerminalValueOneClaims` (`Q5RoutingPartition.lean:271`) and
+  `checkTerminalValueOneClaims_sound` (`Q5RoutingPartition.lean:278`) are the
+  data-side registry check and its soundness.
+  `routing_partition_certificate_slot_reaches_one_terminal_value_one`
+  (`Q5RoutingPartition.lean:303`) and
+  `RoutingPartitionCertificate_sound_terminal_value_one`
+  (`Q5RoutingPartition.lean:346`) are the global routing-partition forms, in
+  which the general reachability hypothesis is **replaced** by the claim-shape
+  hypothesis rather than assumed.
+  `per_leaf_available_bounded_of_check_terminal_value_one`
+  (`BoundedInputCertificateTree.lean:417`) is the per-leaf form and
+  `twoLeafRoutingPartition_sound_terminal_value_one`
+  (`Q5Stage4Tests.lean:434`) its concrete-tree instance.
+
+**Consequence.** The formalization proves *routing* and proves *transport*. For
+a claim whose terminal value is not 1 it still does not prove *reachability for
+any general input*: that premise remains a hypothesis supplied by the caller. At
+the ADR 0009 terminal-value-one tier the premise is instead **discharged by
+checked evidence**, and that discharge is not fixture-local - it holds for any
+registry of terminal-value-one claims:
+
+- `twoLeafRoutingPartition_claim_reaches_one` (`Q5Stage4Tests.lean:257`) - the
+  canonical fixture instance: both registry entries carry
+  `FiniteOrbitClaim.singleton 1`, whose `Holds` reduces to `y = 1`, and
+  `ReachesOne 1` is witnessed by `k := 0` (`accelerated_orbit_zero 1`).
+- `twoLeafRoutingPartition_reaches_one_two` (`Q5Stage4Tests.lean:386`) -
   `ReachesOne 2` from the even witness `[2, 7, 11, 17, 13, 5, 1]`.
 
 That is the frontier in one sentence: **the repository can check that a
-trajectory is an `acceleratedStep` chain and route it to a leaf; it cannot yet
-check that the chain reaches 1, except for the two-leaf fixture.**
+trajectory is an `acceleratedStep` chain and route it to a leaf; at the ADR 0009
+terminal-value-one tier it can also check that the chain reaches 1, for any
+registry of terminal-value-one claims; for every other terminal value it still
+cannot.**
 
-## 3. What is missing: a Lean-side verifier soundness theorem
+## 3. What is missing: a Lean-side verifier soundness theorem outside the ADR
+0009 tier
 
 `docs/lessons-learned-meta.md` section 3.1 prescribes the architecture:
 
 > Python search/generator → serialized proof artifact → small Lean verifier →
 > verifier soundness theorem → `BoundedOrbitCertificate` → existing companion theorem
 
-The first, second and fifth stages exist; **the verifier soundness theorem does
-not**. Verified: `git grep -E 'checkTrajectory|verifier_sound|checkReachability'`
-over `Lean/` returns nothing.
+The first, second and fifth stages exist, and a **verifier soundness theorem
+now exists at the ADR 0009 terminal-value-one tier** - the tier theorems listed
+in Layer 2'. What does **not** exist is a verifier soundness theorem for a
+claim whose terminal value is not 1. Verified: `git grep -E
+'checkTrajectory|verifier_sound|checkReachability'` over `Lean/` returns nothing,
+and the `FiniteOrbitClaim` docstring (`CoverageTree.lean:455-468`) records that
+shapes not reducing to `y = 1` carry no unconditional reachability witness under
+this tier.
 
 What exists on the Lean side today:
 
@@ -100,17 +155,18 @@ What exists on the Lean side today:
   `checkRoutingPartitionCertificate` (`:407`), `checkBoundedCertificateTree`
   (`BoundedInputCertificateTree.lean:97`).
 - **decomposition lemmas** - `checkCertWitness_decompose`
-  (`Q5Integration.lean:423`) rewrites the checker into `anchorOk ∧ leafMatchOk ∧
+  (`Q5Integration.lean:453`) rewrites the checker into `anchorOk ∧ leafMatchOk ∧
   routingOk ∧ terminalClaimOk ∧ transitionOk`; `transitionOk_implies_step` and
-  `transitionOk_implies_step_forall` (`Q5BoundedInputBridge.lean:101`, `:141`)
+  `transitionOk_implies_step_forall` (`Q5BoundedInputBridge.lean:114`, `:160`)
   turn the transition fold into a per-index `acceleratedStep` equation;
-  `trajectory_index` (`Q5Integration.lean:535`) and
+  `trajectory_index` (`Q5Integration.lean:570`) and
   `trajectory_anchor_orbit_step` (`Q5Stage4Subproofs.lean:274`) index the
   trajectory against the orbit; `terminal_claim_transport`
-  (`Q5Integration.lean:604`) carries the terminal claim onto the orbit.
+  (`Q5Integration.lean:650`) carries the terminal claim onto the orbit.
 
-What is missing is the final step: **from "this trajectory is a valid
-`acceleratedStep` chain out of `x`" to "`x` reaches 1"**.
+What is missing is the final step **outside the terminal-value-one tier**:
+**from "this trajectory is a valid `acceleratedStep` chain out of `x`" to
+"`x` reaches 1"** for a claim whose terminal value is not 1.
 
 ## 4. The decisive measurement: which evidence can be kernel-checked
 
@@ -159,16 +215,16 @@ content of this frontier.
 ## 5. The claim shape decides what is closable
 
 The reachability obligation is carried by `claim_reaches_one` in the
-certificate structures (`CoverageTree.lean:593` for `LeafCertificate`,
-`CoverageTree.lean:654` for `BoundedOrbitCertificate`,
-`Q5Integration.lean:158` for `BoundedInputOrbitCertificate`). Its difficulty
+certificate structures (`CoverageTree.lean:639` for `LeafCertificate`,
+`CoverageTree.lean:700` for `BoundedOrbitCertificate`,
+`Q5Integration.lean:181` for `BoundedInputOrbitCertificate`). Its difficulty
 is decided by the claim's shape, because `ReachesOne n` is the unbounded
 existential `∃ k, accelerated_orbit n k = 1`
-(`CoverageTree.lean:157`) and has **no** `Decidable` instance.
+(`CoverageTree.lean:170`) and has **no** `Decidable` instance.
 
 | Claim shape | `Holds` | Obligation | Closable? |
 | --- | --- | --- | --- |
-| `.empty` | `False` (`:449`) | vacuous | yes, trivially and kernel-checkably |
+| `.empty` | `False` (`:490`) | vacuous | yes, trivially and kernel-checkably |
 | `.singleton 1` | `y = 1` | `ReachesOne 1` | yes, kernel-checkably: `⟨0, accelerated_orbit_zero 1⟩` |
 | `.singleton n`, `n ≠ 1` | `y = n` | `ReachesOne n` at some `k ≥ 1` | only with compiler-evaluated evidence, or a hand-proved orbit equation |
 | `.bounded K` | `y ≤ K` | `∀ y ≤ K, ReachesOne y` | as above, per `y`; each `y ≠ 1` inherits the same issue |
@@ -177,12 +233,12 @@ existential `∃ k, accelerated_orbit n k = 1`
 Two structural facts make this the right seam to work along:
 
 1. **`FiniteOrbitClaim` already excludes `.interval` by construction**
-   (`CoverageTree.lean:434`; its docstring records that `FiniteOrbitClaim` and
+   (`CoverageTree.lean:471`; its docstring at `:449-452` records that `FiniteOrbitClaim` and
    `LeafClaim` "are independent - `FiniteOrbitClaim` excludes `.interval` by
    construction; `LeafClaim` retains `.interval` for residue-only routing").
    The repository has already drawn the tractable/open boundary in its types.
 2. **`LeafClaim`'s `.interval` obligation is acknowledged as unfunded**:
-   `CoverageTree.lean:339` records that "No `routed_implies_claim` proof exists
+   `CoverageTree.lean:353` records that "No `routed_implies_claim` proof exists
    for any claim shape yet - the structural `descend t x = some l → claim.Holds x`
    obligation requires an alignment invariant that is not yet formalized".
    NT-5 decision 4 records that state as the disposition rather than an open
@@ -245,19 +301,21 @@ open (section 7.1).
 
 ### 7.1 The documented promotion path for `coverage_tree_soundness_orbit` is refutable
 
-Its docstring (`CoverageTree.lean:839`) names two promotion blockers, the first
-being "A formal proof of `OrbitAlignedTree t` from the existing `ValidTree t ∧
-IsComplete t` hypotheses - currently `OrbitAlignedTree` is taken as an explicit
-hypothesis, and the implication `ValidTree ∧ IsComplete → OrbitAligned` is open."
+Its docstring - read at `3f28799`, where the theorem still existed
+(`CoverageTree.lean:839` at that commit; the theorem was deleted by ADR 0011,
+see below) - names two promotion blockers, the first being "A formal proof of
+`OrbitAlignedTree t` from the existing `ValidTree t ∧ IsComplete t` hypotheses -
+currently `OrbitAlignedTree` is taken as an explicit hypothesis, and the
+implication `ValidTree ∧ IsComplete → OrbitAligned` is open."
 
 On the current definitions that implication is **false**, not open:
 
-- `OrbitAlignedAux.leafA` (`:667`) requires `WellFormed l`, and
-  `WellFormed` for a leaf (`:295`) is `False` whenever `leanInterval l`
-  (`:259`) fails to parse, and otherwise requires
+- `OrbitAlignedAux.leafA` (`:709`) requires `WellFormed l`, and
+  `WellFormed` for a leaf (`:308`) is `False` whenever `leanInterval l`
+  (`:272`) fails to parse, and otherwise requires
   `period > 0 ∧ lo ≤ hi ∧ hi < period`.
-- `IsCompleteAux.leafC` (`:679`) requires only `verified t l`, and
-  `verified` (`:253`) requires merely
+- `IsCompleteAux.leafC` (`:721`) requires only `verified t l`, and
+  `verified` (`:266`) requires merely
   `l ∈ t.leaves ∧ l.leafProperty ≠ "" ∧ l.leafId ≠ ""`.
 - `ValidNode` (`:83`) makes every leaf valid unconditionally.
 
@@ -270,7 +328,7 @@ A tree whose single leaf has `leafProperty = "garbage"` therefore satisfies
 arithmetic work.
 
 Note also that `coverage_tree_soundness_orbit` concludes `SatOrbit t x l`
-(residue-interval membership, `:316`) whereas the checked
+(residue-interval membership, `:329`) whereas the checked
 `coverage_tree_soundness_orbit_cert` concludes `OrbitLeafReachesOne t l`; they
 are **not** interchangeable, and `coverage_tree_soundness_orbit` is referenced by
 no other theorem in `main`. The theorem has since been removed (decision 2;
@@ -294,6 +352,18 @@ Note the constraint from section 4: a packet may only claim a *kernel-checked*
 result if every orbit equation it relies on reduces in the kernel. In practice
 that means the terminal value is 1 (witness `k := 0`). WP-CF-2 is where that
 constraint becomes a maintainer decision rather than an engineering step.
+
+**Status (as of `52e5654`).** WP-CF-1 landed in PR #110 (commit `5854029`); the
+WP-CF-2 decision was taken on 2026-11-04 (ADR 0009, PR #107) and recorded in
+PR #108; WP-CF-3 landed in PR #112 (commit `79c2550`). WP-CF-4 and WP-CF-5 are
+decisions rather than engineering work: they were taken on 2026-11-07 (ADR 0011
+and ADR 0010) and are recorded in section 9.
+
+**Closing the critical path closes the bounded terminal-value-one tier, not this
+document's open mathematics.** The two unclaimed rows in section 1 and the
+`.interval` shape in section 6 remain open, and the tier boundary measured in
+section 4 stands: for a claim whose terminal value is not 1, the orbit equation is
+still not kernel-reducible.
 
 ```yaml
 plan:
@@ -383,6 +453,8 @@ plan:
     - "WP-CF-3: per-leaf availability for one concrete tree, with the companion theorem's hypothesis discharged rather than assumed"
 
   known_design_decisions:
+    - "WP-CF-1: LANDED 2026-11-07 (PR #110, commit 5854029) - the terminal-value-1 instance: a checkCertWitness-accepted trajectory whose terminal value is 1 yields ReachesOne x with no reachability hypothesis and no native_decide"
+    - "WP-CF-3: LANDED 2026-11-07 (PR #112, commit 79c2550) - the routing-partition reachability obligation is discharged by evidence tier: terminal_value_one_claim_obligation holds for ANY registry of terminal-value-one claims, and RoutingPartitionCertificate_sound_terminal_value_one replaces the general reachability hypothesis with the claim-shape hypothesis"
     - "WP-CF-2: DECIDED 2026-11-04 (ADR 0009) - the evidence tier for reachability witnesses at k >= 1 is kernel-checkable, restricted to claims whose terminal value is 1; no reachability theorem evaluates an orbit equation, and native_decide stays admissible for data-side obligations only"
     - "WP-CF-4: DECIDED 2026-11-07 (ADR 0011) - coverage_tree_soundness_orbit is deleted: its conclusion SatOrbit has no consumer and its documented promotion path is refuted on current definitions; the checked companion coverage_tree_soundness_orbit_cert (OrbitLeafReachesOne) is unaffected"
     - "WP-CF-5: DECIDED 2026-11-07 (ADR 0010) - the legacy v1.0 Lean descent-certificate path is retired; the proven witness infrastructure it carried (DescentWitness, DescentWitness.Valid and its ends_at/strict_descent/start_pos_odd/trajectory_odd lemmas) is relocated to Lean/CollatzResearch/DescentWitness.lean rather than deleted, so no proven descent lemma is lost"
@@ -450,12 +522,15 @@ the record of what each call was made against.
   without a kernel-checked soundness theorem.
 - Adding a Lean `Decidable` instance for `ReachesOne`; it is unbounded.
 - Claiming the unconditional form of any companion theorem.
+- Claiming that closing the WP-CF critical path completes the Q5 arc, or
+  discharges reachability for any claim whose terminal value is not 1.
 
 ## 11. How each claim above was checked
 
-Structural claims were read from `main` at `3f28799`; no claim rests on prose
-alone. The reducibility claims in section 4 were measured by compiling one
-standalone file per proposition with `lake env lean` against the pinned
+Structural claims were read from `main` at `3f28799` and re-read against `main` at
+`52e5654` on 2026-11-08; no claim rests on prose alone. The reducibility claims in
+section 4 were measured by compiling one standalone file per proposition with
+`lake env lean` against the pinned toolchain and recording the compiler exit code.
 toolchain and recording the compiler exit code. Those probe files were written
 outside the repository checkout, so the working tree is unmodified; the
 repository's own rule that Lean CI is the sole validation gate is unaffected, and
@@ -464,16 +539,16 @@ validation of a change.
 
 | Claim | How verified |
 | --- | --- |
-| two unclaimed rows | `git show origin/main:docs/theorem-status.md` lines 66-67 |
-| routing proven, reachability assumed | `git show` of each theorem statement; `git grep` for `hLeaf`, `hCert`, `hClaimReachesOne` |
-| only two unconditional reachability facts | enumeration of every `*-reaches_one` / `ReachesOne*` declaration in `Lean/` with its premises |
-| claim shapes and their obligations | `CoverageTree.lean:347`, `:357`, `:434`, `:449` |
-| `FiniteOrbitClaim` excludes `.interval` | `CoverageTree.lean:428-441` docstring and constructor set |
-| no `routed_implies_claim` proof | `CoverageTree.lean:339` |
-| verifier soundness theorem absent | `git grep -E 'checkTrajectory|verifier_sound|checkReachability'` over `Lean/` (no hits) |
+| two unclaimed rows | `git show origin/main:docs/theorem-status.md` lines 74-75 |
+| routing proven, reachability assumed outside the tier | `git show` of each theorem statement; `git grep` for `hLeaf`, `hCert`, `hClaimReachesOne` |
+| the tier discharge holds for any registry of terminal-value-one claims | enumeration of every `*-reaches_one` / `ReachesOne*` declaration in `Lean/` with its premises, read at `52e5654` |
+| claim shapes and their obligations | `CoverageTree.lean:368`, `:378`, `:471`, `:490` |
+| `FiniteOrbitClaim` excludes `.interval` | `CoverageTree.lean:449-452` docstring and `:471-475` constructor set |
+| no `routed_implies_claim` proof | `CoverageTree.lean:353` |
+| verifier soundness theorem absent outside the tier | `git grep -E 'checkTrajectory|verifier_sound|checkReachability'` over `Lean/` (no hits); the tier theorems are listed in Layer 2' |
 | reducibility results in section 4 | one standalone file per proposition, compiled with `lake env lean`, exit code recorded |
 | admitted-declaration inventory | `docs/lean-sorry-budget.json` (schema 3) plus `git show` of each `sorry` site |
 | budget gate is bidirectional | `scripts/check_sorry_budget.py` comparison loop |
-| `ValidTree ∧ IsComplete` does not imply `OrbitAlignedTree` | `CoverageTree.lean:83`, `:253`, `:259`, `:295`, `:667`, `:679` |
+| `ValidTree ∧ IsComplete` does not imply `OrbitAlignedTree` | `CoverageTree.lean:83`, `:266`, `:272`, `:308`, `:709`, `:721` |
 | `Digest.lean` absent | `git ls-tree` over `Lean/` |
-| `coverage_tree_soundness_orbit` has no dependent theorem | `git grep` over `Lean/` |
+| `coverage_tree_soundness_orbit` has no dependent theorem | `git grep` over `Lean/`; the theorem itself was deleted by ADR 0011 |
