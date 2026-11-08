@@ -7,14 +7,15 @@ boundary.
 describes. `3f28799` is the state described, **not** the commit that introduced
 this document: the document was introduced by PR #105, whose squash commit is
 `515a8d52` and whose parent is `3f28799`.
-**Reconciled against `main` at `52e5654` (2026-11-08).** The structural claims
-in sections 2, 3, 5, 7 and 11 were re-read against that state. The reducibility
-measurements in section 4 were taken at `3f28799`, and the definitions they
-measure are unchanged at `52e5654`, so they still hold. What changed is the
-*reachability* picture: WP-CF-1 (PR #110) and WP-CF-3 (PR #112) landed the ADR
-0009 terminal-value-one tier, which discharges the reachability premise by
-evidence tier instead of assuming it. Section 2' records that; section 3 records
-what is still missing.
+**Reconciled against `main` at `52e5654` (2026-11-08).** Every section was
+re-read against that state. The sections whose claims changed are 1, 2, 3, 5, 7,
+8, 10 and 11; sections 4, 6 and 9 were re-read and stand unchanged. The
+reducibility measurements in section 4 were taken at `3f28799`, and the
+definitions they measure are unchanged at `52e5654`, so they still hold. What
+changed is the *reachability* picture: WP-CF-1 (PR #110) and WP-CF-3 (PR #112)
+landed the ADR 0009 terminal-value-one tier, which discharges the reachability
+premise by evidence tier instead of assuming it. Layer 2' records that; section 3
+records what is still missing.
 
 It states precisely where the formalization stops, separates what is
 mechanically closable from what is open mathematics, and proposes the bounded
@@ -138,7 +139,7 @@ cannot.**
 
 The first, second and fifth stages exist, and a **verifier soundness theorem
 now exists at the ADR 0009 terminal-value-one tier** - the tier theorems listed
-in section 2'. What does **not** exist is a verifier soundness theorem for a
+in Layer 2'. What does **not** exist is a verifier soundness theorem for a
 claim whose terminal value is not 1. Verified: `git grep -E
 'checkTrajectory|verifier_sound|checkReachability'` over `Lean/` returns nothing,
 and the `FiniteOrbitClaim` docstring (`CoverageTree.lean:455-468`) records that
@@ -544,7 +545,7 @@ validation of a change.
 | claim shapes and their obligations | `CoverageTree.lean:368`, `:378`, `:471`, `:490` |
 | `FiniteOrbitClaim` excludes `.interval` | `CoverageTree.lean:449-452` docstring and `:471-475` constructor set |
 | no `routed_implies_claim` proof | `CoverageTree.lean:353` |
-| verifier soundness theorem absent outside the tier | `git grep -E 'checkTrajectory|verifier_sound|checkReachability'` over `Lean/` (no hits); the tier theorems are listed in section 2' |
+| verifier soundness theorem absent outside the tier | `git grep -E 'checkTrajectory|verifier_sound|checkReachability'` over `Lean/` (no hits); the tier theorems are listed in Layer 2' |
 | reducibility results in section 4 | one standalone file per proposition, compiled with `lake env lean`, exit code recorded |
 | admitted-declaration inventory | `docs/lean-sorry-budget.json` (schema 3) plus `git show` of each `sorry` site |
 | budget gate is bidirectional | `scripts/check_sorry_budget.py` comparison loop |
