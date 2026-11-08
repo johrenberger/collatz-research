@@ -214,7 +214,7 @@ declaration count as one). Current state:
 
 | File | Baseline | Admitted declaration |
 | --- | --- | --- |
-| `Lean/CollatzResearch/CoverageTree.lean` | 1 | `coverage_tree_soundness_orbit` (`:882`, `sorry` at `:888`) |
+| _(none)_ | 0 | The release-relevant Lean modules currently carry **no** admitted declarations. |
 
 The **legacy v1.0 descent-certificate path**
 (`Certificate.lean` / `Importer.lean`) is retired (decision 3, taken 2026-11-07):
@@ -226,6 +226,11 @@ the retired files carried is not discarded but relocated to
 `Lean/CollatzResearch/DescentWitness.lean` (`DescentWitness`,
 `DescentWitness.Valid`, and its `ends_at` / `strict_descent` / `start_pos_odd` /
 `trajectory_odd` lemmas).
+
+The last remaining admission, `coverage_tree_soundness_orbit`, is also gone
+(decision 2, taken 2026-11-07): its conclusion `SatOrbit` had no consumer,
+and its documented route to establishing it was refuted rather than merely
+open (section 7.1).
 
 ### 7.1 The documented promotion path for `coverage_tree_soundness_orbit` is refutable
 
@@ -257,7 +262,8 @@ Note also that `coverage_tree_soundness_orbit` concludes `SatOrbit t x l`
 (residue-interval membership, `:316`) whereas the checked
 `coverage_tree_soundness_orbit_cert` concludes `OrbitLeafReachesOne t l`; they
 are **not** interchangeable, and `coverage_tree_soundness_orbit` is referenced by
-no other theorem in `main`.
+no other theorem in `main`. The theorem has since been removed (decision 2;
+see [ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md)).
 
 ### 7.2 The budget gate is bidirectional
 
@@ -367,14 +373,14 @@ plan:
 
   known_design_decisions:
     - "WP-CF-2: DECIDED 2026-11-04 (ADR 0009) - the evidence tier for reachability witnesses at k >= 1 is kernel-checkable, restricted to claims whose terminal value is 1; no reachability theorem evaluates an orbit equation, and native_decide stays admissible for data-side obligations only"
-    - "WP-CF-4: coverage_tree_soundness_orbit's documented promotion path is refutable on current definitions; choose deletion, predicate redefinition, or an added hypothesis"
+    - "WP-CF-4: DECIDED 2026-11-07 (ADR 0011) - coverage_tree_soundness_orbit is deleted: its conclusion SatOrbit has no consumer and its documented promotion path is refuted on current definitions; the checked companion coverage_tree_soundness_orbit_cert (OrbitLeafReachesOne) is unaffected"
     - "WP-CF-5: DECIDED 2026-11-07 (ADR 0010) - the legacy v1.0 Lean descent-certificate path is retired; the proven witness infrastructure it carried (DescentWitness, DescentWitness.Valid and its ends_at/strict_descent/start_pos_odd/trajectory_odd lemmas) is relocated to Lean/CollatzResearch/DescentWitness.lean rather than deleted, so no proven descent lemma is lost"
     - "Whether the .interval claim shape is funded at all, given its infinite obligation"
 ```
 
 ## 9. Open decisions for the maintainer
 
-**Decisions 1 and 3 are now made; two remain open.** Merging this specification
+**Decisions 1, 2 and 3 are now made; one remains open.** Merging this specification
 approved the document; it did not resolve any of the questions below. A work
 packet that depends on an open decision must not begin until that decision is
 made. Decision 1 (the evidence tier for reachability witnesses) was taken on
@@ -386,7 +392,8 @@ WP-CF-3. Decision 3 (the legacy v1.0 path) was taken on 2026-11-07 and is record
 [ADR 0010](adr/0010-legacy-v1-descent-certificate-path.md): the Lean v1.0
 bridge is retired, and the **proven** witness infrastructure it carried is
 relocated to `Lean/CollatzResearch/DescentWitness.lean` rather than deleted.
-Decisions 2 and 4 below remain open and still gate WP-CF-4.
+Decision 4 below remains open. It has no work packet: the frontier places
+the `.interval` shape on the open side of the seam (section 6).
 
 These are architectural or mathematical choices, so per the repository's own
 review-gate rules they are maintainer decisions rather than autonomous scope:
@@ -399,7 +406,8 @@ review-gate rules they are maintainer decisions rather than autonomous scope:
    admissible for data-side obligations only, unchanged.
 2. **`coverage_tree_soundness_orbit`** (WP-CF-4) - the documented route to
    closing its `sorry` does not hold (section 7.1). Delete, redefine, or add a
-   hypothesis?
+   hypothesis? **DECIDED 2026-11-07 - delete.** See
+   [ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md).
 3. **The legacy v1.0 path** (WP-CF-5) - retire `Importer.lean` /
    `Certificate.lean` as superseded, or complete them (which requires a Lean
    SHA-256 module that does not exist)? **DECIDED 2026-11-07 - retire, with the

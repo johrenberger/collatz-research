@@ -19,7 +19,9 @@ established.
 option (a) with one refinement over the recommendation below: the proven
 witness infrastructure is **relocated** to
 `Lean/CollatzResearch/DescentWitness.lean` rather than deleted, so no proven
-descent lemma is lost. Decisions 2 and 4 remain open.
+descent lemma is lost. Decision 2 has since been taken as well - see
+[ADR 0011](adr/0011-remove-coverage-tree-soundness-orbit.md): option (a), delete the
+theorem. Decision 4 remains open.
 
 ---
 
@@ -72,12 +74,21 @@ it also lowers the admission baseline in the same change, which the
 bidirectional budget gate requires (§ 7.2). Options (b) and (c) both spend
 effort on a statement the repository does not use.
 
+**As decided (2026-11-07, ADR 0011): option (a).** The theorem is deleted and
+the `CoverageTree.lean` admission baseline drops to 0, so the release-relevant
+Lean modules now carry no admitted declarations at all.
+
 ### What any of these options would need
 
 Whichever is chosen, the change must touch `CoverageTree.lean`,
 `docs/lean-sorry-budget.json` (lower the baseline in the same change) and
 `docs/theorem-status.md` (drop the row if deleted), and must keep Lean CI
 green on the PR head.
+
+As implemented, it also touches `docs/convergence-frontier.md` (the section 7
+ledger, the section 7.1 note, and the section 9 decision record) and
+`docs/nt5-open-decision-briefs.md`, because the repository must not record a
+decision in documents that still describe the old state.
 
 ---
 
@@ -91,7 +102,7 @@ SHA-256 module that does not exist in `main` today.
 
 ### The evidence
 
-The legacy path is three admitted declarations across two files:
+Before this decision, the legacy path was three admitted declarations across two files:
 
 | File | Admitted declaration | Notes |
 |---|---|---|
@@ -99,11 +110,14 @@ The legacy path is three admitted declarations across two files:
 | `Importer.lean` | `parseJsonl` | The JSONL splitter body is a `sorry`. |
 | `Certificate.lean` | `check_certificate_sound` | Three `sorry` holes for the parser-derived constraints `0 < r.start`, `Odd r.start`, `r.target < r.start`. |
 
-They are **not** dead code in the sense of being unreferenced: the root
-module `Lean/CollatzResearch.lean` imports both, and
-`tests/test_checker_lean.py` imports `CollatzResearch.Certificate` to
-evaluate `CollatzResearch.trajectory` against the Python checker. That
-import is what the differential test needs today.
+They were **not** dead code in the sense of being unreferenced: at the
+pre-decision head, the root module `Lean/CollatzResearch.lean` imported
+both, and `tests/test_checker_lean.py` imported
+`CollatzResearch.Certificate` to evaluate `CollatzResearch.trajectory`
+against the Python checker. That import is what the differential test
+needed then. As implemented, the root no longer imports either module, and
+the fixture imports `CollatzResearch.Basic`, which is where `trajectory` is
+defined; see the "As implemented" section below.
 
 The blocking dependency is real: `check_certificate_sound`'s anti-circularity
 argument rests on a SHA-256 digest of the proof-bearing fields, and only the
@@ -244,15 +258,15 @@ the Lean and Python claim types and their tests.
 
 | Claim | How verified |
 | --- | --- |
-| The three decisions are open; decision 1 is taken | `docs/convergence-frontier.md` § 9, read on this branch |
+| Decisions 1, 2 and 3 are taken; decision 4 is open | `docs/convergence-frontier.md` § 9, read on this branch |
 | ADR 0009 is the decision record for decision 1 | `docs/adr/0009-reachability-evidence-tier.md`, merged in PR #107 |
 | `coverage_tree_soundness_orbit` has no dependent theorem | `grep` over `Lean/`, `python/`, `tests/`, `scripts/`, `docs/` for the bare name, excluding the `_cert` variant |
 | Its conclusion is `SatOrbit`, not `OrbitLeafReachesOne` | The theorem statement in `CoverageTree.lean` |
 | `ValidTree ∧ IsComplete` does not imply `OrbitAlignedTree` | A standalone probe compiled with `lake env lean` against the pinned toolchain, outside the repository working tree; the `ValidTree`/`IsComplete`/`verified` facts are proved constructively |
 | `WellFormed` fails when `leanInterval` cannot parse the property | Same probe; the string-parsing step uses `native_decide` because `String.split` is opaque to kernel reduction |
-| The legacy path's three admitted declarations | `docs/lean-sorry-budget.json`, plus the `sorry` sites in `Importer.lean` and `Certificate.lean` |
-| The legacy path has no Lean SHA-256 module | `ls Lean/CollatzResearch/Digest.lean` (absent); the Python digest is in `canonical.py` |
-| `tests/test_checker_lean.py` depends on `CollatzResearch.Certificate` | The generated Lean fixture's `import CollatzResearch.Certificate` |
+| The legacy path's three admitted declarations (pre-decision) | `docs/lean-sorry-budget.json` at the pre-decision head, plus the `sorry` sites in the then-present `Importer.lean` and `Certificate.lean`; both modules are retired as implemented |
+| The legacy path has no Lean SHA-256 module | `ls Lean/CollatzResearch/Digest.lean` (absent at the pre-decision head and still absent now); the Python digest is in `canonical.py` |
+| `tests/test_checker_lean.py` depended on `CollatzResearch.Certificate` before this decision | The generated Lean fixture's import line, before and after: it was `import CollatzResearch.Certificate` and is now `import CollatzResearch.Basic`, which defines `trajectory` |
 | `FiniteOrbitClaim` excludes `.interval`; `LeafClaim` retains it | The inductive definitions and their constructor sets in `CoverageTree.lean` |
 | The `.interval` obligation is infinite **for well-formed intervals** | `LeafClaim.Holds` and `LeafCertificate.claim_reaches_one` in `CoverageTree.lean`; malformed intervals are excluded by the certificate's `well_formed` field, which requires `LeafClaim.WellFormed` (`period > 0 ∧ lo ≤ hi ∧ hi < period`) |
 

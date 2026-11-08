@@ -345,8 +345,9 @@ def SatOrbit (_t : CoverageTree) (x : Nat) (l : CoverageLeaf) : Prop :=
     constructors (`.empty`, `.singleton`, `.bounded`) are kept
     in the type for forward compatibility with the
     bounded-orbit workstream (depends on `descend_orbit_complete`
-    from PR #29 + `coverage_tree_soundness_orbit` from PR #36
-    spec). See `docs/story-q3-leaf-certificate.md`
+    from PR #29 and the orbit-aware certificate
+    `coverage_tree_soundness_orbit_cert` from PR #58). See
+    `docs/story-q3-leaf-certificate.md`
     § "Why finite claims are out of Q3 scope".
 
     No `routed_implies_claim` proof exists for any claim shape
@@ -862,31 +863,6 @@ theorem coverage_tree_soundness_cert (t : CoverageTree)
   exact (hCert l hl hver).claim_reaches_one x'
          ((hCert l hl hver).routed_implies_claim x' hdesc')
 
-/-- Orbit-aware soundness for `CoverageTree` (Story 07c / round-5, 07c-3).
-
-Strengthens `coverage_tree_soundness` with the orbit-aware `SatOrbit`
-predicate. The orbit depth at the leaf is bounded by `t.maxDepth`
-(each internal step advances `k` by 1, and the tree has at most
-`t.maxDepth` internal levels).
-
-**Proof status: preparatory.** The proof is admitted via `sorry`
-pending:
-1. A formal proof of `OrbitAlignedTree t` from the existing
-   `ValidTree t ∧ IsComplete t` hypotheses — currently `OrbitAlignedTree`
-   is taken as an explicit hypothesis, and the implication
-   `ValidTree ∧ IsComplete → OrbitAligned` is open.
-2. Mathlib `Nat.factorization` + `omega` extensions for the residue
-   bounds arithmetic in the `SatOrbit` witness construction.
-
-Promotion to `formally established` requires closing both. -/
-theorem coverage_tree_soundness_orbit (t : CoverageTree)
-    (hv : ValidTree t) (hic : IsComplete t) (ha : OrbitAlignedTree t)
-    (x : Nat) (hx : x > 0) :
-    ∃ l, l ∈ t.leaves ∧ verified t l ∧
-         descendOrbit t x 0 = some l ∧
-         SatOrbit t x l := by
-  sorry
-
 /-- Orbit-aware routing completeness (Story 07c-4).
 
     Strengthens `coverage_tree_soundness` with orbit-aware routing. For
@@ -901,8 +877,8 @@ theorem coverage_tree_soundness_orbit (t : CoverageTree)
     witness threaded through the induction hypothesis.
 
     **Claim level: formally established.** No `sorry`, no `admit`, no
-    axiom. Companion to `coverage_tree_soundness`; does NOT modify
-    `coverage_tree_soundness_orbit` or its `sorry` (separate workstream). -/
+    axiom. Companion to `coverage_tree_soundness`; it is independent of the
+    retired `coverage_tree_soundness_orbit` (see ADR 0011). -/
 theorem descend_orbit_complete (t : CoverageTree) (hv : ValidTree t) (hc : IsComplete t)
     (x : Nat) (hx : 0 < x) :
     ∃ l, l ∈ t.leaves ∧ verified t l ∧
