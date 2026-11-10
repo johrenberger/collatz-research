@@ -311,6 +311,34 @@ def record_review(args: argparse.Namespace) -> dict[str, Any]:
         return {"decision": "review_recorded", "review_key": args.review_key, "review": review}
 
 
+def _prior_review(ledger: dict[str, Any], review: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the most recent recorded review of the same PR, if any.
+
+    The repo protocol resumes one reviewer session across remediation rounds
+    instead of starting a fresh reviewer, so a claimed handoff carries the
+    prior round's receipt and continuation handle to the dispatcher.
+    """
+    candidates = [
+        (item_key, item)
+        for item_key, item in ledger.get("review_requests", {}).items()
+        if item.get("repository") == review.get("repository")
+        and item.get("pr_number") == review.get("pr_number")
+        and item.get("status") == "reviewed"
+        and item.get("receipt")
+        and item.get("head_sha") != review.get("head_sha")
+    ]
+    if not candidates:
+        return None
+    prior_key, prior = max(candidates, key=lambda item: item[1].get("created_at", ""))
+    return {
+        "review_key": prior_key,
+        "head_sha": prior.get("head_sha"),
+        "round": prior.get("round"),
+        "recorded_at": prior.get("recorded_at"),
+        "receipt": prior.get("receipt"),
+    }
+
+
 def claim_review(args: argparse.Namespace) -> dict[str, Any]:
     """Atomically lease the next pending review handoff to one dispatcher."""
     _, state = _paths(args)
@@ -324,11 +352,22 @@ def claim_review(args: argparse.Namespace) -> dict[str, Any]:
             candidates = [item for item in candidates if item[0] == args.review_key]
         if not candidates:
             return {"decision": "none_pending"}
-        key, review = min(candidates, key=lambda item: item[1]["created_at"])
+        # The dispatcher is invoked immediately after a handoff is created, so
+        # the newest pending handoff is the one it means to review. Leasing the
+        # oldest instead lets a stale handoff from an earlier PR capture the
+        # dispatch, which is how PR #119's review was spent on PR #107.
+        key, review = max(candidates, key=lambda item: item[1]["created_at"])
         review["status"] = "dispatched"
         review["dispatched_at"] = _utc_now()
         review["dispatcher"] = args.dispatcher
-        return {"decision": "claimed", "review_key": key, "review": review}
+        # The prior round travels in the response, not in the stored entry:
+        # persisting it would copy a receipt into the ledger on every claim.
+        return {
+            "decision": "claimed",
+            "review_key": key,
+            "review": review,
+            "prior_review": _prior_review(ledger, review),
+        }
 
 
 def _parser() -> argparse.ArgumentParser:

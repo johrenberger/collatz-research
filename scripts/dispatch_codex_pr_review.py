@@ -24,26 +24,78 @@ def _run_json(command: list[str]) -> dict[str, Any]:
     return json.loads(result.stdout)
 
 
-def _prompt(review_key: str, review: dict[str, Any]) -> str:
+def _prior_findings(prior: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not prior:
+        return []
+    receipt = prior.get("receipt") or {}
+    findings = receipt.get("findings") or []
+    return findings if isinstance(findings, list) else []
+
+
+def _prior_session_key(prior: dict[str, Any] | None) -> str | None:
+    """Return the resumable reviewer session key recorded by the prior round."""
+    if not prior:
+        return None
+    receipt = prior.get("receipt") or {}
+    handle = receipt.get("continuation_handle") or {}
+    key = handle.get("session_key")
+    return key if isinstance(key, str) and key else None
+
+
+def _prompt(
+    review_key: str,
+    review: dict[str, Any],
+    prior: dict[str, Any] | None = None,
+    repo_path: str | None = None,
+) -> str:
+    findings = _prior_findings(prior)
+    if prior:
+        carried = "\n".join(
+            f"- [{item.get('severity', 'finding')}] {item.get('summary', '')}" for item in findings
+        )
+        delta = f"""
+This is a RESUMED review round. You are the same reviewer session that
+reviewed the previous head, so your transcript, prior findings, and
+confirmed-sound checklist carry forward. Do not re-review the whole
+repository and do not re-raise findings you already reported.
+
+Previous head reviewed: {prior.get("head_sha")}
+Previous round: {prior.get("round")}
+Prior findings:
+{carried or "- none reported"}
+
+Review ONLY what changed between {prior.get("head_sha")} and
+{review["head_sha"]}, plus any file that finding above depends on.
+Verify that every prior finding is actually resolved in the new tree, and
+report a prior finding again ONLY if it is still open at the new head.
+"""
+    else:
+        delta = """
+This is the first review round for this head. Review the whole change at
+the recorded head SHA, plus the surrounding code the change depends on.
+"""
     return f"""You are an independent, review-only PR reviewer.
 
-Review repository {review['repository']} PR #{review['pr_number']} at exact
-head SHA {review['head_sha']} for review round {review['round']}.
+Review repository {review["repository"]} PR #{review["pr_number"]} at exact
+head SHA {review["head_sha"]} for review round {review["round"]}.
 
 You may read the PR, diff, CI evidence, and existing review threads. You may
 post a GitHub review, but you must not edit source, push, resolve threads, or
 merge. Do not review a different SHA.
-
+Repository checkout on disk: {repo_path or "(not supplied; read the PR and diff from GitHub)"}
+{delta}
 Return ONLY one JSON object with this exact schema:
 {{
-  "repository": "{review['repository']}",
-  "pr_number": {review['pr_number']},
-  "head_sha": "{review['head_sha']}",
-  "round": {review['round']},
+  "repository": "{review["repository"]}",
+  "pr_number": {review["pr_number"]},
+  "head_sha": "{review["head_sha"]}",
+  "round": {review["round"]},
   "model": "openai/gpt-5.6-terra",
   "verdict": "approved|changes_requested|escalated",
   "review_url": "https://... or null",
-  "findings": [{{"severity":"P0|P1|P2|architecture", "summary":"...", "url":"https://... or null"}}]
+  "continuation_handle": {{"session_key": "...", "session_id": "..."}},
+  "findings": [{{"severity": "P0|P1|P2|architecture", "summary": "...",
+                "url": "https://... or null"}}]
 }}
 
 The GitHub review body, if posted, must begin exactly:
@@ -53,6 +105,34 @@ Durable review key: {review_key}
 """
 
 
+def _extract_text(envelope: Any) -> str | None:
+    """Pull the reviewer's JSON receipt out of an agent response envelope."""
+    if isinstance(envelope, str):
+        return envelope
+    if not isinstance(envelope, dict):
+        return None
+    for key in ("text", "result", "output", "reply", "message", "content"):
+        value = envelope.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+        if isinstance(value, dict):
+            nested = _extract_text(value)
+            if nested:
+                return nested
+    return None
+
+
+def _reviewer_session_key(pr_number: int, label: str = "") -> str:
+    """Stable per-PR reviewer session, so round 2 resumes round 1.
+
+    One session key per PR means a remediation round continues the reviewer
+    that already read the change, instead of starting a fresh reviewer that
+    re-reads the repository and the diff from scratch.
+    """
+    suffix = f"-{label}" if label else ""
+    return f"agent:main:collatz-review-pr{int(pr_number)}{suffix}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-path", required=True)
@@ -60,6 +140,11 @@ def main() -> int:
     parser.add_argument("--python-command", default="python3")
     parser.add_argument("--dispatcher", default="terra-reviewer")
     parser.add_argument("--review-key")
+    parser.add_argument(
+        "--session-label",
+        default="",
+        help="Session-key suffix for a second, independent reviewer of the same head.",
+    )
     args = parser.parse_args()
 
     lifecycle = Path(args.repo_path) / "scripts" / "agent_lifecycle.py"
@@ -83,8 +168,32 @@ def main() -> int:
 
     review_key = str(claimed["review_key"])
     review = claimed["review"]
-    agent = subprocess.run(
-        [
+    prior = claimed.get("prior_review")
+    prompt = _prompt(review_key, review, prior, args.repo_path)
+
+    # The handle recorded by the prior round names the session that already
+    # read this change; otherwise the per-PR session is used so a remediation
+    # round continues the same reviewer.
+    resume_key = _prior_session_key(prior)
+    session_key = resume_key or _reviewer_session_key(review["pr_number"], args.session_label)
+
+    def _named_session_command() -> list[str]:
+        return [
+            "openclaw",
+            "agent",
+            "--session-key",
+            session_key,
+            "--model",
+            "openai/gpt-5.6-terra",
+            "--timeout",
+            "600",
+            "--json",
+            "--message",
+            prompt,
+        ]
+
+    def _fresh_exec_command() -> list[str]:
+        return [
             "openclaw",
             "agent",
             "exec",
@@ -95,19 +204,57 @@ def main() -> int:
             "openai/gpt-5.6-terra",
             "--timeout",
             "600",
-            _prompt(review_key, review),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if agent.returncode:
-        raise RuntimeError(agent.stderr.strip() or "Terra reviewer failed")
-    envelope = json.loads(agent.stdout)
-    raw = envelope.get("text") or envelope.get("result") or envelope.get("output")
-    if not isinstance(raw, str):
-        raise RuntimeError("Terra reviewer returned no text receipt")
-    receipt = json.loads(raw)
+            prompt,
+        ]
+
+    def _run(command: list[str]) -> tuple[int, str, str]:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=args.repo_path,
+        )
+        return result.returncode, result.stdout, result.stderr
+
+    def _receipt_from(stdout: str) -> dict[str, Any] | None:
+        try:
+            envelope = json.loads(stdout)
+        except json.JSONDecodeError:
+            return None
+        raw = _extract_text(envelope)
+        if not isinstance(raw, str):
+            return None
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+
+    # The named session carries the prior round's context forward. It is
+    # preferred, but a session that is unreachable, or that answers in a shape
+    # without a receipt, must not cost the review: fall back to an isolated
+    # reviewer and record no handle, so a later round does not retry it.
+    code, stdout, stderr = _run(_named_session_command())
+    resumable = True
+    receipt = _receipt_from(stdout) if code == 0 else None
+    if receipt is None:
+        code, stdout, stderr = _run(_fresh_exec_command())
+        resumable = False
+        receipt = _receipt_from(stdout) if code == 0 else None
+    if receipt is None:
+        raise RuntimeError(stderr.strip() or "Terra reviewer failed")
+    handle = receipt.get("continuation_handle")
+    handle = handle if isinstance(handle, dict) else {}
+    receipt["continuation_handle"] = {
+        # The key the dispatcher will address next round is the one it used,
+        # so it is always resumable. The handle the reviewer reported is kept
+        # beside it rather than replacing it.
+        "session_key": session_key if resumable else None,
+        "reported_session_key": handle.get("session_key"),
+        "session_id": handle.get("session_id"),
+        "resumed": bool(resume_key),
+    }
     _run_json(
         base + ["record-review", "--review-key", review_key, "--receipt-json", json.dumps(receipt)]
     )

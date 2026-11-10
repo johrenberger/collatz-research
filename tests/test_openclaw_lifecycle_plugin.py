@@ -40,7 +40,7 @@ def test_successful_pr_create_or_update_emits_a_durable_review_handoff() -> None
     assert "isPullRequestMutation" in source
     assert "reviewRequestFrom" in source
     assert "reviewRequests.set" in source
-    assert "dispatchReview(config)" in source
+    assert "dispatchReview(config, handoff.review_key)" in source
     assert "reviewDispatcherCommand" in (PLUGIN / "openclaw.plugin.json").read_text(
         encoding="utf-8"
     )
