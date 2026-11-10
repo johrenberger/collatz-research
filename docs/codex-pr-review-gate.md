@@ -104,6 +104,13 @@ before dispatching. Leasing the oldest pending handoff instead let a stale
 handoff from an earlier pull request capture a later dispatch, which spent one
 pull request's review on another pull request's head.
 
+A dispatch that fails returns its handoff to the pending pool. A lease covers
+only an awaiting_review entry, so a handoff left leased by a failed dispatch
+could never be leased again, which would make the mandated gate permanently
+unsatisfiable for that pull request. The failure reason is recorded with the
+handoff, so a later attempt is made against a pending handoff rather than
+against no handoff at all.
+
 While it waits, the implementation session waits by event, not by polling.
 The rule that holds regardless of how the model is routed is: probe once, and
 if there is no decision-relevant result, register the completion event and
