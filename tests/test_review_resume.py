@@ -1,4 +1,4 @@
-"""Tests for reviewer-session resume and scoped review dispatch."""
+"""Tests for reviewer-session resume, scoped dispatch, and failed-dispatch requeue."""
 
 from __future__ import annotations
 
@@ -237,6 +237,54 @@ def test_the_dispatcher_falls_back_when_the_named_session_answers_without_a_rece
     assert result.returncode == 0, result.stderr
 
     assert _stored_handle(state, key)["session_key"] is None
+
+
+def test_a_failed_dispatch_returns_its_handoff_to_the_pending_pool(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    script = bin_dir / "openclaw"
+    script.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "sys.stderr.write('provider refused the dispatch')\n"
+        "raise SystemExit(4)\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+
+    key = _request(state, 7, "head-one", {"round": 1})
+    result = _dispatch(state, bin_dir, key)
+    assert result.returncode != 0
+
+    ledger = json.loads((state / "turn-ledger.json").read_text(encoding="utf-8"))
+    entry = ledger["review_requests"][key]
+    # A lease covers only an awaiting_review entry, so a handoff left at
+    # dispatched could never be leased again and the gate became
+    # permanently unsatisfiable for this pull request.
+    assert entry["status"] == "awaiting_review"
+    assert "dispatch failed" in entry["requeue_note"]
+
+
+def test_requeue_review_leaves_a_recorded_review_untouched(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    key = _request(state, 7, "head-one", {"round": 1})
+    _run(state, "claim-review", "--dispatcher", "terra-reviewer", "--review-key", key)
+    _record(state, key, _first_round_receipt(7, "head-one", "agent:main:reviewer-7"))
+
+    result = _run(
+        state,
+        "requeue-review",
+        "--review-key",
+        key,
+        "--reason",
+        "dispatch failed: provider refused",
+    )
+
+    assert result["decision"] == "already_recorded"
+
+    ledger = json.loads((state / "turn-ledger.json").read_text(encoding="utf-8"))
+    assert ledger["review_requests"][key]["status"] == "reviewed"
 
 
 def test_the_plugin_dispatches_the_handoff_it_just_created() -> None:

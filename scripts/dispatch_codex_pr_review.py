@@ -133,6 +133,35 @@ def _reviewer_session_key(pr_number: int, label: str = "") -> str:
     return f"agent:main:collatz-review-pr{int(pr_number)}{suffix}"
 
 
+_claim_state: dict[str, Any] = {}
+
+
+def _requeue_failed_dispatch(exc: BaseException) -> None:
+    """Return a failed dispatch's handoff to the pending pool.
+
+    A lease covers only an 'awaiting_review' entry, so a handoff left at
+    'dispatched' by a failed dispatch can never be leased again, and the
+    mandated gate for that pull request becomes permanently unsatisfiable.
+    """
+    review_key = _claim_state.get("review_key")
+    base = _claim_state.get("base")
+    if not review_key or not base:
+        return
+    try:
+        _run_json(
+            base
+            + [
+                "requeue-review",
+                "--review-key",
+                str(review_key),
+                "--reason",
+                f"dispatch failed: {exc}",
+            ]
+        )
+    except (OSError, RuntimeError, json.JSONDecodeError, KeyError, TypeError):
+        pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-path", required=True)
@@ -168,6 +197,8 @@ def main() -> int:
 
     review_key = str(claimed["review_key"])
     review = claimed["review"]
+    _claim_state["review_key"] = review_key
+    _claim_state["base"] = base
     prior = claimed.get("prior_review")
     prompt = _prompt(review_key, review, prior, args.repo_path)
 
@@ -265,5 +296,6 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except (OSError, RuntimeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        _requeue_failed_dispatch(exc)
         print(f"codex PR review dispatch failed: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc

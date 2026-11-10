@@ -339,6 +339,39 @@ def _prior_review(ledger: dict[str, Any], review: dict[str, Any]) -> dict[str, A
     }
 
 
+def requeue_review(args: argparse.Namespace) -> dict[str, Any]:
+    """Return a failed dispatch's handoff to the pending pool.
+
+    A lease covers only an 'awaiting_review' entry, so a handoff left at
+    'dispatched' by a failed dispatch can never be leased again, and the
+    mandated gate for that pull request becomes permanently unsatisfiable.
+    """
+    _, state = _paths(args)
+    with _locked_ledger(state) as (_, ledger):
+        try:
+            review = ledger["review_requests"][args.review_key]
+        except KeyError as exc:
+            raise ValueError("unknown review request") from exc
+        if review["status"] == "reviewed":
+            return {
+                "decision": "already_recorded",
+                "review_key": args.review_key,
+                "review": review,
+            }
+        if review["status"] != "dispatched":
+            return {
+                "decision": "not_dispatched",
+                "review_key": args.review_key,
+                "review": review,
+            }
+        review["status"] = "awaiting_review"
+        review.pop("dispatched_at", None)
+        review.pop("dispatcher", None)
+        review["requeued_at"] = _utc_now()
+        review["requeue_note"] = (review.get("requeue_note", "") + f" {args.reason}").strip()
+        return {"decision": "requeued", "review_key": args.review_key, "review": review}
+
+
 def claim_review(args: argparse.Namespace) -> dict[str, Any]:
     """Atomically lease the next pending review handoff to one dispatcher."""
     _, state = _paths(args)
@@ -422,6 +455,10 @@ def _parser() -> argparse.ArgumentParser:
     record_review_parser.add_argument("--review-key", required=True)
     record_review_parser.add_argument("--receipt-json", required=True)
     record_review_parser.set_defaults(handler=record_review)
+    requeue_review_parser = commands.add_parser("requeue-review")
+    requeue_review_parser.add_argument("--review-key", required=True)
+    requeue_review_parser.add_argument("--reason", required=True)
+    requeue_review_parser.set_defaults(handler=requeue_review)
     claim_review_parser = commands.add_parser("claim-review")
     claim_review_parser.add_argument("--dispatcher", required=True)
     claim_review_parser.add_argument("--review-key")
