@@ -150,6 +150,21 @@ def _reviewer_session_key(pr_number: int, label: str = "") -> str:
 _claim_state: dict[str, Any] = {}
 
 
+def _failure_reason(stderr: str) -> str:
+    """Pick the line that names the failure, ignoring runtime noise.
+
+    stderr often opens with a deprecation warning, so the first line is
+    rarely the cause. The last non-empty line that is not a warning is.
+    """
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    meaningful = [
+        line for line in lines if "DeprecationWarning" not in line and not line.startswith("(node:")
+    ]
+    if meaningful:
+        return meaningful[-1]
+    return lines[-1] if lines else "Terra reviewer failed"
+
+
 def _requeue_failed_dispatch(exc: BaseException) -> None:
     """Return a failed dispatch's handoff to the pending pool.
 
@@ -288,7 +303,7 @@ def main() -> int:
         resumable = False
         receipt = _receipt_from(stdout) if code == 0 else None
     if receipt is None:
-        raise RuntimeError(stderr.strip() or "Terra reviewer failed")
+        raise RuntimeError(_failure_reason(stderr))
     handle = receipt.get("continuation_handle")
     handle = handle if isinstance(handle, dict) else {}
     receipt["continuation_handle"] = {
