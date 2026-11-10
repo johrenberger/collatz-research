@@ -292,3 +292,44 @@ def test_the_plugin_dispatches_the_handoff_it_just_created() -> None:
 
     assert "dispatchReview(config, handoff.review_key)" in source
     assert "--review-key" in source
+
+
+# Envelopes captured from the real CLI, not fabricated by a fake binary.
+REAL_EXEC_ENVELOPE = {
+    "ok": True,
+    "text": '{"verdict": "approved", "findings": []}',
+}
+
+REAL_NAMED_SESSION_ENVELOPE = {
+    "runId": "7bd6e711-ede4-4a03-9539-366a5692be86",
+    "status": "ok",
+    "summary": "completed",
+    "result": {
+        "payloads": [{"text": '{"verdict": "approved", "findings": []}', "mediaUrl": None}],
+        "meta": {"durationMs": 2514, "provider": "minimax"},
+    },
+}
+
+
+def _dispatcher_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("dispatcher", DISPATCHER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_receipt_is_read_from_the_real_exec_envelope() -> None:
+    module = _dispatcher_module()
+
+    assert module._extract_text(REAL_EXEC_ENVELOPE) == REAL_EXEC_ENVELOPE["text"]
+
+
+def test_the_receipt_is_read_from_the_real_named_session_envelope() -> None:
+    module = _dispatcher_module()
+
+    envelope = REAL_NAMED_SESSION_ENVELOPE
+    expected = envelope["result"]["payloads"][0]["text"]
+
+    assert module._extract_text(envelope) == expected
