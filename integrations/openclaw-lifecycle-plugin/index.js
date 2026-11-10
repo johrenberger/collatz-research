@@ -101,10 +101,14 @@ function isPullRequestMutation(event) {
   return name.includes("pull_request") && /(create|update|edit)/.test(name);
 }
 
-function dispatchReview(config) {
+function dispatchReview(config, reviewKey) {
   const command = config?.reviewDispatcherCommand;
   if (!command) return;
-  const result = spawnSync(command, [], {
+  // Scope the dispatch to the handoff this turn just created. Without the
+  // review key the dispatcher leases the OLDEST pending handoff, so a fresh
+  // PR can be dispatched against a stale handoff for an older PR.
+  const scoped = reviewKey ? `${command} --review-key ${reviewKey}` : command;
+  const result = spawnSync(scoped, [], {
     encoding: "utf8",
     timeout: 10_000,
     shell: true,
@@ -207,7 +211,7 @@ export default definePluginEntry({
               }),
             ]);
             reviewRequests.set(`${request.repository}:${request.prNumber}:${request.headSha}`, handoff.review_key);
-            dispatchReview(config);
+            dispatchReview(config, handoff.review_key);
           }
         }
       } catch (error) {
