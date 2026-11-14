@@ -322,7 +322,7 @@ def test_review_receipt_must_match_requested_pr_head_and_is_immutable(project: P
         "pr_number": 65,
         "head_sha": "b" * 40,
         "round": 1,
-        "model": "openai/gpt-5.6-terra",
+        "model": "openai/gpt-6.1-terra",
         "verdict": "approved",
         "review_url": "https://example.invalid/review/1",
         "findings": [],
