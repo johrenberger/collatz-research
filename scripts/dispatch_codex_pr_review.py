@@ -106,7 +106,13 @@ Durable review key: {review_key}
 
 
 def _extract_text(envelope: Any) -> str | None:
-    """Pull the reviewer's JSON receipt out of an agent response envelope."""
+    """Pull the reviewer's JSON receipt out of an agent response envelope.
+
+    Two envelope shapes are in use. The isolated exec route puts the reply at
+    the top level; the named-session route puts it at result.payloads[].text.
+    Both must be read, or the receipt is lost and the reviewer session the
+    receipt names can never be resumed.
+    """
     if isinstance(envelope, str):
         return envelope
     if not isinstance(envelope, dict):
@@ -115,10 +121,18 @@ def _extract_text(envelope: Any) -> str | None:
         value = envelope.get(key)
         if isinstance(value, str) and value.strip():
             return value
-        if isinstance(value, dict):
-            nested = _extract_text(value)
-            if nested:
-                return nested
+    result = envelope.get("result")
+    if isinstance(result, dict):
+        payloads = result.get("payloads")
+        if isinstance(payloads, list):
+            for payload in payloads:
+                if isinstance(payload, dict):
+                    text = payload.get("text")
+                    if isinstance(text, str) and text.strip():
+                        return text
+        nested = _extract_text(result)
+        if nested:
+            return nested
     return None
 
 
@@ -134,6 +148,21 @@ def _reviewer_session_key(pr_number: int, label: str = "") -> str:
 
 
 _claim_state: dict[str, Any] = {}
+
+
+def _failure_reason(stderr: str) -> str:
+    """Pick the line that names the failure, ignoring runtime noise.
+
+    stderr often opens with a deprecation warning, so the first line is
+    rarely the cause. The last non-empty line that is not a warning is.
+    """
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    meaningful = [
+        line for line in lines if "DeprecationWarning" not in line and not line.startswith("(node:")
+    ]
+    if meaningful:
+        return meaningful[-1]
+    return lines[-1] if lines else "Terra reviewer failed"
 
 
 def _requeue_failed_dispatch(exc: BaseException) -> None:
@@ -274,7 +303,7 @@ def main() -> int:
         resumable = False
         receipt = _receipt_from(stdout) if code == 0 else None
     if receipt is None:
-        raise RuntimeError(stderr.strip() or "Terra reviewer failed")
+        raise RuntimeError(_failure_reason(stderr))
     handle = receipt.get("continuation_handle")
     handle = handle if isinstance(handle, dict) else {}
     receipt["continuation_handle"] = {
