@@ -91,7 +91,7 @@ arguments and must:
 
 1. call `agent_lifecycle.py ... claim-review --dispatcher terra-reviewer`;
 2. when the result is `claimed`, launch an isolated
-   `openai/gpt-5.6-terra` reviewer with the returned PR/head/round;
+   `openai/gpt-6.1-terra` reviewer with the returned PR/head/round;
 3. require the reviewer to return structured JSON containing repository, PR
    number, head SHA, round, model, verdict, findings, and review URL; and
 4. call `record-review --review-key <key> --receipt-json <json>`.

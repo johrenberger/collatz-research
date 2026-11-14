@@ -16,6 +16,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# The mandated independent-reviewer model for this repository's PR review gate.
+# Single source of truth: the prompt schema, the resumed-session command, and the
+# fresh-exec command all read this constant, so an upgrade is one edit here.
+REVIEWER_MODEL = "openai/gpt-6.1-terra"
+
 
 def _run_json(command: list[str]) -> dict[str, Any]:
     result = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -90,7 +95,7 @@ Return ONLY one JSON object with this exact schema:
   "pr_number": {review["pr_number"]},
   "head_sha": "{review["head_sha"]}",
   "round": {review["round"]},
-  "model": "openai/gpt-5.6-terra",
+  "model": "{REVIEWER_MODEL}",
   "verdict": "approved|changes_requested|escalated",
   "review_url": "https://... or null",
   "continuation_handle": {{"session_key": "...", "session_id": "..."}},
@@ -244,7 +249,7 @@ def main() -> int:
             "--session-key",
             session_key,
             "--model",
-            "openai/gpt-5.6-terra",
+            REVIEWER_MODEL,
             "--timeout",
             "600",
             "--json",
@@ -261,7 +266,7 @@ def main() -> int:
             "--cwd",
             args.repo_path,
             "--model",
-            "openai/gpt-5.6-terra",
+            REVIEWER_MODEL,
             "--timeout",
             "600",
             prompt,
