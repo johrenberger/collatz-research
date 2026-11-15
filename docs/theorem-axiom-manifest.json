@@ -1,0 +1,1075 @@
+{
+  "schema_version": 1,
+  "toolchain": "leanprover/lean4:v4.33.0",
+  "approved_axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "results": [
+    {
+      "name": "CollatzResearch.AffineMap.comp_apply_eq",
+      "simple_name": "AffineMap.comp_apply_eq",
+      "module": "CollatzResearch.Affine",
+      "location": "Lean/CollatzResearch/Affine.lean:155",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.AffineMap.comp_assoc",
+      "simple_name": "AffineMap.comp_assoc",
+      "module": "CollatzResearch.Affine",
+      "location": "Lean/CollatzResearch/Affine.lean:83",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.AffineMap.comp_id_left",
+      "simple_name": "AffineMap.comp_id_left",
+      "module": "CollatzResearch.Affine",
+      "location": "Lean/CollatzResearch/Affine.lean:89",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.AffineMap.comp_id_right",
+      "simple_name": "AffineMap.comp_id_right",
+      "module": "CollatzResearch.Affine",
+      "location": "Lean/CollatzResearch/Affine.lean:95",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.BoundedInputOrbitCertificate",
+      "simple_name": "BoundedInputOrbitCertificate",
+      "module": "CollatzResearch.Q5Integration",
+      "location": "Lean/CollatzResearch/Q5Integration.lean:175",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.BoundedOrbitCertificate",
+      "simple_name": "BoundedOrbitCertificate",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:695",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.BranchWord.appliesTo",
+      "simple_name": "BranchWord.appliesTo",
+      "module": "CollatzResearch.Affine",
+      "location": "Lean/CollatzResearch/Affine.lean:215",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.BranchWord.execute",
+      "simple_name": "BranchWord.execute",
+      "module": "CollatzResearch.Affine",
+      "location": "Lean/CollatzResearch/Affine.lean:227",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.BranchWord.execute_eq_toAffine_apply",
+      "simple_name": "BranchWord.execute_eq_toAffine_apply",
+      "module": "CollatzResearch.Affine",
+      "location": "Lean/CollatzResearch/Affine.lean:247",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.BranchWord.toAffine",
+      "simple_name": "BranchWord.toAffine",
+      "module": "CollatzResearch.Affine",
+      "location": "Lean/CollatzResearch/Affine.lean:209",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.DescentWitness.Valid",
+      "simple_name": "DescentWitness.Valid",
+      "module": "CollatzResearch.DescentWitness",
+      "location": "Lean/CollatzResearch/DescentWitness.lean:61",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.DescentWitness.Valid.start_pos_odd",
+      "simple_name": "DescentWitness.Valid.start_pos_odd",
+      "module": "CollatzResearch.DescentWitness",
+      "location": "Lean/CollatzResearch/DescentWitness.lean:75",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.DescentWitness.Valid.strict_descent",
+      "simple_name": "DescentWitness.Valid.strict_descent",
+      "module": "CollatzResearch.DescentWitness",
+      "location": "Lean/CollatzResearch/DescentWitness.lean:70",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.DescentWitness.trajectory_odd",
+      "simple_name": "DescentWitness.trajectory_odd",
+      "module": "CollatzResearch.DescentWitness",
+      "location": "Lean/CollatzResearch/DescentWitness.lean:84",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.FiniteOrbitClaim",
+      "simple_name": "FiniteOrbitClaim",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:471",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.FiniteOrbitClaim.Holds",
+      "simple_name": "Holds",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:490",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.FiniteOrbitClaim.IsFiniteClaim",
+      "simple_name": "IsFiniteClaim",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:524",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.LeafCertificate",
+      "simple_name": "LeafCertificate",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:634",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.LeafClaim",
+      "simple_name": "LeafClaim",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:368",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.LeafReachesOne",
+      "simple_name": "LeafReachesOne",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:207",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.OrbitLeafReachesOne",
+      "simple_name": "OrbitLeafReachesOne",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:254",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.Partition",
+      "simple_name": "Partition",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:45",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.Partition.trivial",
+      "simple_name": "trivial",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:55",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.Partition.trivial_complete",
+      "simple_name": "trivial_complete",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:70",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.Partition.trivial_nodup",
+      "simple_name": "trivial_nodup",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:60",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.Partition.trivial_partition",
+      "simple_name": "trivial_partition",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:77",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.ReachesOne",
+      "simple_name": "ReachesOne",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:170",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.Residue",
+      "simple_name": "Residue",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:24",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.RoutingPartitionCertificate_sound",
+      "simple_name": "RoutingPartitionCertificate_sound",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:318",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.RoutingPartitionCertificate_sound_terminal_value_one",
+      "simple_name": "RoutingPartitionCertificate_sound_terminal_value_one",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:346",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.acceleratedStep_equiv_standardStep",
+      "simple_name": "acceleratedStep_equiv_standardStep",
+      "module": "CollatzResearch.Equivalence",
+      "location": "Lean/CollatzResearch/Equivalence.lean:150",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.acceleratedStep_odd_of_odd",
+      "simple_name": "acceleratedStep_odd_of_odd",
+      "module": "CollatzResearch.Basic",
+      "location": "Lean/CollatzResearch/Basic.lean:39",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.acceleratedStep_positive_of_odd",
+      "simple_name": "acceleratedStep_positive_of_odd",
+      "module": "CollatzResearch.Dynamics",
+      "location": "Lean/CollatzResearch/Dynamics.lean:137",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.acceleratedTrajectory_reaches_one_implies_standard",
+      "simple_name": "acceleratedTrajectory_reaches_one_implies_standard",
+      "module": "CollatzResearch.Equivalence",
+      "location": "Lean/CollatzResearch/Equivalence.lean:250",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.accelerated_orbit_compose",
+      "simple_name": "accelerated_orbit_compose",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:147",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.accelerated_orbit_succ",
+      "simple_name": "accelerated_orbit_succ",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:130",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.applyOrbitReaches",
+      "simple_name": "applyOrbitReaches",
+      "module": "CollatzResearch.CoverageTreeOrbitTests",
+      "location": "Lean/CollatzResearch/CoverageTreeOrbitTests.lean:256",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.applyResidueReaches",
+      "simple_name": "applyResidueReaches",
+      "module": "CollatzResearch.CoverageTreeOrbitTests",
+      "location": "Lean/CollatzResearch/CoverageTreeOrbitTests.lean:251",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.checkBoundedCertificateTree_sound",
+      "simple_name": "checkBoundedCertificateTree_sound",
+      "module": "CollatzResearch.BoundedInputCertificateTree",
+      "location": "Lean/CollatzResearch/BoundedInputCertificateTree.lean:117",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.checkCertWitness_singleton_one_reaches_one",
+      "simple_name": "checkCertWitness_singleton_one_reaches_one",
+      "module": "CollatzResearch.Q5BoundedInputBridge",
+      "location": "Lean/CollatzResearch/Q5BoundedInputBridge.lean:263",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.checkCertWitness_terminal_value_one_reaches_one",
+      "simple_name": "checkCertWitness_terminal_value_one_reaches_one",
+      "module": "CollatzResearch.Q5BoundedInputBridge",
+      "location": "Lean/CollatzResearch/Q5BoundedInputBridge.lean:201",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.checkRoutingPartitionCertificate_accepts_slot",
+      "simple_name": "checkRoutingPartitionCertificate_accepts_slot",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:53",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.checkRoutingPartitionWitness_accepts",
+      "simple_name": "checkRoutingPartitionWitness_accepts",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:70",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.checkTerminalValueOneClaims",
+      "simple_name": "checkTerminalValueOneClaims",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:271",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.checkTerminalValueOneClaims_sound",
+      "simple_name": "checkTerminalValueOneClaims_sound",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:278",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.coverage_tree_soundness_cert",
+      "simple_name": "coverage_tree_soundness_cert",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:861",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.coverage_tree_soundness_full",
+      "simple_name": "coverage_tree_soundness_full",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:819",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.coverage_tree_soundness_orbit_cert",
+      "simple_name": "coverage_tree_soundness_orbit_cert",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:986",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.coverage_tree_soundness_orbit_cert_bounded",
+      "simple_name": "coverage_tree_soundness_orbit_cert_bounded",
+      "module": "CollatzResearch.Q5Integration",
+      "location": "Lean/CollatzResearch/Q5Integration.lean:217",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.descendOrbit",
+      "simple_name": "descendOrbit",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:225",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.descend_orbit_complete",
+      "simple_name": "descend_orbit_complete",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:889",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.per_leaf_available_bounded_of_check",
+      "simple_name": "per_leaf_available_bounded_of_check",
+      "module": "CollatzResearch.BoundedInputCertificateTree",
+      "location": "Lean/CollatzResearch/BoundedInputCertificateTree.lean:368",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.per_leaf_available_bounded_of_check_terminal_value_one",
+      "simple_name": "per_leaf_available_bounded_of_check_terminal_value_one",
+      "module": "CollatzResearch.BoundedInputCertificateTree",
+      "location": "Lean/CollatzResearch/BoundedInputCertificateTree.lean:417",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.per_leaf_available_bounded_of_hCert",
+      "simple_name": "per_leaf_available_bounded_of_hCert",
+      "module": "CollatzResearch.Q5Integration",
+      "location": "Lean/CollatzResearch/Q5Integration.lean:261",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.residue_lt",
+      "simple_name": "residue_lt",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:29",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.routing_partition_certificate_slot_reaches_one",
+      "simple_name": "routing_partition_certificate_slot_reaches_one",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:242",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.routing_partition_certificate_slot_reaches_one_terminal_value_one",
+      "simple_name": "routing_partition_certificate_slot_reaches_one_terminal_value_one",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:303",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.routing_partition_leaf_certificate",
+      "simple_name": "routing_partition_leaf_certificate",
+      "module": "CollatzResearch.BoundedInputCertificateTree",
+      "location": "Lean/CollatzResearch/BoundedInputCertificateTree.lean:179",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.routing_partition_leaf_certificate_terminal_value_one",
+      "simple_name": "routing_partition_leaf_certificate_terminal_value_one",
+      "module": "CollatzResearch.BoundedInputCertificateTree",
+      "location": "Lean/CollatzResearch/BoundedInputCertificateTree.lean:400",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.routing_partition_witness_reaches_one",
+      "simple_name": "routing_partition_witness_reaches_one",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:166",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.routing_trajectory_reaches_one",
+      "simple_name": "routing_trajectory_reaches_one",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:105",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.standardStep_of_odd",
+      "simple_name": "standardStep_of_odd",
+      "module": "CollatzResearch.Dynamics",
+      "location": "Lean/CollatzResearch/Dynamics.lean:118",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.standardStep_positive",
+      "simple_name": "standardStep_positive",
+      "module": "CollatzResearch.Dynamics",
+      "location": "Lean/CollatzResearch/Dynamics.lean:77",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.standardTrajectory_pow_div",
+      "simple_name": "standardTrajectory_pow_div",
+      "module": "CollatzResearch.Equivalence",
+      "location": "Lean/CollatzResearch/Equivalence.lean:87",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.standardTrajectory_succ_shift",
+      "simple_name": "standardTrajectory_succ_shift",
+      "module": "CollatzResearch.Equivalence",
+      "location": "Lean/CollatzResearch/Equivalence.lean:58",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.standardTrajectory_zero",
+      "simple_name": "standardTrajectory_zero",
+      "module": "CollatzResearch.Equivalence",
+      "location": "Lean/CollatzResearch/Equivalence.lean:35",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.terminal_value_one_claim_obligation",
+      "simple_name": "terminal_value_one_claim_obligation",
+      "module": "CollatzResearch.Q5RoutingPartition",
+      "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:227",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.trajectory_zero",
+      "simple_name": "trajectory_zero",
+      "module": "CollatzResearch.Basic",
+      "location": "Lean/CollatzResearch/Basic.lean:23",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.twoLeafRoutingPartition",
+      "simple_name": "twoLeafRoutingPartition",
+      "module": "CollatzResearch.Q5VerifierTests",
+      "location": "Lean/CollatzResearch/Q5VerifierTests.lean:278",
+      "tier": "compiler_dependent_instance",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {
+        "CollatzResearch.twoLeafRoutingPartition": 3
+      },
+      "native_axiom_names": [
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_1",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_4",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_5"
+      ]
+    },
+    {
+      "name": "CollatzResearch.twoLeafRoutingPartition_claim_reaches_one",
+      "simple_name": "twoLeafRoutingPartition_claim_reaches_one",
+      "module": "CollatzResearch.Q5Stage4Tests",
+      "location": "Lean/CollatzResearch/Q5Stage4Tests.lean:257",
+      "tier": "compiler_dependent_instance",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {
+        "CollatzResearch.twoLeafRoutingPartition": 3
+      },
+      "native_axiom_names": [
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_1",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_4",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_5"
+      ]
+    },
+    {
+      "name": "CollatzResearch.twoLeafRoutingPartition_reaches_one_two",
+      "simple_name": "twoLeafRoutingPartition_reaches_one_two",
+      "module": "CollatzResearch.Q5Stage4Tests",
+      "location": "Lean/CollatzResearch/Q5Stage4Tests.lean:386",
+      "tier": "compiler_dependent_instance",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {
+        "CollatzResearch.twoLeafRoutingPartition": 3,
+        "CollatzResearch.twoLeafRoutingPartition_reaches_one_two": 1
+      },
+      "native_axiom_names": [
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_1",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_4",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_5",
+        "CollatzResearch.twoLeafRoutingPartition_reaches_one_two._native.native_decide.ax_1_1"
+      ]
+    },
+    {
+      "name": "CollatzResearch.twoLeafRoutingPartition_registry",
+      "simple_name": "twoLeafRoutingPartition_registry",
+      "module": "CollatzResearch.Q5Stage4Tests",
+      "location": "Lean/CollatzResearch/Q5Stage4Tests.lean:290",
+      "tier": "compiler_dependent_instance",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {
+        "CollatzResearch.twoLeafRoutingPartition": 3
+      },
+      "native_axiom_names": [
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_1",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_4",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_5"
+      ]
+    },
+    {
+      "name": "CollatzResearch.twoLeafRoutingPartition_sound_terminal_value_one",
+      "simple_name": "twoLeafRoutingPartition_sound_terminal_value_one",
+      "module": "CollatzResearch.Q5Stage4Tests",
+      "location": "Lean/CollatzResearch/Q5Stage4Tests.lean:434",
+      "tier": "compiler_dependent_instance",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {
+        "CollatzResearch.twoLeafRoutingPartition": 3,
+        "CollatzResearch.twoLeafRoutingPartition_sound_terminal_value_one": 1
+      },
+      "native_axiom_names": [
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_1",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_4",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_5",
+        "CollatzResearch.twoLeafRoutingPartition_sound_terminal_value_one._native.native_decide.ax_1_1"
+      ]
+    },
+    {
+      "name": "CollatzResearch.twoLeaf_per_leaf_available_bounded_of_check",
+      "simple_name": "twoLeaf_per_leaf_available_bounded_of_check",
+      "module": "CollatzResearch.Q5Stage4Tests",
+      "location": "Lean/CollatzResearch/Q5Stage4Tests.lean:358",
+      "tier": "compiler_dependent_instance",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {
+        "CollatzResearch.twoLeafRoutingPartition": 3,
+        "CollatzResearch.twoLeaf_routing_partition_leaf_certificate": 1
+      },
+      "native_axiom_names": [
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_1",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_4",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_5",
+        "CollatzResearch.twoLeaf_routing_partition_leaf_certificate._native.native_decide.ax_1"
+      ]
+    },
+    {
+      "name": "CollatzResearch.twoLeaf_per_leaf_available_bounded_of_check_terminal_value_one",
+      "simple_name": "twoLeaf_per_leaf_available_bounded_of_check_terminal_value_one",
+      "module": "CollatzResearch.Q5Stage4Tests",
+      "location": "Lean/CollatzResearch/Q5Stage4Tests.lean:417",
+      "tier": "compiler_dependent_instance",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {
+        "CollatzResearch.twoLeafRoutingPartition": 3,
+        "CollatzResearch.twoLeaf_routing_partition_leaf_certificate": 1
+      },
+      "native_axiom_names": [
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_1",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_4",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_5",
+        "CollatzResearch.twoLeaf_routing_partition_leaf_certificate._native.native_decide.ax_1"
+      ]
+    },
+    {
+      "name": "CollatzResearch.twoLeaf_routing_partition_leaf_certificate",
+      "simple_name": "twoLeaf_routing_partition_leaf_certificate",
+      "module": "CollatzResearch.Q5Stage4Tests",
+      "location": "Lean/CollatzResearch/Q5Stage4Tests.lean:341",
+      "tier": "compiler_dependent_instance",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {
+        "CollatzResearch.twoLeafRoutingPartition": 3,
+        "CollatzResearch.twoLeaf_routing_partition_leaf_certificate": 1
+      },
+      "native_axiom_names": [
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_1",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_4",
+        "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_5",
+        "CollatzResearch.twoLeaf_routing_partition_leaf_certificate._native.native_decide.ax_1"
+      ]
+    }
+  ]
+}

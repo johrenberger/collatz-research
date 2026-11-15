@@ -44,9 +44,9 @@ closable at all.
 ### PR #107 — ADR 0009, decision 1 (merged `cd08863`)
 
 The substantive decision. The tier question was forced by a measurement, not
-a preference: an orbit equation at `k >= 1` is not kernel-reducible
+a preference: an orbit equation at `k >= 1` did not reduce in the kernel by the reductions tried on that implementation and toolchain
 (`rfl` fails, `decide` gets stuck, only `native_decide` closes it), while
-the terminal-is-1 case IS kernel-checkable. The record resolves the question by
+the terminal-is-1 case IS kernel-checkable. The record resolves the question by (ADR 0013: that measurement bounds those reductions, not the existence of a kernel proof.)
 restricting the claim shape, not by weakening the checker.
 
 ### PR #108 — WP-CF-2, recording the tier (merged `5d2e938`)
