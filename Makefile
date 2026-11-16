@@ -1,4 +1,4 @@
-.PHONY: help format format-check lint test lean cert-test reproduce ci smoke clean check
+.PHONY: help format format-check lint test lean cert-test reproduce ci smoke clean check axiom-audit
 
 # Default: print help.
 help:
@@ -43,13 +43,19 @@ cert-test:
 reproduce: smoke
 	uv run python scripts/check.py
 
-# CI aggregator. Formatting, lint, Python tests, and Lean build.
+# CI aggregator. Formatting, lint, Python tests, Lean build, and the
+# transitive axiom audit.
 # Per backlog: "make ci runs, then formatting, lint, Python tests, and lake build pass."
-ci: format-check lint test lean
+ci: format-check lint test lean axiom-audit
 
 # Python-only CI gate (no Lean build). Used by python-ci.yml to keep the
 # Python gate fast; the Lean gate is owned by lean-ci.yml.
 python-ci: format-check lint test
+
+# Audit the transitive axiom dependencies of exported Lean results.
+# Needs the compiled library, so it runs after the Lean build.
+axiom-audit:
+	python3 scripts/check_theorem_axioms.py
 
 # Lightweight sanity check used by the reproducibility workflow.
 smoke:

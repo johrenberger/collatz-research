@@ -130,3 +130,27 @@ per instance.
 - The remaining three decisions are unaffected: the
   `coverage_tree_soundness_orbit` disposition (decision 2), the legacy v1.0
   path (decision 3), and whether `.interval` claims are funded (decision 4).
+
+## Clarification (ADR 0013)
+
+[ADR 0013](0013-transitive-axiom-tiers.md) clarifies this record without
+changing it.
+
+This record fixes which **premises** a reachability theorem may discharge by
+evaluation. It does not say which axioms a finished result rests on, and the
+two are independent. Measured on the pinned toolchain with `#print axioms`,
+the tier's generic theorems — `RoutingPartitionCertificate_sound_terminal_value_one`,
+`routing_partition_leaf_certificate_terminal_value_one`, and
+`per_leaf_available_bounded_of_check_terminal_value_one` — rest on exactly
+`propext`, `Classical.choice`, and `Quot.sound`. The concrete two-leaf
+instances rest on those **plus** the native-evaluation axioms they inherit
+through the fixture `twoLeafRoutingPartition`, whose own well-formedness
+fields are discharged by `native_decide`.
+
+So the statement in this record's decision section, that every `ReachesOne`
+conclusion is kernel-checked, is true of the tier's generic theorems and
+about the *conclusion* in every case: no reachability path evaluates an orbit
+equation. What it does not establish is that an instantiated result rests
+only on the kernel. ADR 0013 records that distinction per result and gates
+it in CI, so "kernel-checked" is a property of a result rather than of the
+tactic that closed its last step.

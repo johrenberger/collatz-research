@@ -167,6 +167,14 @@ jobs:
         if: success()
         run: python3 scripts/check_admission_oracle.py
 
+      # The transitive axiom audit records what every exported reachability
+      # result actually depends on, and fails when that trusted base
+      # changes. It runs after the build because `#print axioms` needs the
+      # compiled library.
+      - name: Audit transitive theorem axioms
+        if: success()
+        run: python3 scripts/check_theorem_axioms.py
+
       # Final status reporter. Runs `if: always()` so it executes on
       # every terminal state (success, failure, cancelled). Prints a
       # single, unambiguous line describing the run outcome, which makes
