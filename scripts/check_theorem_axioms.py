@@ -383,6 +383,14 @@ def scan_declarations() -> list[dict]:
                     # A pattern arm starts the body.
                     if starts_body(line):
                         break
+                    # The next declaration ends this one. Without this
+                    # boundary a declaration whose type does not end on
+                    # its own line swallows the declaration that follows
+                    # it, so that declaration never enters discovery and
+                    # a reachability theorem can pass the completeness
+                    # gate without a manifest entry.
+                    if DECL_RE.match(line):
+                        break
                     type_lines.append(line)
                     cursor += 1
                     if ends_type(line):

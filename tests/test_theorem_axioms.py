@@ -66,6 +66,46 @@ def test_every_exported_reachability_result_is_recorded() -> None:
     assert not missing, f"unrecorded exported reachability results: {missing}"
 
 
+def test_scanner_drops_no_declaration_it_matches() -> None:
+    """The scanner must return every declaration the pattern matches.
+
+    A declaration whose first line already ends its type is complete on
+    that line. If the scanner consumed further lines anyway, the
+    declaration after it would be swallowed, and a reachability theorem
+    could escape the audit without a manifest entry.
+    """
+    declarations = _MODULE.scan_declarations()
+    found = {decl["location"] for decl in declarations}
+    expected = set()
+    for path in sorted(_MODULE.LEAN_ROOT.rglob("*.lean")):
+        rel = path.relative_to(_MODULE.ROOT).as_posix()
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            if _MODULE.DECL_RE.match(line):
+                expected.add(f"{rel}:{index + 1}")
+    assert found == expected, f"declarations dropped by the scanner: {sorted(expected - found)}"
+
+
+def test_one_line_declaration_does_not_swallow_the_next(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A one-line declaration must not consume the declaration after it."""
+    lean_dir = tmp_path / "Lean" / "CollatzResearch"
+    lean_dir.mkdir(parents=True)
+    (lean_dir / "ScannerFixture.lean").write_text(
+        "namespace CollatzResearch\n"
+        "def oneLiner : Nat := 0\n"
+        "theorem reaches_one : ReachesOne 1 1\n"
+        "end CollatzResearch\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(_MODULE, "ROOT", tmp_path)
+    monkeypatch.setattr(_MODULE, "LEAN_ROOT", tmp_path / "Lean")
+    names = {decl["name"] for decl in _MODULE.scan_declarations()}
+    assert "CollatzResearch.oneLiner" in names
+    assert "CollatzResearch.reaches_one" in names
+
+
 @skip_if_no_lake
 def test_gate_self_test_cases() -> None:
     """A clean proof, an admitted proof, and two native shapes are checked."""

@@ -152,6 +152,20 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.DescentWitness.Valid.ends_at",
+      "simple_name": "DescentWitness.Valid.ends_at",
+      "module": "CollatzResearch.DescentWitness",
+      "location": "Lean/CollatzResearch/DescentWitness.lean:65",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.DescentWitness.Valid.start_pos_odd",
       "simple_name": "DescentWitness.Valid.start_pos_odd",
       "module": "CollatzResearch.DescentWitness",
@@ -309,6 +323,19 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.Partition.trivial_mem",
+      "simple_name": "trivial_mem",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:57",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.Partition.trivial_nodup",
       "simple_name": "trivial_nodup",
       "module": "CollatzResearch.Residues",
@@ -330,6 +357,19 @@
       "tier": "kernel_proof",
       "approved_axioms": [
         "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.Partition.trivial_valid",
+      "simple_name": "trivial_valid",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:64",
+      "tier": "kernel_proof",
+      "approved_axioms": [
         "Quot.sound",
         "propext"
       ],
@@ -678,6 +718,20 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.orbit_predecessor_reaches_one",
+      "simple_name": "orbit_predecessor_reaches_one",
+      "module": "CollatzResearch.CoverageTree",
+      "location": "Lean/CollatzResearch/CoverageTree.lean:193",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.per_leaf_available_bounded_of_check",
       "simple_name": "per_leaf_available_bounded_of_check",
       "module": "CollatzResearch.BoundedInputCertificateTree",
@@ -720,10 +774,30 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.residue",
+      "simple_name": "residue",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:27",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.residue_lt",
       "simple_name": "residue_lt",
       "module": "CollatzResearch.Residues",
       "location": "Lean/CollatzResearch/Residues.lean:29",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.residue_zero",
+      "simple_name": "residue_zero",
+      "module": "CollatzResearch.Residues",
+      "location": "Lean/CollatzResearch/Residues.lean:34",
       "tier": "kernel_proof",
       "approved_axioms": [],
       "native_axiom_owners": {},
@@ -854,6 +928,16 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.standardTrajectory_succ",
+      "simple_name": "standardTrajectory_succ",
+      "module": "CollatzResearch.Equivalence",
+      "location": "Lean/CollatzResearch/Equivalence.lean:37",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.standardTrajectory_succ_shift",
       "simple_name": "standardTrajectory_succ_shift",
       "module": "CollatzResearch.Equivalence",
@@ -879,6 +963,20 @@
       "module": "CollatzResearch.Q5RoutingPartition",
       "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:227",
       "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.trajectory_succ",
+      "simple_name": "trajectory_succ",
+      "module": "CollatzResearch.Basic",
+      "location": "Lean/CollatzResearch/Basic.lean:25",
+      "tier": "kernel_proof",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",

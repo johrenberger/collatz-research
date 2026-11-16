@@ -104,7 +104,17 @@ base, record that classification, and gate it in CI.**
    They are simply classified honestly, in their own tier, instead of
    being presented as kernel-only results.
 
-5. **ADR 0009 stands.** This record does not weaken, replace, or extend
+5. **Discovery is bounded by declaration boundaries.** The gate
+   discovers exported results by scanning declarations, so a
+   declaration whose type does not end on its own line must not
+   consume the declaration that follows it. A swallowed declaration
+   would never enter the manifest, and the "every exported reachability
+   result is recorded" check would then pass over a result it never
+   saw. The scanner therefore stops a declaration at the next
+   declaration, and a test asserts that every declaration the
+   pattern matches is returned.
+
+6. **ADR 0009 stands.** This record does not weaken, replace, or extend
    the reachability evidence tier. The tier still says that no
    reachability theorem evaluates an orbit equation, and that remains
    true: the measurements above show native axioms in the trusted base
@@ -167,3 +177,4 @@ base, record that classification, and gate it in CI.**
 | the gate catches a directly native proof | self-test case `direct native proof` |
 | a clean result passes the gate | self-test case `known clean proof` |
 | every exported reachability result is recorded | `test_every_exported_reachability_result_is_recorded` in `tests/test_theorem_axioms.py` |
+| discovery does not drop a declaration | `test_scanner_drops_no_declaration_it_matches` and `test_one_line_declaration_does_not_swallow_the_next` in `tests/test_theorem_axioms.py`; the scanner returns every declaration the pattern matches |
