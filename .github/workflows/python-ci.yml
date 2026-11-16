@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'python/**'
+      - 'scripts/**'
       - 'tests/**'
       - 'pyproject.toml'
       - 'uv.lock'

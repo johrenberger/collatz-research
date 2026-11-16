@@ -324,7 +324,7 @@ def test_review_receipt_must_match_requested_pr_head_and_is_immutable(project: P
         "round": 1,
         "model": "openai/gpt-6.1-terra",
         "verdict": "approved",
-        "review_url": "https://example.invalid/review/1",
+        "review_url": "https://github.com/johrenberger/collatz-research/pull/65#pullrequestreview-1",
         "findings": [],
     }
     recorded = _run(
