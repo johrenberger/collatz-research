@@ -324,9 +324,10 @@ def record_review_posting(args: argparse.Namespace) -> dict[str, Any]:
 
     A recorded receipt is immutable, so the evidence that the review was
     published on the pull request is recorded beside it rather than inside
-    it. The evidence must name the same repository, pull request, and head
-    SHA as the handoff, and it must point at a pull-request review on
-    github.com.
+    it. The evidence is verified against GitHub at this trust boundary: the
+    caller may nominate a review, but only a review GitHub actually publishes
+    for this pull request, this head SHA, and this durable review key becomes
+    gate evidence, and what is stored is what GitHub reported.
     """
     _, state = _paths(args)
     posting = _load_json(args.posting_json)
@@ -340,27 +341,43 @@ def record_review_posting(args: argparse.Namespace) -> dict[str, Any]:
             raise ValueError("unknown review request") from exc
         if review["status"] != "reviewed":
             raise ValueError("review request has no recorded receipt")
-        if posting.get("repository") != review["repository"]:
-            raise ValueError("posting evidence repository does not match request")
-        if posting.get("pr_number") != review["pr_number"]:
-            raise ValueError("posting evidence PR number does not match request")
-        if posting.get("commit_sha") != review["head_sha"]:
-            raise ValueError("posting evidence is bound to a different head SHA")
-        if posting.get("review_key") != args.review_key:
-            raise ValueError("posting evidence names a different durable review key")
         receipt = review.get("receipt") or {}
-        if posting.get("verdict") != receipt.get("verdict"):
-            raise ValueError("posting evidence verdict does not match the recorded receipt")
+        repository = str(review["repository"])
+        pr_number = int(review["pr_number"])
+        head_sha = str(review["head_sha"])
+        verdict = str(receipt.get("verdict") or "")
+        model = str(receipt.get("model") or "") or None
+
+    try:
+        from pr_review_evidence import verified_posting_evidence
+    except ImportError as exc:
+        raise ValueError("the GitHub evidence verifier is unavailable") from exc
+    evidence, problems = verified_posting_evidence(
+        repository,
+        pr_number,
+        url,
+        head_sha,
+        args.review_key,
+        verdict,
+        model,
+    )
+    if evidence is None:
+        raise ValueError(
+            "the published review is not gate evidence: " + "; ".join(problems)
+        )
+
+    with _locked_ledger(state) as (_, ledger):
+        review = ledger["review_requests"][args.review_key]
         existing = review.get("posting")
         if existing is not None:
-            if _digest(existing) != _digest(posting):
+            if _digest(existing) != _digest(evidence):
                 raise ValueError("posting evidence conflicts with existing evidence")
             return {
                 "decision": "already_recorded",
                 "review_key": args.review_key,
                 "review": review,
             }
-        review["posting"] = posting
+        review["posting"] = evidence
         review["posting_recorded_at"] = _utc_now()
         return {
             "decision": "posting_recorded",
@@ -374,7 +391,8 @@ def gate_status(args: argparse.Namespace) -> dict[str, Any]:
 
     The gate counts a head as approved only when the recorded receipt
     approves it and the review was published on the pull request for that
-    exact head SHA. Anything else fails closed.
+    exact head SHA. The recorded evidence is re-checked here rather than
+    taken on trust, so a record edited after the fact fails closed.
     """
     _, state = _paths(args)
     with _locked_ledger(state) as (_, ledger):
@@ -405,12 +423,22 @@ def gate_status(args: argparse.Namespace) -> dict[str, Any]:
         if not url.startswith("https://github.com/") or "/pull/" not in url:
             reasons.append("no posted GitHub review is recorded for this head")
         else:
-            if posting.get("commit_sha") != args.head_sha:
-                reasons.append("the posted GitHub review is bound to a different head SHA")
-            if posting.get("review_key") != key:
-                reasons.append("the posted GitHub review names a different durable review key")
-            if posting.get("verdict") != verdict:
-                reasons.append("the posted GitHub review states a different verdict")
+            try:
+                from pr_review_evidence import recorded_posting_problems
+            except ImportError:
+                reasons.append("the posted GitHub review cannot be verified")
+            else:
+                reasons.extend(
+                    recorded_posting_problems(
+                        posting,
+                        args.head_sha,
+                        key,
+                        str(verdict or ""),
+                        str(receipt.get("model") or "") or None,
+                        args.repository,
+                        args.pr_number,
+                    )
+                )
         return {
             "gate_satisfied": not reasons,
             "reason": "; ".join(reasons) if reasons else "approved with a posted GitHub review",

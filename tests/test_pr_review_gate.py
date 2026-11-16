@@ -144,7 +144,12 @@ def test_find_review_matches_the_published_url() -> None:
     assert find_review([_review()], "https://example.invalid/review/1") is None
 
 
-def _run(state: Path, *args: str, expect: int = 0) -> dict[str, object]:
+def _run(
+    state: Path,
+    *args: str,
+    expect: int = 0,
+    env: dict[str, str] | None = None,
+) -> dict[str, object]:
     result = subprocess.run(
         [
             sys.executable,
@@ -157,6 +162,7 @@ def _run(state: Path, *args: str, expect: int = 0) -> dict[str, object]:
         ],
         text=True,
         capture_output=True,
+        env=env,
     )
     assert result.returncode == expect, result.stderr
     return json.loads(result.stdout if expect == 0 else result.stderr)
@@ -250,8 +256,28 @@ def test_a_changes_requested_verdict_needs_no_published_review(tmp_path: Path) -
     assert recorded["decision"] == "review_recorded"
 
 
+def _gh_env(bin_dir: Path) -> dict[str, str]:
+    """Run with the fake gh first on PATH, so no real GitHub call happens."""
+    return {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
+
+
+def _posting(key: str, url: str = REVIEW_URL) -> dict[str, object]:
+    return {
+        "repository": REPOSITORY,
+        "pr_number": PR_NUMBER,
+        "commit_sha": HEAD,
+        "url": url,
+        "review_id": 42,
+        "state": "COMMENTED",
+        "review_key": key,
+        "verdict": "approved",
+    }
+
+
 def test_the_gate_is_not_satisfied_until_the_review_is_published(tmp_path: Path) -> None:
     state = tmp_path / "state"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
     key = _request(state)
     _run(
         state,
@@ -265,23 +291,25 @@ def test_the_gate_is_not_satisfied_until_the_review_is_published(tmp_path: Path)
     assert status["gate_satisfied"] is False
     assert "no posted GitHub review" in status["reason"]
 
-    posting = {
-        "repository": REPOSITORY,
-        "pr_number": PR_NUMBER,
-        "commit_sha": HEAD,
-        "url": REVIEW_URL,
-        "review_id": 42,
-        "state": "COMMENTED",
-        "review_key": key,
-        "verdict": "approved",
-    }
-    _run(state, "record-review-posting", "--review-key", key, "--posting-json", json.dumps(posting))
+    _fake_gh(bin_dir, [_review(body=_body(review_key=key))])
+    _run(
+        state,
+        "record-review-posting",
+        "--review-key",
+        key,
+        "--posting-json",
+        json.dumps(_posting(key)),
+        env=_gh_env(bin_dir),
+    )
     status = _gate_status(state)
     assert status["gate_satisfied"] is True
 
 
-def test_posting_evidence_bound_to_another_head_is_refused(tmp_path: Path) -> None:
+def test_posting_evidence_without_a_published_review_is_refused(tmp_path: Path) -> None:
+    """A caller cannot satisfy the gate by describing a review that is not published."""
     state = tmp_path / "state"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
     key = _request(state)
     _run(
         state,
@@ -291,24 +319,149 @@ def test_posting_evidence_bound_to_another_head_is_refused(tmp_path: Path) -> No
         "--receipt-json",
         json.dumps(_approved_receipt(REVIEW_URL)),
     )
-    posting = {
-        "repository": REPOSITORY,
-        "pr_number": PR_NUMBER,
-        "commit_sha": "c" * 40,
-        "url": REVIEW_URL,
-        "review_key": key,
-        "verdict": "approved",
-    }
+    _fake_gh(bin_dir, [])  # nothing was published
     error = _run(
         state,
         "record-review-posting",
         "--review-key",
         key,
         "--posting-json",
-        json.dumps(posting),
+        json.dumps(_posting(key)),
         expect=2,
+        env=_gh_env(bin_dir),
+    )
+    assert "not gate evidence" in str(error["error"])
+
+
+def test_posting_evidence_naming_another_pull_request_is_refused(tmp_path: Path) -> None:
+    """A review published on another pull request is not evidence for this one."""
+    state = tmp_path / "state"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    key = _request(state)
+    _run(
+        state,
+        "record-review",
+        "--review-key",
+        key,
+        "--receipt-json",
+        json.dumps(_approved_receipt(REVIEW_URL)),
+    )
+    other_url = f"https://github.com/{REPOSITORY}/pull/99#pullrequestreview-42"
+    _fake_gh(bin_dir, [_review(url=other_url, body=_body(review_key=key))])
+    error = _run(
+        state,
+        "record-review-posting",
+        "--review-key",
+        key,
+        "--posting-json",
+        json.dumps(_posting(key, other_url)),
+        expect=2,
+        env=_gh_env(bin_dir),
+    )
+    assert "names pull request 99" in str(error["error"])
+
+
+def test_posting_evidence_bound_to_another_head_is_refused(tmp_path: Path) -> None:
+    """A published review that is attached to another head is not evidence."""
+    state = tmp_path / "state"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    key = _request(state)
+    _run(
+        state,
+        "record-review",
+        "--review-key",
+        key,
+        "--receipt-json",
+        json.dumps(_approved_receipt(REVIEW_URL)),
+    )
+    _fake_gh(bin_dir, [_review(commit_id="c" * 40, body=_body(review_key=key))])
+    error = _run(
+        state,
+        "record-review-posting",
+        "--review-key",
+        key,
+        "--posting-json",
+        json.dumps(_posting(key)),
+        expect=2,
+        env=_gh_env(bin_dir),
     )
     assert "different head SHA" in str(error["error"])
+
+
+def test_a_review_published_after_the_first_page_is_still_found(tmp_path: Path) -> None:
+    """GitHub paginates the review listing, so every page has to be read."""
+    state = tmp_path / "state"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    key = _request(state)
+    _run(
+        state,
+        "record-review",
+        "--review-key",
+        key,
+        "--receipt-json",
+        json.dumps(_approved_receipt(REVIEW_URL)),
+    )
+    filler = [
+        {
+            "id": 1000 + index,
+            "state": "COMMENTED",
+            "commit_id": "d" * 40,
+            "html_url": f"https://github.com/{REPOSITORY}/pull/{PR_NUMBER}#pullrequestreview-{1000 + index}",
+            "body": _body(review_key="e" * 64),
+            "submitted_at": "2026-11-16T12:00:00Z",
+            "user": {"login": "johrenberger"},
+        }
+        for index in range(100)
+    ]
+    _fake_gh_pages(bin_dir, {1: filler, 2: [_review(body=_body(review_key=key))]})
+    _run(
+        state,
+        "record-review-posting",
+        "--review-key",
+        key,
+        "--posting-json",
+        json.dumps(_posting(key)),
+        env=_gh_env(bin_dir),
+    )
+    status = _gate_status(state)
+    assert status["gate_satisfied"] is True
+
+
+def test_the_gate_refuses_evidence_edited_after_the_fact(tmp_path: Path) -> None:
+    """The gate re-checks the recorded evidence, so a later edit does not count."""
+    state = tmp_path / "state"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    key = _request(state)
+    _run(
+        state,
+        "record-review",
+        "--review-key",
+        key,
+        "--receipt-json",
+        json.dumps(_approved_receipt(REVIEW_URL)),
+    )
+    _fake_gh(bin_dir, [_review(body=_body(review_key=key))])
+    _run(
+        state,
+        "record-review-posting",
+        "--review-key",
+        key,
+        "--posting-json",
+        json.dumps(_posting(key)),
+        env=_gh_env(bin_dir),
+    )
+    assert _gate_status(state)["gate_satisfied"] is True
+
+    ledger_path = state / "turn-ledger.json"
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    ledger["review_requests"][key]["posting"]["body"] = _body(review_key="f" * 64)
+    ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
+    status = _gate_status(state)
+    assert status["gate_satisfied"] is False
 
 
 def _fake_gh(bin_dir: Path, reviews: list[dict[str, object]]) -> None:
@@ -320,6 +473,30 @@ def _fake_gh(bin_dir: Path, reviews: list[dict[str, object]]) -> None:
         f"REVIEWS = {json.dumps(reviews)}\n"
         "if 'reviews' in ' '.join(sys.argv):\n"
         "    sys.stdout.write(json.dumps(REVIEWS))\n"
+        "else:\n"
+        "    sys.stdout.write('{}')\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+
+
+def _fake_gh_pages(bin_dir: Path, pages: dict[int, list[dict[str, object]]]) -> None:
+    """Write a fake gh that answers the reviews query page by page.
+
+    The gate reads every page of the listing, so a review published after the
+    first page must still be found.
+    """
+    script = bin_dir / "gh"
+    script.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        f"PAGES = {json.dumps(pages)}\n"
+        "argv = ' '.join(sys.argv)\n"
+        "page = 1\n"
+        "if '&page=' in argv:\n"
+        "    page = int(argv.split('&page=')[-1])\n"
+        "if 'reviews' in argv:\n"
+        "    sys.stdout.write(json.dumps(PAGES.get(str(page), [])))\n"
         "else:\n"
         "    sys.stdout.write('{}')\n",
         encoding="utf-8",

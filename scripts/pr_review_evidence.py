@@ -118,6 +118,62 @@ def verify_posted_review(
     return accepted, rejected
 
 
+def parse_review_url(url: str) -> tuple[str, int, int] | None:
+    """Return (repository, pr_number, review_id) for a pull-request review URL.
+
+    The URL binds the evidence to one pull request and one review, so a
+    review published elsewhere cannot be offered as evidence for this head.
+    """
+    text = (url or "").strip()
+    prefix = "https://github.com/"
+    if not text.startswith(prefix):
+        return None
+    rest = text[len(prefix) :]
+    path, _, fragment = rest.partition("#")
+    parts = path.split("/")
+    if len(parts) != 4 or parts[2] != "pull" or not parts[3].isdigit():
+        return None
+    repository = f"{parts[0]}/{parts[1]}"
+    pr_number = int(parts[3])
+    review_id = 0
+    if fragment:
+        marker = "pullrequestreview-"
+        if not fragment.startswith(marker) or not fragment[len(marker) :].isdigit():
+            return None
+        review_id = int(fragment[len(marker) :])
+    return repository, pr_number, review_id
+
+
+def review_url_problems(
+    url: str,
+    repository: str = "",
+    pr_number: int = 0,
+    review_id: Any = None,
+) -> list[str]:
+    """Check that a review URL names the pull request and review it claims.
+
+    A URL that names a different pull request, a different repository, or a
+    different review is not evidence for this handoff, however well it is
+    formatted.
+    """
+    parsed = parse_review_url(url)
+    if parsed is None:
+        return [f"{url!r} is not a pull-request review URL"]
+    named_repository, named_pr, named_review = parsed
+    problems: list[str] = []
+    if repository and named_repository.lower() != repository.lower():
+        problems.append(
+            f"the review URL names repository {named_repository!r}, not {repository!r}"
+        )
+    if pr_number and named_pr != pr_number:
+        problems.append(
+            f"the review URL names pull request {named_pr}, not {pr_number}"
+        )
+    if review_id is not None and named_review != review_id:
+        problems.append(f"the review URL names review {named_review}, not {review_id}")
+    return problems
+
+
 def find_review(reviews: list[dict[str, Any]], url: str) -> dict[str, Any] | None:
     """Return the review published at a URL, if the pull request has one."""
     if not url:
@@ -144,14 +200,21 @@ def posting_evidence(
     GitHub reported rather than facts the reviewer claimed: the review id,
     its state, the commit it is attached to, and the body as published.
     """
+    binding = review_url_problems(review_url, repository, pr_number)
+    if binding:
+        return None, binding
     review = find_review(reviews, review_url)
     if review is None:
         return None, [f"no published review was found at {review_url!r}"]
-    accepted, _ = verify_posted_review([review], head_sha, review_key, verdict, model)
+    bound = review_url_problems(review_url, repository, pr_number, review.get("id"))
+    if bound:
+        return None, bound
+    accepted, rejected = verify_posted_review(
+        [review], head_sha, review_key, verdict, model
+    )
     if not accepted:
-        problems = accepted[0]["problems"] if accepted else []
-        detail = problems or ["the published review is not acceptable gate evidence"]
-        return None, detail
+        detail = rejected[0]["problems"] if rejected else []
+        return None, detail or ["the published review is not acceptable gate evidence"]
     fields = parse_review_body(str(review.get("body") or ""))
     evidence = {
         "repository": repository,
@@ -171,9 +234,14 @@ def posting_evidence(
     return evidence, []
 
 
-def fetch_reviews(repository: str, pr_number: int) -> list[dict[str, Any]]:
-    """Read the reviews attached to a pull request."""
-    path = f"/repos/{repository}/pulls/{pr_number}/reviews?per_page=100"
+def _fetch_review_page(
+    repository: str, pr_number: int, page: int, per_page: int
+) -> list[dict[str, Any]]:
+    """Read one page of the reviews attached to a pull request."""
+    path = (
+        f"/repos/{repository}/pulls/{pr_number}/reviews"
+        f"?per_page={per_page}&page={page}"
+    )
     if shutil.which("gh"):
         result = subprocess.run(
             ["gh", "api", path],
@@ -198,3 +266,109 @@ def fetch_reviews(repository: str, pr_number: int) -> list[dict[str, Any]]:
     with urllib.request.urlopen(request, timeout=60) as response:
         payload = json.loads(response.read().decode("utf-8"))
     return payload if isinstance(payload, list) else []
+
+
+def fetch_reviews(
+    repository: str,
+    pr_number: int,
+    per_page: int = 100,
+    max_pages: int = 100,
+) -> list[dict[str, Any]]:
+    """Read every review attached to a pull request.
+
+    GitHub paginates this listing, so one request sees only the first page:
+    a review published after it would be invisible to the gate even though
+    the evidence exists. Every page is read, and the walk stops when a page
+    is short or repeats itself.
+    """
+    reviews: list[dict[str, Any]] = []
+    seen: set[Any] = set()
+    for page in range(1, max_pages + 1):
+        batch = _fetch_review_page(repository, pr_number, page, per_page)
+        if not batch:
+            break
+        fresh = [review for review in batch if review.get("id") not in seen]
+        if not fresh:
+            break
+        seen.update(review.get("id") for review in fresh)
+        reviews.extend(fresh)
+        if len(batch) < per_page:
+            break
+    return reviews
+
+
+def verified_posting_evidence(
+    repository: str,
+    pr_number: int,
+    review_url: str,
+    head_sha: str,
+    review_key: str,
+    verdict: str,
+    model: str | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Verify a claimed review against GitHub and return GitHub's own facts.
+
+    The caller may only nominate a review; GitHub decides whether it exists,
+    which head it is attached to, and what its body says. The returned
+    record is built from GitHub's response, so a fabricated claim cannot
+    become gate evidence.
+    """
+    binding = review_url_problems(review_url, repository, pr_number)
+    if binding:
+        return None, binding
+    reviews = fetch_reviews(repository, pr_number)
+    evidence, problems = posting_evidence(
+        reviews,
+        review_url,
+        head_sha,
+        review_key,
+        verdict,
+        model,
+        repository,
+        pr_number,
+    )
+    if evidence is None:
+        return None, problems
+    bound = review_url_problems(
+        review_url, repository, pr_number, evidence.get("review_id")
+    )
+    if bound:
+        return None, bound
+    return evidence, []
+
+
+def recorded_posting_problems(
+    posting: dict[str, Any],
+    head_sha: str,
+    review_key: str,
+    verdict: str,
+    model: str | None = None,
+    repository: str = "",
+    pr_number: int = 0,
+) -> list[str]:
+    """Re-check recorded GitHub evidence against the receipt it must support.
+
+    The evidence was verified against GitHub when it was recorded; this
+    re-checks that the record still describes the review it names, so the
+    gate does not count a record that was edited after the fact.
+    """
+    url = str(posting.get("url") or "")
+    problems = review_url_problems(url, repository, pr_number, posting.get("review_id"))
+    if problems:
+        return problems
+    review = {
+        "id": posting.get("review_id"),
+        "state": posting.get("state"),
+        "commit_id": posting.get("commit_sha"),
+        "html_url": url,
+        "body": posting.get("body"),
+    }
+    accepted, rejected = verify_posted_review(
+        [review], head_sha, review_key, verdict, model
+    )
+    if accepted:
+        return []
+    problems = []
+    for entry in rejected:
+        problems.extend(entry.get("problems") or [])
+    return problems or ["the recorded GitHub review is not acceptable gate evidence"]
