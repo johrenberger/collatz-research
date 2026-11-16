@@ -198,8 +198,15 @@ reduction". The measurement above pins the consequence precisely.
 
 - `ReachesOne 1` and any reachability whose witness is `k := 0` **is**
   kernel-checkable. So is a claim whose terminal value is 1.
-- A reachability witness at `k ≥ 1` is **not** kernel-reducible, and not
-  provable by `decide` or by `rw`/`simp`/`norm_num` in the direct form. It is
+- A reachability witness at `k ≥ 1` was **not** kernel-reducible by the
+  direct reductions measured above, and not provable by `decide` or by
+  `rw`/`simp`/`norm_num` in the direct form. That is the measured
+  fact, and it is narrower than "no kernel proof is available": those
+  reductions failed **on that implementation and on that toolchain**. A
+  different representation with a proved equivalence — for example a generic
+  uniqueness-of-valuation lemma that establishes `acceleratedStep n = m` from
+  `3*n + 1 = 2^k*m` — is not excluded by this measurement. Until such a
+  representation is built and checked, the orbit equation at `k ≥ 1` is
   obtainable only via `native_decide`, which the repository already flags as
   "compiler-evaluated ... rests on the core native-decide axiom, **not
   kernel-checked**" (`docs/lessons-learned-meta.md` section 3.5, and
@@ -211,6 +218,19 @@ kernel-checkable in exactly the case the two-leaf fixture already covers
 compiler-evaluated evidence for the orbit equation. That is a trust-boundary
 question about evidence, not a proof-effort question, and it is the substantive
 content of this frontier.
+
+**One distinction this section does not make, and ADR 0013 now does.** A
+result whose *reachability conclusion* is derived symbolically can still rest
+on compiler-evaluated evidence elsewhere in its transitive dependencies. The
+generic tier theorems are kernel-clean: measured with `#print axioms`, they
+depend on `propext`, `Classical.choice`, and `Quot.sound` only. The concrete
+two-leaf instances do not: they depend on the fixture
+`twoLeafRoutingPartition`, whose own well-formedness fields are discharged by
+`native_decide`, so they inherit that dependency even where their proof body
+is kernel-only. The trusted base of every exported reachability result is now
+recorded per result in `docs/theorem-axiom-manifest.json` and gated by
+`scripts/check_theorem_axioms.py` (decision record:
+`docs/adr/0013-transitive-axiom-tiers.md`).
 
 ## 5. The claim shape decides what is closable
 
@@ -363,7 +383,7 @@ and ADR 0010) and are recorded in section 9.
 document's open mathematics.** The two unclaimed rows in section 1 and the
 `.interval` shape in section 6 remain open, and the tier boundary measured in
 section 4 stands: for a claim whose terminal value is not 1, the orbit equation is
-still not kernel-reducible.
+did not reduce in the kernel by the reductions measured on that implementation and toolchain (ADR 0013 records what that measurement does and does not establish).
 
 ```yaml
 plan:
