@@ -162,13 +162,9 @@ def review_url_problems(
     named_repository, named_pr, named_review = parsed
     problems: list[str] = []
     if repository and named_repository.lower() != repository.lower():
-        problems.append(
-            f"the review URL names repository {named_repository!r}, not {repository!r}"
-        )
+        problems.append(f"the review URL names repository {named_repository!r}, not {repository!r}")
     if pr_number and named_pr != pr_number:
-        problems.append(
-            f"the review URL names pull request {named_pr}, not {pr_number}"
-        )
+        problems.append(f"the review URL names pull request {named_pr}, not {pr_number}")
     if review_id is not None and named_review != review_id:
         problems.append(f"the review URL names review {named_review}, not {review_id}")
     return problems
@@ -209,9 +205,7 @@ def posting_evidence(
     bound = review_url_problems(review_url, repository, pr_number, review.get("id"))
     if bound:
         return None, bound
-    accepted, rejected = verify_posted_review(
-        [review], head_sha, review_key, verdict, model
-    )
+    accepted, rejected = verify_posted_review([review], head_sha, review_key, verdict, model)
     if not accepted:
         detail = rejected[0]["problems"] if rejected else []
         return None, detail or ["the published review is not acceptable gate evidence"]
@@ -238,10 +232,7 @@ def _fetch_review_page(
     repository: str, pr_number: int, page: int, per_page: int
 ) -> list[dict[str, Any]]:
     """Read one page of the reviews attached to a pull request."""
-    path = (
-        f"/repos/{repository}/pulls/{pr_number}/reviews"
-        f"?per_page={per_page}&page={page}"
-    )
+    path = f"/repos/{repository}/pulls/{pr_number}/reviews" f"?per_page={per_page}&page={page}"
     if shutil.which("gh"):
         result = subprocess.run(
             ["gh", "api", path],
@@ -329,9 +320,7 @@ def verified_posting_evidence(
     )
     if evidence is None:
         return None, problems
-    bound = review_url_problems(
-        review_url, repository, pr_number, evidence.get("review_id")
-    )
+    bound = review_url_problems(review_url, repository, pr_number, evidence.get("review_id"))
     if bound:
         return None, bound
     return evidence, []
@@ -363,9 +352,7 @@ def recorded_posting_problems(
         "html_url": url,
         "body": posting.get("body"),
     }
-    accepted, rejected = verify_posted_review(
-        [review], head_sha, review_key, verdict, model
-    )
+    accepted, rejected = verify_posted_review([review], head_sha, review_key, verdict, model)
     if accepted:
         return []
     problems = []

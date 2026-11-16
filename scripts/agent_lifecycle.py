@@ -362,9 +362,7 @@ def record_review_posting(args: argparse.Namespace) -> dict[str, Any]:
         model,
     )
     if evidence is None:
-        raise ValueError(
-            "the published review is not gate evidence: " + "; ".join(problems)
-        )
+        raise ValueError("the published review is not gate evidence: " + "; ".join(problems))
 
     with _locked_ledger(state) as (_, ledger):
         review = ledger["review_requests"][args.review_key]

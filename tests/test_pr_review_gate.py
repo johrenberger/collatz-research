@@ -409,7 +409,10 @@ def test_a_review_published_after_the_first_page_is_still_found(tmp_path: Path) 
             "id": 1000 + index,
             "state": "COMMENTED",
             "commit_id": "d" * 40,
-            "html_url": f"https://github.com/{REPOSITORY}/pull/{PR_NUMBER}#pullrequestreview-{1000 + index}",
+            "html_url": (
+                f"https://github.com/{REPOSITORY}/pull/{PR_NUMBER}"
+                f"#pullrequestreview-{1000 + index}"
+            ),
             "body": _body(review_key="e" * 64),
             "submitted_at": "2026-11-16T12:00:00Z",
             "user": {"login": "johrenberger"},
