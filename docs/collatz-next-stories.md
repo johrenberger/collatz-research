@@ -52,6 +52,8 @@ Caps bound investigation before a decision; they are not effort estimates calibr
 
 **Completion artifact:** machine-readable theorem/axiom manifest and a short decision record.
 
+**Delivered:** the manifest is `docs/theorem-axiom-manifest.json`, the decision record is `docs/adr/0013-transitive-axiom-tiers.md`, and the release gate is `scripts/check_theorem_axioms.py`.
+
 ## R02 — Make the standard-Collatz theorem boundary explicit
 
 **Story:** As a formalizer, I need odd-domain accelerated results to imply the intended standard-map statement for every positive input.
