@@ -80,8 +80,9 @@ def test_scanner_drops_no_declaration_it_matches() -> None:
     for path in sorted(_MODULE.LEAN_ROOT.rglob("*.lean")):
         rel = path.relative_to(_MODULE.ROOT).as_posix()
         lines = path.read_text(encoding="utf-8").splitlines()
-        for index, line in enumerate(lines):
-            if _MODULE.DECL_RE.match(line):
+        code = _MODULE.blank_comments("\n".join(lines)).splitlines()
+        for index, line in enumerate(code):
+            if _MODULE.DECL_RE.match(line.lstrip()):
                 expected.add(f"{rel}:{index + 1}")
     assert found == expected, f"declarations dropped by the scanner: {sorted(expected - found)}"
 
@@ -104,6 +105,77 @@ def test_one_line_declaration_does_not_swallow_the_next(
     names = {decl["name"] for decl in _MODULE.scan_declarations()}
     assert "CollatzResearch.oneLiner" in names
     assert "CollatzResearch.reaches_one" in names
+
+
+def test_indented_declaration_is_discovered(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declaration indented inside a namespace is discovered.
+
+    Lean does not require a top-level declaration to start at column
+    zero. A reachability theorem written with an indentation would
+    otherwise stay out of discovery, and the completeness gate would
+    pass without recording or auditing it.
+    """
+    lean_dir = tmp_path / "Lean" / "CollatzResearch"
+    lean_dir.mkdir(parents=True)
+    (lean_dir / "IndentedFixture.lean").write_text(
+        "namespace CollatzResearch\n"
+        "  theorem indented_reaches_one : ReachesOne 1 1 := by sorry\n"
+        "end CollatzResearch\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(_MODULE, "ROOT", tmp_path)
+    monkeypatch.setattr(_MODULE, "LEAN_ROOT", tmp_path / "Lean")
+    names = {decl["name"] for decl in _MODULE.scan_declarations()}
+    assert "CollatzResearch.indented_reaches_one" in names
+
+
+def test_declaration_inside_a_comment_is_not_discovered(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declaration keyword inside a comment is not a declaration.
+
+    The scanner matches the declaration keyword anywhere on the line,
+    so a comment that quotes a theorem must be blanked out first.
+    """
+    lean_dir = tmp_path / "Lean" / "CollatzResearch"
+    lean_dir.mkdir(parents=True)
+    (lean_dir / "CommentFixture.lean").write_text(
+        "namespace CollatzResearch\n"
+        "  /- theorem quoted_reaches_one : ReachesOne 1 1 := by sorry -/\n"
+        "end CollatzResearch\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(_MODULE, "ROOT", tmp_path)
+    monkeypatch.setattr(_MODULE, "LEAN_ROOT", tmp_path / "Lean")
+    names = {decl["name"] for decl in _MODULE.scan_declarations()}
+    assert "CollatzResearch.quoted_reaches_one" not in names
+
+
+def test_binder_style_hypothesis_is_conditional() -> None:
+    """A hypothesis written as a binder still makes a result conditional.
+
+    Lean usually writes a hypothesis as a binder rather than as an
+    arrow in the type, so the classification comes from the elaborated
+    environment. An instance-implicit proposition is resolved
+    automatically and is therefore not a hypothesis.
+    """
+    assert _MODULE.is_conditional(1, 0) is True
+    assert _MODULE.is_conditional(2, 0) is True
+    assert _MODULE.is_conditional(0, 0) is False
+    assert _MODULE.is_conditional(1, 1) is False
+
+
+def test_binder_style_result_is_recorded_as_conditional() -> None:
+    """A result whose hypothesis is a binder is recorded as conditional.
+
+    `acceleratedStep_odd_of_odd` takes its hypothesis as a binder, so
+    the recorded tier must not be the unconditional one.
+    """
+    entries = {entry["name"]: entry for entry in _manifest()["results"]}
+    name = "CollatzResearch.acceleratedStep_odd_of_odd"
+    assert entries[name]["tier"] == "conditional_generic_theorem"
 
 
 @skip_if_no_lake
