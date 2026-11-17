@@ -45,6 +45,7 @@ def parse_review_body(body: str) -> dict[str, str]:
         "review_key": "",
         "head_sha": "",
         "model": "",
+        "thinking": "",
         "verdict": "",
     }
     lines = text.splitlines()
@@ -62,6 +63,8 @@ def parse_review_body(body: str) -> dict[str, str]:
             fields["head_sha"] = value
         elif name == "model":
             fields["model"] = value
+        elif name == "thinking":
+            fields["thinking"] = value.lower()
         elif name == "verdict":
             fields["verdict"] = value.lower()
     return fields
@@ -73,12 +76,18 @@ def verify_posted_review(
     review_key: str,
     verdict: str,
     model: str | None = None,
+    thinking: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Split candidate reviews into accepted evidence and rejected candidates.
 
     A review is accepted only when it is attached to the exact head SHA under
     review, carries the mandated marker and the durable review key of this
     handoff, states the expected verdict, and names the expected model.
+
+    The reasoning effort is checked only when the caller expects one. A
+    receipt recorded before the effort became part of the mandate carries no
+    expected effort, so an older published review stays valid evidence; a
+    receipt that does carry one must have a published review that attests it.
     """
     accepted: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
@@ -100,6 +109,8 @@ def verify_posted_review(
             problems.append(f"review verdict {fields['verdict']!r} does not match {verdict!r}")
         if model and fields["model"] != model:
             problems.append("review body names a different model")
+        if thinking and fields["thinking"] != thinking:
+            problems.append("review body names a different reasoning effort")
         entry = {
             "id": review.get("id"),
             "state": state,
@@ -111,6 +122,7 @@ def verify_posted_review(
             "review_key": fields["review_key"],
             "head_sha": fields["head_sha"],
             "model": fields["model"],
+            "thinking": fields["thinking"],
             "verdict": fields["verdict"],
             "problems": problems,
         }
@@ -189,6 +201,7 @@ def posting_evidence(
     model: str | None = None,
     repository: str = "",
     pr_number: int = 0,
+    thinking: str | None = None,
 ) -> tuple[dict[str, Any] | None, list[str]]:
     """Verify the published review and build the durable posting record.
 
@@ -205,7 +218,9 @@ def posting_evidence(
     bound = review_url_problems(review_url, repository, pr_number, review.get("id"))
     if bound:
         return None, bound
-    accepted, rejected = verify_posted_review([review], head_sha, review_key, verdict, model)
+    accepted, rejected = verify_posted_review(
+        [review], head_sha, review_key, verdict, model, thinking
+    )
     if not accepted:
         detail = rejected[0]["problems"] if rejected else []
         return None, detail or ["the published review is not acceptable gate evidence"]
@@ -223,6 +238,7 @@ def posting_evidence(
         "review_key": fields["review_key"],
         "head_sha": fields["head_sha"],
         "model": fields["model"],
+        "thinking": fields["thinking"],
         "verdict": fields["verdict"],
     }
     return evidence, []
@@ -296,6 +312,7 @@ def verified_posting_evidence(
     review_key: str,
     verdict: str,
     model: str | None = None,
+    thinking: str | None = None,
 ) -> tuple[dict[str, Any] | None, list[str]]:
     """Verify a claimed review against GitHub and return GitHub's own facts.
 
@@ -317,6 +334,7 @@ def verified_posting_evidence(
         model,
         repository,
         pr_number,
+        thinking,
     )
     if evidence is None:
         return None, problems
@@ -334,6 +352,7 @@ def recorded_posting_problems(
     model: str | None = None,
     repository: str = "",
     pr_number: int = 0,
+    thinking: str | None = None,
 ) -> list[str]:
     """Re-check recorded GitHub evidence against the receipt it must support.
 
@@ -352,7 +371,9 @@ def recorded_posting_problems(
         "html_url": url,
         "body": posting.get("body"),
     }
-    accepted, rejected = verify_posted_review([review], head_sha, review_key, verdict, model)
+    accepted, rejected = verify_posted_review(
+        [review], head_sha, review_key, verdict, model, thinking
+    )
     if accepted:
         return []
     problems = []

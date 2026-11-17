@@ -15,7 +15,7 @@ Usage:
     python3 scripts/check_pr_review_gate.py \
         --repository OWNER/REPO --pr 125 --head-sha SHA --review-key KEY \
         [--expect-verdict approved] [--model openai/gpt-6.1-terra] \
-        [--reviews-json reviews.json]
+        [--expect-thinking high] [--reviews-json reviews.json]
 
 Exit status is 0 when the gate evidence is present and 1 otherwise.
 """
@@ -40,6 +40,11 @@ def main() -> int:
     parser.add_argument("--review-key", default="")
     parser.add_argument("--expect-verdict", default="approved")
     parser.add_argument("--model", default="")
+    parser.add_argument(
+        "--expect-thinking",
+        default="",
+        help="reasoning effort the published review must attest, e.g. high",
+    )
     parser.add_argument("--reviews-json", help="read reviews from a file instead of GitHub")
     args = parser.parse_args()
 
@@ -57,6 +62,7 @@ def main() -> int:
         args.review_key,
         args.expect_verdict,
         args.model or None,
+        args.expect_thinking or None,
     )
     result = {
         "ok": bool(accepted),
@@ -65,6 +71,7 @@ def main() -> int:
         "head_sha": args.head_sha,
         "review_key": args.review_key,
         "expected_verdict": args.expect_verdict,
+        "expected_thinking": args.expect_thinking,
         "accepted": accepted,
         "rejected": rejected,
     }
