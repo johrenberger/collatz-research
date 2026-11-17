@@ -117,6 +117,16 @@ BINDER_SELFTEST_CASES: list[tuple[str, str, str, bool]] = [
         "binderSelftestGlobalInstance",
         False,
     ),
+    (
+        "specialized global instance premise",
+        "instance binderSelftestSpecializedFactZero : Fact (0 = 0) where\n"
+        "  out := rfl\n"
+        "\n"
+        "theorem binderSelftestSpecializedInstance (n : Nat) "
+        "[h : Fact (n = 0)] : True := trivial",
+        "binderSelftestSpecializedInstance",
+        True,
+    ),
 ]
 
 # A binder-count row printed by the probe:

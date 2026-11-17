@@ -9,6 +9,10 @@ takes `[Fact p]` needs a proof of `p` from the caller or from another
 assumption, and instance synthesis cannot conjure one, so such a binder is a
 hypothesis. An instance-implicit proposition whose instance *can* be
 synthesized on its own is not.
+
+The synthesizability test is only meaningful when synthesis cannot
+specialize the theorem own parameters, so the caller builds the
+telescope with opaque metavariables.
 -/
 private def synthesizable (ty : Expr) : MetaM Bool := do
   match ← Meta.trySynthInstance ty with
@@ -36,7 +40,13 @@ elab "#probePropBinders" : command => do
     for target in probeTargets do
       let some (_, ci) :=
         env.constants.toList.find? (fun (n, _) => n.toString == target) | continue
-      let (fvars, bis, _body) ← Meta.forallMetaTelescopeReducing ci.type
+      -- The theorem own parameters are opaque metavariables here, so
+      -- instance synthesis cannot specialize them while looking for an
+      -- instance, and a global instance that matches only one
+      -- specialization of a parameter cannot be mistaken for an instance
+      -- that is available for every argument.
+      let (fvars, bis, _body) ←
+        Meta.forallMetaTelescopeReducing ci.type (kind := MetavarKind.syntheticOpaque)
       let mut propBinders := 0
       let mut instPropBinders := 0
       let mut unsynthesized := 0
