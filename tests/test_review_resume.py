@@ -157,8 +157,10 @@ def _write_fake_openclaw(
     bin_dir.mkdir(parents=True, exist_ok=True)
     body = (
         "#!/usr/bin/env python3\n"
-        "import json, sys\n"
+        "import json, os, sys\n"
         "RECEIPT = " + repr(receipt) + "\n"
+        "with open(os.path.join(os.path.dirname(__file__), 'argv.jsonl'), 'a') as handle:\n"
+        "    handle.write(json.dumps(sys.argv[1:]) + '\\n')\n"
         "if '--session-key' in sys.argv:\n"
         f"    sys.stdout.write(json.dumps({{'text': {json.dumps(named_answer)}}}))\n"
         f"    raise SystemExit({named_exit})\n"
@@ -168,6 +170,14 @@ def _write_fake_openclaw(
     script.write_text(body, encoding="utf-8")
     script.chmod(0o755)
     return bin_dir
+
+
+def _recorded_argv(bin_dir: Path) -> list[list[str]]:
+    """The argument lists the fake openclaw was invoked with."""
+    log = bin_dir / "argv.jsonl"
+    if not log.exists():
+        return []
+    return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]
 
 
 def _dispatch(state: Path, bin_dir: Path, review_key: str) -> subprocess.CompletedProcess[str]:
@@ -195,6 +205,29 @@ def _stored_handle(state: Path, review_key: str) -> dict[str, object]:
     handle = receipt["continuation_handle"]
     assert isinstance(handle, dict)
     return handle
+
+
+def test_the_dispatcher_runs_the_reviewer_at_the_mandated_effort(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    receipt = _reviewer_receipt(7, "head-one", "agent:main:reviewer-7")
+    bin_dir = _write_fake_openclaw(tmp_path, receipt, json.dumps(receipt))
+
+    key = _request(state, 7, "head-one", {"round": 1})
+    result = _dispatch(state, bin_dir, key)
+    assert result.returncode == 0, result.stderr
+
+    calls = _recorded_argv(bin_dir)
+    assert calls, "the reviewer was never dispatched"
+    for argv in calls:
+        # Both dispatch paths must pin the effort, so a resumed round and a
+        # fresh one are reviewed at the same mandated level.
+        assert "--thinking" in argv
+        assert argv[argv.index("--thinking") + 1] == "high"
+        assert argv[argv.index("--model") + 1] == "openai/gpt-6.1-terra"
+
+    stored = json.loads((state / "turn-ledger.json").read_text(encoding="utf-8"))
+    recorded = stored["review_requests"][key]["receipt"]
+    assert recorded["thinking"] == "high"
 
 
 def test_the_dispatcher_records_a_resumable_handle(tmp_path: Path) -> None:

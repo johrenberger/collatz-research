@@ -435,6 +435,7 @@ def gate_status(args: argparse.Namespace) -> dict[str, Any]:
                         str(receipt.get("model") or "") or None,
                         args.repository,
                         args.pr_number,
+                        str(receipt.get("thinking") or "") or None,
                     )
                 )
         return {
