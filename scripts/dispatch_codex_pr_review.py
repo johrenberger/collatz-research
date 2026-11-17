@@ -106,7 +106,7 @@ Return ONLY one JSON object with this exact schema:
   "head_sha": "{review["head_sha"]}",
   "round": {review["round"]},
   "model": "{REVIEWER_MODEL}",
-  "thinking": "the reasoning effort this run used, e.g. high",
+  "thinking": "the effort your run used, e.g. high",
   "verdict": "approved|changes_requested|escalated",
   "review_url": "https://github.com/OWNER/REPO/pull/N#pullrequestreview-ID",
   "continuation_handle": {{"session_key": "...", "session_id": "..."}},
@@ -124,11 +124,13 @@ Thinking: {REVIEWER_THINKING}
 Head SHA: {review["head_sha"]}
 Verdict: approved|changes_requested|escalated
 
-The Thinking line states the reasoning effort your own run used. It is
-{REVIEWER_THINKING} unless the runtime resolved your effort differently. If it
-did, state the effort you actually ran at instead of repeating
-{REVIEWER_THINKING}: the gate compares the attested effort with the effort
-this round was dispatched at, and a mismatch is reported rather than counted.
+The Thinking line states the reasoning effort your own run used, written
+as exactly one of: off, minimal, low, medium, high, xhigh, adaptive, max,
+ultra. It is {REVIEWER_THINKING} unless the runtime resolved your effort
+differently. If it did, write the effort you actually ran at instead of
+repeating {REVIEWER_THINKING}: the gate compares the attested effort with the
+effort this round was dispatched at, and a mismatch is reported rather than
+counted. Write the level on its own, with no extra words.
 
 The gate counts an approval only when this review is published on the pull
 request for the exact head SHA, so publish it before returning the receipt.
