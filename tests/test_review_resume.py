@@ -139,7 +139,7 @@ def _reviewer_receipt(pr_number: int, head_sha: str, session_key: str) -> dict[s
         "head_sha": head_sha,
         "round": 1,
         "model": "openai/gpt-6.1-terra",
-        "verdict": "approved",
+        "verdict": "changes_requested",
         "review_url": None,
         "continuation_handle": {"session_key": session_key},
         "findings": [],

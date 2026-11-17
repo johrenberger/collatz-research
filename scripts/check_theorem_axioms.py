@@ -76,6 +76,66 @@ SCHEMA_VERSION = 1
 
 LEAN_ROOT = ROOT / "Lean"
 
+# The Lean program that counts the proposition-valued binders of each
+# measured result. Only the elaborated environment knows whether a
+# binder is a proposition.
+PROBE_PROGRAM = ROOT / "scripts" / "prop_binder_probe.lean"
+
+# The probe file marks the start of the rule, so that the target list can be
+# generated between the imports and the rule.
+PROBE_RULE_MARKER = "-- PROBE-RULE"
+
+# The binder self-test fixtures. Each measures one theorem through the probe
+# and states whether the theorem carries a hypothesis.
+#
+# The first is the case a source-text scan cannot see. A binder of the form
+# [h : Fact p] is an instance-implicit proposition, and the instance is a
+# proof of p. Instance synthesis cannot conjure such a proof, so the caller
+# supplies it and the theorem carries a hypothesis.
+#
+# The second is the counter-case: the instance is globally available, so
+# synthesis satisfies it without extra assumptions and the theorem carries no
+# hypothesis at all.
+BINDER_SELFTEST_CASES: list[tuple[str, str, str, bool]] = [
+    (
+        "instance-implicit proposition premise",
+        "theorem binderSelftestInstanceProp (p : Prop) [h : Fact p] : p := h.out",
+        "binderSelftestInstanceProp",
+        True,
+    ),
+    (
+        "globally available instance premise",
+        "class BinderSelftestGlobalProp (p : Prop) : Prop where\n"
+        "  ok : True\n"
+        "\n"
+        "instance binderSelftestGlobalPropInst (p : Prop) "
+        "    : BinderSelftestGlobalProp p where\n"
+        "  ok := trivial\n"
+        "\n"
+        "theorem binderSelftestGlobalInstance (p : Prop) "
+        "    [h : BinderSelftestGlobalProp p] : True := trivial",
+        "binderSelftestGlobalInstance",
+        False,
+    ),
+    (
+        "specialized global instance premise",
+        "instance binderSelftestSpecializedFactZero : Fact (0 = 0) where\n"
+        "  out := rfl\n"
+        "\n"
+        "theorem binderSelftestSpecializedInstance (n : Nat) "
+        "[h : Fact (n = 0)] : True := trivial",
+        "binderSelftestSpecializedInstance",
+        True,
+    ),
+]
+
+# A binder-count row printed by the probe:
+# `PROP|<name>|<propBinders>|<instanceImplicitPropBinders>|<unsynthesizedInstancePropBinders>`.
+PROP_BINDER_RE = re.compile(
+    r"^PROP\|(?P<name>[^|]+)\|(?P<prop>\d+)\|(?P<inst>\d+)\|(?P<unsynth>\d+)$",
+    re.MULTILINE,
+)
+
 # The root namespace. Ledger rows name results relative to it
 # ("AffineMap.comp_assoc"); Lean names them fully.
 ROOT_NAMESPACE = "CollatzResearch"
@@ -99,7 +159,19 @@ NATIVE_AXIOM_RE = re.compile(r"(native_decide\.ax_|ofReduceBool|ofReduceNat)")
 # before the `._native.native_decide.` marker.
 NATIVE_OWNER_RE = re.compile(r"^(?P<owner>.+?)\._native\.native_decide\.ax_\d+(?:_\d+)?$")
 
-DEFAULT_TIMEOUT = 900
+# The measurement program imports CollatzResearch, which pulls in
+# Mathlib, and it now also loads the Lean DSL for the binder analysis.
+# Loading that import graph takes considerably longer than the
+# measurement itself: on a host with a small page cache the oleans are
+# re-read while they are loaded. The bound is therefore set well above
+# the measurement.
+#
+# The bound is also a ceiling on the whole audit, and the Lean CI job
+# allows two hours for the build and the audit together. The bound is
+# kept below that job budget so that a measurement that hangs fails the
+# audit with a readable message instead of being cancelled with the job,
+# which would report no reason at all.
+DEFAULT_TIMEOUT = 3600
 
 # A top-level Lean declaration. The name may be dotted, which is how
 # `AffineMap.comp_assoc` and friends are declared.
@@ -334,81 +406,159 @@ def is_namespace_boundary(text: str) -> bool:
     return NAMESPACE_RE.match(text) is not None or END_RE.match(text) is not None
 
 
-def scan_declarations() -> list[dict]:
-    """Return every top-level Lean declaration with its type and location.
+def blank_comments(text: str) -> str:
+    """Return `text` with every comment replaced by spaces.
+
+    The line numbering of the result matches the source, so a blanked
+    line still points at the line it came from. A declaration keyword
+    inside a comment must not be mistaken for a declaration, and a
+    comment must not be mistaken for a namespace boundary.
+    """
+    out: list[str] = []
+    index = 0
+    length = len(text)
+    depth = 0
+    while index < length:
+        char = text[index]
+        if depth:
+            if text.startswith("/-", index):
+                depth += 1
+                out.append("  ")
+                index += 2
+                continue
+            if text.startswith("-/", index):
+                depth -= 1
+                out.append("  ")
+                index += 2
+                continue
+            out.append("\n" if char == "\n" else " ")
+            index += 1
+            continue
+        if text.startswith("/-", index):
+            depth = 1
+            out.append("  ")
+            index += 2
+            continue
+        if text.startswith("--", index):
+            end = text.find("\n", index)
+            if end == -1:
+                end = length
+            out.append(" " * (end - index))
+            index = end
+            continue
+        if char == '"':
+            # A string literal is copied verbatim, so that a `--`
+            # inside a string is not mistaken for a comment.
+            out.append(char)
+            index += 1
+            while index < length:
+                if text[index] == "\\" and index + 1 < length:
+                    out.append(text[index : index + 2])
+                    index += 2
+                    continue
+                out.append(text[index])
+                index += 1
+                if text[index - 1] == '"':
+                    break
+            continue
+        out.append(char)
+        index += 1
+    return "".join(out)
+
+
+def scan_source(lines: list[str], module: str, rel: str) -> list[dict]:
+    """Return every top-level Lean declaration in one source file.
+
+    Lean does not require a declaration to start at column zero: a
+    declaration inside a namespace block is usually indented, and the
+    namespace command itself may be indented too. Discovery therefore
+    matches the declaration keyword anywhere on the line, once the
+    comments have been blanked out, and keeps track of the enclosing
+    namespaces so that an indented declaration is recorded under its
+    qualified name.
 
     The type is the text between the declaration's name and the `:=`
     or `by` that starts its proof, so a mention of `ReachesOne` in the
     type can be told apart from a mention in the proof term.
     """
     results: list[dict] = []
+    code = blank_comments("\n".join(lines)).splitlines()
+    stack: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        code_line = code[index] if index < len(code) else ""
+        namespace_match = NAMESPACE_RE.match(code_line.lstrip())
+        if namespace_match:
+            stack.append(namespace_match.group("name"))
+            index += 1
+            continue
+        end_match = END_RE.match(code_line.lstrip())
+        if end_match:
+            if stack and stack[-1] == end_match.group("name"):
+                stack.pop()
+            index += 1
+            continue
+        match = DECL_RE.match(code_line.lstrip())
+        if not match:
+            index += 1
+            continue
+        kind = match.group(1)
+        name = match.group("name")
+        start = index
+        type_lines = [lines[index]]
+        cursor = index + 1
+        if kind not in ("structure", "inductive", "class"):
+            # A structure or inductive declaration is its header; its
+            # fields are not part of its type.
+            while cursor < len(lines):
+                line = lines[cursor]
+                code_line = code[cursor] if cursor < len(code) else ""
+                # A namespace boundary ends the type. The boundary
+                # itself is left for the caller, so the namespace
+                # stack stays correct.
+                if is_namespace_boundary(code_line.lstrip()):
+                    break
+                # A pattern arm starts the body.
+                if starts_body(line):
+                    break
+                # The next declaration ends this one. Without this
+                # boundary a declaration whose type does not end on
+                # its own line swallows the declaration that follows
+                # it, so that declaration never enters discovery and
+                # a reachability theorem can pass the completeness
+                # gate without a manifest entry.
+                if DECL_RE.match(code_line.lstrip()):
+                    break
+                type_lines.append(line)
+                cursor += 1
+                if ends_type(line):
+                    break
+                if cursor - start > 60:
+                    break
+        qualified = ".".join([*stack, name])
+        results.append(
+            {
+                "name": qualified,
+                "simple_name": name,
+                "kind": kind,
+                "module": module,
+                "location": f"{rel}:{start + 1}",
+                "type": strip_comments("\n".join(type_lines)),
+            }
+        )
+        index = cursor
+    return results
+
+
+def scan_declarations() -> list[dict]:
+    """Return every top-level Lean declaration with its type and location."""
+    results: list[dict] = []
     for path in sorted(LEAN_ROOT.rglob("*.lean")):
         rel = path.relative_to(ROOT).as_posix()
         module = "CollatzResearch." + path.stem
         lines = path.read_text(encoding="utf-8").splitlines()
-        stack: list[str] = []
-        index = 0
-        while index < len(lines):
-            line = lines[index]
-            namespace_match = NAMESPACE_RE.match(line)
-            if namespace_match:
-                stack.append(namespace_match.group("name"))
-                index += 1
-                continue
-            end_match = END_RE.match(line)
-            if end_match:
-                if stack and stack[-1] == end_match.group("name"):
-                    stack.pop()
-                index += 1
-                continue
-            match = DECL_RE.match(line)
-            if not match:
-                index += 1
-                continue
-            kind = match.group(1)
-            name = match.group("name")
-            start = index
-            type_lines = [lines[index]]
-            cursor = index + 1
-            if kind not in ("structure", "inductive", "class"):
-                # A structure or inductive declaration is its header; its
-                # fields are not part of its type.
-                while cursor < len(lines):
-                    line = lines[cursor]
-                    # A namespace boundary ends the type. The boundary
-                    # itself is left for the caller, so the namespace
-                    # stack stays correct.
-                    if is_namespace_boundary(line):
-                        break
-                    # A pattern arm starts the body.
-                    if starts_body(line):
-                        break
-                    # The next declaration ends this one. Without this
-                    # boundary a declaration whose type does not end on
-                    # its own line swallows the declaration that follows
-                    # it, so that declaration never enters discovery and
-                    # a reachability theorem can pass the completeness
-                    # gate without a manifest entry.
-                    if DECL_RE.match(line):
-                        break
-                    type_lines.append(line)
-                    cursor += 1
-                    if ends_type(line):
-                        break
-                    if cursor - start > 60:
-                        break
-            qualified = ".".join([*stack, name])
-            results.append(
-                {
-                    "name": qualified,
-                    "simple_name": name,
-                    "kind": kind,
-                    "module": module,
-                    "location": f"{rel}:{start + 1}",
-                    "type": strip_comments("\n".join(type_lines)),
-                }
-            )
-            index = cursor
+        results.extend(scan_source(lines, module, rel))
     return results
 
 
@@ -506,28 +656,114 @@ def discover() -> list[dict]:
     return list(wanted.values())
 
 
-def measure(names: list[str]) -> tuple[dict[str, list[str]], list[str]]:
-    """Measure the dependency closure of each name with `#print axioms`.
+def build_measurement_source(names: list[str]) -> str:
+    """Build the single Lean program that measures the manifest's inputs.
 
-    Returns the measured closures and the names that did not resolve.
-    A name that does not resolve produces a Lean error but does not
-    stop the remaining commands, so the report is parsed per name.
+    The axiom closures and the binder structure come from one Lean run.
+    The binder structure is only available from the elaborated
+    environment, and a second run would pay the whole Mathlib start-up
+    twice.
     """
-    source = "import CollatzResearch\n\n"
+    template = PROBE_PROGRAM.read_text(encoding="utf-8")
+    # The rule is split off the template here so that the target list can
+    # be generated between the imports and the rule. The split point is
+    # the marker in front of the rule, which keeps the rule's docstring
+    # attached to the rule itself.
+    head, rule = template.split(PROBE_RULE_MARKER, 1)
+    targets = "def probeTargets : List String := [\n"
+    targets += "".join(f'  "{name}",\n' for name in names)
+    targets += "]\n\n"
+    # The library is imported here rather than in the probe file, so the
+    # probe rule itself does not depend on the library and the binder
+    # self-test can reuse it.
+    source = (
+        "import CollatzResearch\n" + head + targets + rule.lstrip("\n") + "\n#probePropBinders\n\n"
+    )
     source += "".join(f"#print axioms {name}\n" for name in names)
+    return source
+
+
+def parse_prop_binder_report(report: str) -> dict[str, tuple[int, int, int]]:
+    """Parse the binder counts the Lean probe printed.
+
+    Each row is
+    `PROP|<name>|<propBinders>|<instanceImplicitPropBinders>|<unsynthesizedInstancePropBinders>`.
+    """
+    counts: dict[str, tuple[int, int, int]] = {}
+    for match in PROP_BINDER_RE.finditer(report):
+        counts[match.group("name")] = (
+            int(match.group("prop")),
+            int(match.group("inst")),
+            int(match.group("unsynth")),
+        )
+    return counts
+
+
+def is_conditional(prop_binders: int, inst_prop_binders: int, unsynthesized: int) -> bool:
+    """True when a result binds at least one proposition-valued hypothesis.
+
+    A Lean hypothesis is usually written as a binder, not as an arrow in
+    the type, so the count comes from the elaborated environment rather
+    than from the source text.
+
+    An instance-implicit proposition is a hypothesis unless the instance
+    can be synthesized without extra assumptions. A theorem that takes
+    `[Fact p]` needs a proof of `p` from the caller, because synthesis
+    cannot conjure one, so the instance-implicit binders the probe
+    reported as unsynthesized count as hypotheses.
+    """
+    return prop_binders - inst_prop_binders + unsynthesized >= 1
+
+
+def measure(
+    names: list[str],
+) -> tuple[dict[str, list[str]], list[str], dict[str, tuple[int, int, int]]]:
+    """Measure the dependency closure and the binder structure of each name.
+
+    Returns the measured closures, the names that did not resolve, and
+    the number of proposition-valued binders of each resolved name. A
+    name that does not resolve produces a Lean error but does not stop
+    the remaining commands, so the report is parsed per name.
+    """
+    source = build_measurement_source(names)
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "AxiomAudit.lean"
         path.write_text(source, encoding="utf-8")
-        proc = subprocess.run(
-            ["lake", "env", "lean", str(path)],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            timeout=DEFAULT_TIMEOUT,
-        )
+        try:
+            proc = subprocess.run(
+                ["lake", "env", "lean", str(path)],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=DEFAULT_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError(
+                f"the measurement program did not finish within {DEFAULT_TIMEOUT}s; "
+                "the manifest is left unchanged"
+            ) from error
+    if proc.returncode != 0:
+        # Lean reports elaboration errors on stdout, not stderr.
+        detail = " ".join(part for part in (proc.stdout, proc.stderr) if part).strip()
+        raise RuntimeError("the measurement program failed: " + detail[-1500:])
     measured = parse_axiom_report(proc.stdout)
+    conditions = parse_prop_binder_report(proc.stdout)
     unresolved = [name for name in names if name not in measured]
-    return measured, unresolved
+    # A broken measurement must never be recorded as a manifest. If the
+    # Lean program reported nothing, or if more names failed to resolve
+    # than resolved, the measurement is incomplete and the recorded
+    # manifest is left untouched.
+    if names and not measured:
+        raise RuntimeError(
+            "the measurement program reported no dependency closure; "
+            "the manifest is left unchanged"
+        )
+    if len(unresolved) > len(measured):
+        raise RuntimeError(
+            f"{len(unresolved)} of {len(names)} names did not resolve, so the "
+            "measurement is incomplete; the manifest is left unchanged"
+        )
+    return measured, unresolved, conditions
 
 
 def build_manifest() -> tuple[dict, list[str]]:
@@ -536,13 +772,16 @@ def build_manifest() -> tuple[dict, list[str]]:
     if not declarations:
         raise RuntimeError("no exported reachability results were discovered")
     names = [decl["name"] for decl in declarations]
-    measured, unresolved = measure(names)
+    measured, unresolved, conditions = measure(names)
     results = []
     for decl in declarations:
         if decl["name"] not in measured:
             continue
         axioms = measured[decl["name"]]
-        conditional = "→" in decl["type"] or "->" in decl["type"]
+        if decl["name"] not in conditions:
+            raise RuntimeError(f"no binder analysis was reported for {decl['name']}")
+        prop_binders, inst_prop_binders, unsynthesized = conditions[decl["name"]]
+        conditional = is_conditional(prop_binders, inst_prop_binders, unsynthesized)
         results.append(
             {
                 "name": decl["name"],
@@ -565,6 +804,67 @@ def build_manifest() -> tuple[dict, list[str]]:
     return manifest, unresolved
 
 
+def run_binder_selftest() -> list[str]:
+    """Exercise the binder classification on an instance-implicit premise.
+
+    A premise written as an instance-implicit binder is invisible to a
+    source-text scan, and it is not automatically harmless either: synthesis
+    cannot conjure the proof that [Fact p] demands. The self-test measures
+    both shapes through the probe and checks the classification the audit
+    would record for them.
+    """
+    template = PROBE_PROGRAM.read_text(encoding="utf-8")
+    head, rule = template.split(PROBE_RULE_MARKER, 1)
+    failures: list[str] = []
+    for label, fixture, probe_name, expected in BINDER_SELFTEST_CASES:
+        targets = "def probeTargets : List String := [\n"
+        targets += f'  "{probe_name}",\n'
+        targets += "]\n\n"
+        source = (
+            "import Mathlib.Logic.Basic\n"
+            + head
+            + fixture
+            + "\n\n"
+            + targets
+            + rule.lstrip("\n")
+            + "\n#probePropBinders\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "AxiomBinderSelftest.lean"
+            path.write_text(source, encoding="utf-8")
+            try:
+                proc = subprocess.run(
+                    ["lake", "env", "lean", str(path)],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=DEFAULT_TIMEOUT,
+                )
+            except subprocess.TimeoutExpired:
+                failures.append(f"{label}: the fixture did not finish in time")
+                continue
+        if proc.returncode != 0:
+            failures.append(
+                f"{label}: the fixture failed to elaborate: {proc.stderr.strip()[:400]}"
+            )
+            continue
+        counts = parse_prop_binder_report(proc.stdout)
+        if probe_name not in counts:
+            failures.append(f"{label}: the probe reported no binder counts")
+            continue
+        prop_binders, inst_prop_binders, unsynthesized = counts[probe_name]
+        conditional = is_conditional(prop_binders, inst_prop_binders, unsynthesized)
+        if conditional != expected:
+            failures.append(
+                f"{label}: the premise was classified "
+                f"{'conditional' if conditional else 'unconditional'}, "
+                f"expected {'conditional' if expected else 'unconditional'} "
+                f"(prop={prop_binders}, instance={inst_prop_binders}, "
+                f"unsynthesized={unsynthesized})"
+            )
+    return failures
+
+
 def run_selftest() -> list[str]:
     """Exercise the release gate on the four fixture shapes.
 
@@ -579,13 +879,17 @@ def run_selftest() -> list[str]:
             # The fixture must ask Lean for the closure; without the
             # command there is nothing to parse.
             path.write_text(source + f"#print axioms {probe_name}\n", encoding="utf-8")
-            proc = subprocess.run(
-                ["lake", "env", "lean", str(path)],
-                cwd=ROOT,
-                capture_output=True,
-                text=True,
-                timeout=DEFAULT_TIMEOUT,
-            )
+            try:
+                proc = subprocess.run(
+                    ["lake", "env", "lean", str(path)],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=DEFAULT_TIMEOUT,
+                )
+            except subprocess.TimeoutExpired:
+                failures.append(f"{label}: the fixture did not finish within {DEFAULT_TIMEOUT}s")
+                continue
         if proc.returncode != 0:
             failures.append(f"{label}: fixture failed to elaborate: {proc.stderr.strip()[:500]}")
             continue
@@ -630,7 +934,7 @@ def run_selftest() -> list[str]:
 def verify(manifest: dict) -> list[str]:
     """Check the recorded manifest against a fresh measurement."""
     results = manifest["results"]
-    measured, unresolved = measure([entry["name"] for entry in results])
+    measured, unresolved, conditions = measure([entry["name"] for entry in results])
     failures: list[str] = []
     for name in unresolved:
         failures.append(f"{name}: no dependency closure was reported")
@@ -638,6 +942,23 @@ def verify(manifest: dict) -> list[str]:
         if entry["name"] not in measured:
             continue
         failures.extend(evaluate(entry, measured[entry["name"]]))
+        # The tier is derived from the measurement, not asserted. A
+        # result whose hypothesis is a binder rather than an arrow is
+        # conditional even when the source text shows no arrow, so the
+        # recorded tier is re-derived and compared here.
+        if entry["name"] not in conditions:
+            failures.append(f"{entry['name']}: no binder analysis was reported")
+            continue
+        prop_binders, inst_prop_binders, unsynthesized = conditions[entry["name"]]
+        expected = tier_of(
+            measured[entry["name"]],
+            is_conditional(prop_binders, inst_prop_binders, unsynthesized),
+        )
+        if entry["tier"] != expected:
+            failures.append(
+                f"{entry['name']}: recorded tier {entry['tier']!r} does not match the "
+                f"measured tier {expected!r}"
+            )
 
     recorded = {entry["name"] for entry in results}
     for decl in discover():
@@ -673,6 +994,7 @@ def main(argv: list[str] | None = None) -> int:
             for name in unresolved:
                 print(f"note: {name} did not resolve to a constant", file=sys.stderr)
             failures = run_selftest()
+            failures.extend(run_binder_selftest())
             if failures:
                 print("\n".join(failures), file=sys.stderr)
                 return 1
@@ -688,6 +1010,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         failures = verify(manifest)
         failures.extend(run_selftest())
+        failures.extend(run_binder_selftest())
         if failures:
             print("\n".join(failures), file=sys.stderr)
             return 1

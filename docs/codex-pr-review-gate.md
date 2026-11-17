@@ -16,6 +16,18 @@ records its validation state. The controller records, in the PR template:
 A review only approves the exact recorded SHA. A subsequent push invalidates
 the approval and begins a new round.
 
+An approval counts only when the review is published on the pull request. The
+durable ledger receipt records that a review happened; the posted review is
+what a reader of the pull request can see, so the gate requires both. The
+published review must be attached to the exact reviewed SHA and must state
+the durable review key, the model, the head SHA, and the verdict in its body.
+GitHub refuses an approving review on a pull request the posting identity
+authored, and this repository's reviews are published through the
+maintainer's identity, so the review is published as a comment review that
+states the verdict. `scripts/check_pr_review_gate.py` performs this check for
+one pull request head, and `agent_lifecycle.py gate-status` reports whether
+the recorded receipt and the published review agree.
+
 ## States
 
 ```text
@@ -27,8 +39,9 @@ IMPLEMENTING
                           -> ESCALATED
 ```
 
-`HUMAN_MERGE_READY` requires a current-head Codex approval, required CI green
-at that same SHA, and no unresolved P0/P1 finding. It is not merge authority.
+`HUMAN_MERGE_READY` requires a current-head Codex approval published on the
+pull request, required CI green at that same SHA, and no unresolved P0/P1
+finding. It is not merge authority.
 
 ## Controller procedure
 

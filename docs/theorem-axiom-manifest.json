@@ -12,7 +12,7 @@
       "simple_name": "AffineMap.comp_apply_eq",
       "module": "CollatzResearch.Affine",
       "location": "Lean/CollatzResearch/Affine.lean:155",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -90,7 +90,7 @@
       "simple_name": "BranchWord.appliesTo",
       "module": "CollatzResearch.Affine",
       "location": "Lean/CollatzResearch/Affine.lean:215",
-      "tier": "conditional_generic_theorem",
+      "tier": "kernel_proof",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -104,7 +104,7 @@
       "simple_name": "BranchWord.execute",
       "module": "CollatzResearch.Affine",
       "location": "Lean/CollatzResearch/Affine.lean:227",
-      "tier": "conditional_generic_theorem",
+      "tier": "kernel_proof",
       "approved_axioms": [
         "propext"
       ],
@@ -116,7 +116,7 @@
       "simple_name": "BranchWord.execute_eq_toAffine_apply",
       "module": "CollatzResearch.Affine",
       "location": "Lean/CollatzResearch/Affine.lean:247",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -130,7 +130,7 @@
       "simple_name": "BranchWord.toAffine",
       "module": "CollatzResearch.Affine",
       "location": "Lean/CollatzResearch/Affine.lean:209",
-      "tier": "conditional_generic_theorem",
+      "tier": "kernel_proof",
       "approved_axioms": [
         "propext"
       ],
@@ -156,7 +156,7 @@
       "simple_name": "DescentWitness.Valid.ends_at",
       "module": "CollatzResearch.DescentWitness",
       "location": "Lean/CollatzResearch/DescentWitness.lean:65",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -170,7 +170,7 @@
       "simple_name": "DescentWitness.Valid.start_pos_odd",
       "module": "CollatzResearch.DescentWitness",
       "location": "Lean/CollatzResearch/DescentWitness.lean:75",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -184,7 +184,7 @@
       "simple_name": "DescentWitness.Valid.strict_descent",
       "module": "CollatzResearch.DescentWitness",
       "location": "Lean/CollatzResearch/DescentWitness.lean:70",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -198,7 +198,7 @@
       "simple_name": "DescentWitness.trajectory_odd",
       "module": "CollatzResearch.DescentWitness",
       "location": "Lean/CollatzResearch/DescentWitness.lean:84",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -232,7 +232,7 @@
       "simple_name": "IsFiniteClaim",
       "module": "CollatzResearch.CoverageTree",
       "location": "Lean/CollatzResearch/CoverageTree.lean:524",
-      "tier": "conditional_generic_theorem",
+      "tier": "kernel_proof",
       "approved_axioms": [],
       "native_axiom_owners": {},
       "native_axiom_names": []
@@ -266,7 +266,7 @@
       "simple_name": "LeafReachesOne",
       "module": "CollatzResearch.CoverageTree",
       "location": "Lean/CollatzResearch/CoverageTree.lean:207",
-      "tier": "conditional_generic_theorem",
+      "tier": "kernel_proof",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -280,7 +280,7 @@
       "simple_name": "OrbitLeafReachesOne",
       "module": "CollatzResearch.CoverageTree",
       "location": "Lean/CollatzResearch/CoverageTree.lean:254",
-      "tier": "conditional_generic_theorem",
+      "tier": "kernel_proof",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -354,7 +354,7 @@
       "simple_name": "trivial_partition",
       "module": "CollatzResearch.Residues",
       "location": "Lean/CollatzResearch/Residues.lean:77",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -368,7 +368,7 @@
       "simple_name": "trivial_valid",
       "module": "CollatzResearch.Residues",
       "location": "Lean/CollatzResearch/Residues.lean:64",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Quot.sound",
         "propext"
@@ -381,7 +381,7 @@
       "simple_name": "ReachesOne",
       "module": "CollatzResearch.CoverageTree",
       "location": "Lean/CollatzResearch/CoverageTree.lean:170",
-      "tier": "conditional_generic_theorem",
+      "tier": "kernel_proof",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -433,7 +433,7 @@
       "simple_name": "acceleratedStep_equiv_standardStep",
       "module": "CollatzResearch.Equivalence",
       "location": "Lean/CollatzResearch/Equivalence.lean:150",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -447,7 +447,7 @@
       "simple_name": "acceleratedStep_odd_of_odd",
       "module": "CollatzResearch.Basic",
       "location": "Lean/CollatzResearch/Basic.lean:39",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -461,7 +461,7 @@
       "simple_name": "acceleratedStep_positive_of_odd",
       "module": "CollatzResearch.Dynamics",
       "location": "Lean/CollatzResearch/Dynamics.lean:137",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -475,7 +475,7 @@
       "simple_name": "acceleratedTrajectory_reaches_one_implies_standard",
       "module": "CollatzResearch.Equivalence",
       "location": "Lean/CollatzResearch/Equivalence.lean:250",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -517,7 +517,7 @@
       "simple_name": "applyOrbitReaches",
       "module": "CollatzResearch.CoverageTreeOrbitTests",
       "location": "Lean/CollatzResearch/CoverageTreeOrbitTests.lean:256",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -531,7 +531,7 @@
       "simple_name": "applyResidueReaches",
       "module": "CollatzResearch.CoverageTreeOrbitTests",
       "location": "Lean/CollatzResearch/CoverageTreeOrbitTests.lean:251",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -559,7 +559,7 @@
       "simple_name": "checkCertWitness_singleton_one_reaches_one",
       "module": "CollatzResearch.Q5BoundedInputBridge",
       "location": "Lean/CollatzResearch/Q5BoundedInputBridge.lean:263",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -587,7 +587,7 @@
       "simple_name": "checkRoutingPartitionCertificate_accepts_slot",
       "module": "CollatzResearch.Q5RoutingPartition",
       "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:53",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -601,7 +601,7 @@
       "simple_name": "checkRoutingPartitionWitness_accepts",
       "module": "CollatzResearch.Q5RoutingPartition",
       "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:70",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -625,7 +625,7 @@
       "simple_name": "checkTerminalValueOneClaims_sound",
       "module": "CollatzResearch.Q5RoutingPartition",
       "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:278",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Quot.sound",
         "propext"
@@ -708,7 +708,7 @@
       "simple_name": "descend_orbit_complete",
       "module": "CollatzResearch.CoverageTree",
       "location": "Lean/CollatzResearch/CoverageTree.lean:889",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -722,7 +722,7 @@
       "simple_name": "orbit_predecessor_reaches_one",
       "module": "CollatzResearch.CoverageTree",
       "location": "Lean/CollatzResearch/CoverageTree.lean:193",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -788,7 +788,7 @@
       "simple_name": "residue_lt",
       "module": "CollatzResearch.Residues",
       "location": "Lean/CollatzResearch/Residues.lean:29",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [],
       "native_axiom_owners": {},
       "native_axiom_names": []
@@ -822,7 +822,7 @@
       "simple_name": "routing_partition_certificate_slot_reaches_one_terminal_value_one",
       "module": "CollatzResearch.Q5RoutingPartition",
       "location": "Lean/CollatzResearch/Q5RoutingPartition.lean:303",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -892,7 +892,7 @@
       "simple_name": "standardStep_of_odd",
       "module": "CollatzResearch.Dynamics",
       "location": "Lean/CollatzResearch/Dynamics.lean:118",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -906,7 +906,7 @@
       "simple_name": "standardStep_positive",
       "module": "CollatzResearch.Dynamics",
       "location": "Lean/CollatzResearch/Dynamics.lean:77",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Quot.sound",
         "propext"
@@ -919,7 +919,7 @@
       "simple_name": "standardTrajectory_pow_div",
       "module": "CollatzResearch.Equivalence",
       "location": "Lean/CollatzResearch/Equivalence.lean:87",
-      "tier": "kernel_proof",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Quot.sound",
         "propext"

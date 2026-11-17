@@ -304,11 +304,149 @@ def record_review(args: argparse.Namespace) -> dict[str, Any]:
             raise ValueError("review receipt round does not match request")
         if receipt.get("verdict") not in {"approved", "changes_requested", "escalated"}:
             raise ValueError("review receipt has invalid verdict")
+        if receipt.get("verdict") == "approved":
+            # An approval is only real once the reviewer published it on the
+            # pull request. A receipt in this ledger is invisible to anyone
+            # reading the pull request, so an approval without a posted
+            # GitHub review is refused here rather than counted later.
+            review_url = str(receipt.get("review_url") or "")
+            if not review_url.startswith("https://github.com/") or "/pull/" not in review_url:
+                raise ValueError("an approved review receipt must name the posted GitHub review")
         review["status"] = "reviewed"
         review["recorded_at"] = _utc_now()
         review["receipt_digest"] = _digest(receipt)
         review["receipt"] = receipt
         return {"decision": "review_recorded", "review_key": args.review_key, "review": review}
+
+
+def record_review_posting(args: argparse.Namespace) -> dict[str, Any]:
+    """Attach GitHub-hosted review evidence to an already recorded receipt.
+
+    A recorded receipt is immutable, so the evidence that the review was
+    published on the pull request is recorded beside it rather than inside
+    it. The evidence is verified against GitHub at this trust boundary: the
+    caller may nominate a review, but only a review GitHub actually publishes
+    for this pull request, this head SHA, and this durable review key becomes
+    gate evidence, and what is stored is what GitHub reported.
+    """
+    _, state = _paths(args)
+    posting = _load_json(args.posting_json)
+    url = str(posting.get("url") or "")
+    if not url.startswith("https://github.com/") or "/pull/" not in url:
+        raise ValueError("posting evidence must name a github.com pull request review")
+    with _locked_ledger(state) as (_, ledger):
+        try:
+            review = ledger["review_requests"][args.review_key]
+        except KeyError as exc:
+            raise ValueError("unknown review request") from exc
+        if review["status"] != "reviewed":
+            raise ValueError("review request has no recorded receipt")
+        receipt = review.get("receipt") or {}
+        repository = str(review["repository"])
+        pr_number = int(review["pr_number"])
+        head_sha = str(review["head_sha"])
+        verdict = str(receipt.get("verdict") or "")
+        model = str(receipt.get("model") or "") or None
+
+    try:
+        from pr_review_evidence import verified_posting_evidence
+    except ImportError as exc:
+        raise ValueError("the GitHub evidence verifier is unavailable") from exc
+    evidence, problems = verified_posting_evidence(
+        repository,
+        pr_number,
+        url,
+        head_sha,
+        args.review_key,
+        verdict,
+        model,
+    )
+    if evidence is None:
+        raise ValueError("the published review is not gate evidence: " + "; ".join(problems))
+
+    with _locked_ledger(state) as (_, ledger):
+        review = ledger["review_requests"][args.review_key]
+        existing = review.get("posting")
+        if existing is not None:
+            if _digest(existing) != _digest(evidence):
+                raise ValueError("posting evidence conflicts with existing evidence")
+            return {
+                "decision": "already_recorded",
+                "review_key": args.review_key,
+                "review": review,
+            }
+        review["posting"] = evidence
+        review["posting_recorded_at"] = _utc_now()
+        return {
+            "decision": "posting_recorded",
+            "review_key": args.review_key,
+            "review": review,
+        }
+
+
+def gate_status(args: argparse.Namespace) -> dict[str, Any]:
+    """Report whether a reviewed head satisfies the posted-review gate.
+
+    The gate counts a head as approved only when the recorded receipt
+    approves it and the review was published on the pull request for that
+    exact head SHA. The recorded evidence is re-checked here rather than
+    taken on trust, so a record edited after the fact fails closed.
+    """
+    _, state = _paths(args)
+    with _locked_ledger(state) as (_, ledger):
+        entries = [
+            (key, item)
+            for key, item in ledger.get("review_requests", {}).items()
+            if item.get("repository") == args.repository
+            and item.get("pr_number") == args.pr_number
+            and item.get("head_sha") == args.head_sha
+            and item.get("status") == "reviewed"
+        ]
+        if not entries:
+            return {
+                "gate_satisfied": False,
+                "reason": "no reviewed receipt for this pull request head",
+                "repository": args.repository,
+                "pr_number": args.pr_number,
+                "head_sha": args.head_sha,
+            }
+        key, review = max(entries, key=lambda item: item[1].get("recorded_at", ""))
+        receipt = review.get("receipt") or {}
+        verdict = receipt.get("verdict")
+        posting = review.get("posting") or {}
+        url = str(posting.get("url") or "")
+        reasons: list[str] = []
+        if verdict != "approved":
+            reasons.append(f"recorded verdict is {verdict!r}, not 'approved'")
+        if not url.startswith("https://github.com/") or "/pull/" not in url:
+            reasons.append("no posted GitHub review is recorded for this head")
+        else:
+            try:
+                from pr_review_evidence import recorded_posting_problems
+            except ImportError:
+                reasons.append("the posted GitHub review cannot be verified")
+            else:
+                reasons.extend(
+                    recorded_posting_problems(
+                        posting,
+                        args.head_sha,
+                        key,
+                        str(verdict or ""),
+                        str(receipt.get("model") or "") or None,
+                        args.repository,
+                        args.pr_number,
+                    )
+                )
+        return {
+            "gate_satisfied": not reasons,
+            "reason": "; ".join(reasons) if reasons else "approved with a posted GitHub review",
+            "repository": args.repository,
+            "pr_number": args.pr_number,
+            "head_sha": args.head_sha,
+            "review_key": key,
+            "verdict": verdict,
+            "posting": posting,
+        }
 
 
 def _prior_review(ledger: dict[str, Any], review: dict[str, Any]) -> dict[str, Any] | None:
@@ -455,6 +593,15 @@ def _parser() -> argparse.ArgumentParser:
     record_review_parser.add_argument("--review-key", required=True)
     record_review_parser.add_argument("--receipt-json", required=True)
     record_review_parser.set_defaults(handler=record_review)
+    record_posting_parser = commands.add_parser("record-review-posting")
+    record_posting_parser.add_argument("--review-key", required=True)
+    record_posting_parser.add_argument("--posting-json", required=True)
+    record_posting_parser.set_defaults(handler=record_review_posting)
+    gate_status_parser = commands.add_parser("gate-status")
+    gate_status_parser.add_argument("--repository", required=True)
+    gate_status_parser.add_argument("--pr-number", type=int, required=True)
+    gate_status_parser.add_argument("--head-sha", required=True)
+    gate_status_parser.set_defaults(handler=gate_status)
     requeue_review_parser = commands.add_parser("requeue-review")
     requeue_review_parser.add_argument("--review-key", required=True)
     requeue_review_parser.add_argument("--reason", required=True)
