@@ -81,10 +81,48 @@ LEAN_ROOT = ROOT / "Lean"
 # binder is a proposition.
 PROBE_PROGRAM = ROOT / "scripts" / "prop_binder_probe.lean"
 
+# The probe file marks the start of the rule, so that the target list can be
+# generated between the imports and the rule.
+PROBE_RULE_MARKER = "-- PROBE-RULE"
+
+# The binder self-test fixtures. Each measures one theorem through the probe
+# and states whether the theorem carries a hypothesis.
+#
+# The first is the case a source-text scan cannot see. A binder of the form
+# [h : Fact p] is an instance-implicit proposition, and the instance is a
+# proof of p. Instance synthesis cannot conjure such a proof, so the caller
+# supplies it and the theorem carries a hypothesis.
+#
+# The second is the counter-case: the instance is globally available, so
+# synthesis satisfies it without extra assumptions and the theorem carries no
+# hypothesis at all.
+BINDER_SELFTEST_CASES: list[tuple[str, str, str, bool]] = [
+    (
+        "instance-implicit proposition premise",
+        "theorem binderSelftestInstanceProp (p : Prop) [h : Fact p] : p := h.out",
+        "binderSelftestInstanceProp",
+        True,
+    ),
+    (
+        "globally available instance premise",
+        "class BinderSelftestGlobalProp (p : Prop) : Prop where\n"
+        "  ok : True\n"
+        "\n"
+        "instance binderSelftestGlobalPropInst (p : Prop) "
+        "    : BinderSelftestGlobalProp p where\n"
+        "  ok := trivial\n"
+        "\n"
+        "theorem binderSelftestGlobalInstance (p : Prop) "
+        "    [h : BinderSelftestGlobalProp p] : True := trivial",
+        "binderSelftestGlobalInstance",
+        False,
+    ),
+]
+
 # A binder-count row printed by the probe:
-# `PROP|<name>|<propBinders>|<instanceImplicitPropBinders>`.
+# `PROP|<name>|<propBinders>|<instanceImplicitPropBinders>|<unsynthesizedInstancePropBinders>`.
 PROP_BINDER_RE = re.compile(
-    r"^PROP\|(?P<name>[^|]+)\|(?P<prop>\d+)\|(?P<inst>\d+)$",
+    r"^PROP\|(?P<name>[^|]+)\|(?P<prop>\d+)\|(?P<inst>\d+)\|(?P<unsynth>\d+)$",
     re.MULTILINE,
 )
 
@@ -617,48 +655,59 @@ def build_measurement_source(names: list[str]) -> str:
     twice.
     """
     template = PROBE_PROGRAM.read_text(encoding="utf-8")
-    # The probe rule is split off the template here so that the target
-    # list can be generated between the imports and the rule. The split
-    # point is the rule itself, which keeps the template's docstring
-    # attached to the declaration that follows it.
-    marker = 'elab "#probePropBinders"'
-    head, rule = template.split(marker, 1)
+    # The rule is split off the template here so that the target list can
+    # be generated between the imports and the rule. The split point is
+    # the marker in front of the rule, which keeps the rule's docstring
+    # attached to the rule itself.
+    head, rule = template.split(PROBE_RULE_MARKER, 1)
     targets = "def probeTargets : List String := [\n"
     targets += "".join(f'  "{name}",\n' for name in names)
     targets += "]\n\n"
-    source = head + targets + marker + rule + "\n#probePropBinders\n\n"
+    # The library is imported here rather than in the probe file, so the
+    # probe rule itself does not depend on the library and the binder
+    # self-test can reuse it.
+    source = (
+        "import CollatzResearch\n" + head + targets + rule.lstrip("\n") + "\n#probePropBinders\n\n"
+    )
     source += "".join(f"#print axioms {name}\n" for name in names)
     return source
 
 
-def parse_prop_binder_report(report: str) -> dict[str, tuple[int, int]]:
+def parse_prop_binder_report(report: str) -> dict[str, tuple[int, int, int]]:
     """Parse the binder counts the Lean probe printed.
 
-    Each row is `PROP|<name>|<propBinders>|<instanceImplicitPropBinders>`.
+    Each row is
+    `PROP|<name>|<propBinders>|<instanceImplicitPropBinders>|<unsynthesizedInstancePropBinders>`.
     """
-    counts: dict[str, tuple[int, int]] = {}
+    counts: dict[str, tuple[int, int, int]] = {}
     for match in PROP_BINDER_RE.finditer(report):
         counts[match.group("name")] = (
             int(match.group("prop")),
             int(match.group("inst")),
+            int(match.group("unsynth")),
         )
     return counts
 
 
-def is_conditional(prop_binders: int, inst_prop_binders: int) -> bool:
+def is_conditional(prop_binders: int, inst_prop_binders: int, unsynthesized: int) -> bool:
     """True when a result binds at least one proposition-valued hypothesis.
 
     A Lean hypothesis is usually written as a binder, not as an arrow in
     the type, so the count comes from the elaborated environment rather
-    than from the source text. An instance-implicit proposition is
-    resolved automatically and is therefore not a hypothesis.
+    than from the source text.
+
+    An instance-implicit proposition is a hypothesis unless the instance
+    can be synthesized without extra assumptions. A theorem that takes
+    `[Fact p]` needs a proof of `p` from the caller, because synthesis
+    cannot conjure one, so the instance-implicit binders the probe
+    reported as unsynthesized count as hypotheses.
     """
-    return prop_binders - inst_prop_binders >= 1
+    return prop_binders - inst_prop_binders + unsynthesized >= 1
 
 
 def measure(
     names: list[str],
-) -> tuple[dict[str, list[str]], list[str], dict[str, tuple[int, int]]]:
+) -> tuple[dict[str, list[str]], list[str], dict[str, tuple[int, int, int]]]:
     """Measure the dependency closure and the binder structure of each name.
 
     Returns the measured closures, the names that did not resolve, and
@@ -721,8 +770,8 @@ def build_manifest() -> tuple[dict, list[str]]:
         axioms = measured[decl["name"]]
         if decl["name"] not in conditions:
             raise RuntimeError(f"no binder analysis was reported for {decl['name']}")
-        prop_binders, inst_prop_binders = conditions[decl["name"]]
-        conditional = is_conditional(prop_binders, inst_prop_binders)
+        prop_binders, inst_prop_binders, unsynthesized = conditions[decl["name"]]
+        conditional = is_conditional(prop_binders, inst_prop_binders, unsynthesized)
         results.append(
             {
                 "name": decl["name"],
@@ -743,6 +792,67 @@ def build_manifest() -> tuple[dict, list[str]]:
         "results": results,
     }
     return manifest, unresolved
+
+
+def run_binder_selftest() -> list[str]:
+    """Exercise the binder classification on an instance-implicit premise.
+
+    A premise written as an instance-implicit binder is invisible to a
+    source-text scan, and it is not automatically harmless either: synthesis
+    cannot conjure the proof that [Fact p] demands. The self-test measures
+    both shapes through the probe and checks the classification the audit
+    would record for them.
+    """
+    template = PROBE_PROGRAM.read_text(encoding="utf-8")
+    head, rule = template.split(PROBE_RULE_MARKER, 1)
+    failures: list[str] = []
+    for label, fixture, probe_name, expected in BINDER_SELFTEST_CASES:
+        targets = "def probeTargets : List String := [\n"
+        targets += f'  "{probe_name}",\n'
+        targets += "]\n\n"
+        source = (
+            "import Mathlib.Logic.Basic\n"
+            + head
+            + fixture
+            + "\n\n"
+            + targets
+            + rule.lstrip("\n")
+            + "\n#probePropBinders\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "AxiomBinderSelftest.lean"
+            path.write_text(source, encoding="utf-8")
+            try:
+                proc = subprocess.run(
+                    ["lake", "env", "lean", str(path)],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=DEFAULT_TIMEOUT,
+                )
+            except subprocess.TimeoutExpired:
+                failures.append(f"{label}: the fixture did not finish in time")
+                continue
+        if proc.returncode != 0:
+            failures.append(
+                f"{label}: the fixture failed to elaborate: {proc.stderr.strip()[:400]}"
+            )
+            continue
+        counts = parse_prop_binder_report(proc.stdout)
+        if probe_name not in counts:
+            failures.append(f"{label}: the probe reported no binder counts")
+            continue
+        prop_binders, inst_prop_binders, unsynthesized = counts[probe_name]
+        conditional = is_conditional(prop_binders, inst_prop_binders, unsynthesized)
+        if conditional != expected:
+            failures.append(
+                f"{label}: the premise was classified "
+                f"{'conditional' if conditional else 'unconditional'}, "
+                f"expected {'conditional' if expected else 'unconditional'} "
+                f"(prop={prop_binders}, instance={inst_prop_binders}, "
+                f"unsynthesized={unsynthesized})"
+            )
+    return failures
 
 
 def run_selftest() -> list[str]:
@@ -829,10 +939,10 @@ def verify(manifest: dict) -> list[str]:
         if entry["name"] not in conditions:
             failures.append(f"{entry['name']}: no binder analysis was reported")
             continue
-        prop_binders, inst_prop_binders = conditions[entry["name"]]
+        prop_binders, inst_prop_binders, unsynthesized = conditions[entry["name"]]
         expected = tier_of(
             measured[entry["name"]],
-            is_conditional(prop_binders, inst_prop_binders),
+            is_conditional(prop_binders, inst_prop_binders, unsynthesized),
         )
         if entry["tier"] != expected:
             failures.append(
@@ -874,6 +984,7 @@ def main(argv: list[str] | None = None) -> int:
             for name in unresolved:
                 print(f"note: {name} did not resolve to a constant", file=sys.stderr)
             failures = run_selftest()
+            failures.extend(run_binder_selftest())
             if failures:
                 print("\n".join(failures), file=sys.stderr)
                 return 1
@@ -889,6 +1000,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         failures = verify(manifest)
         failures.extend(run_selftest())
+        failures.extend(run_binder_selftest())
         if failures:
             print("\n".join(failures), file=sys.stderr)
             return 1

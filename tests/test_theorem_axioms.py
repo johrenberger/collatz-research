@@ -158,13 +158,23 @@ def test_binder_style_hypothesis_is_conditional() -> None:
 
     Lean usually writes a hypothesis as a binder rather than as an
     arrow in the type, so the classification comes from the elaborated
-    environment. An instance-implicit proposition is resolved
-    automatically and is therefore not a hypothesis.
+    environment.
     """
-    assert _MODULE.is_conditional(1, 0) is True
-    assert _MODULE.is_conditional(2, 0) is True
-    assert _MODULE.is_conditional(0, 0) is False
-    assert _MODULE.is_conditional(1, 1) is False
+    assert _MODULE.is_conditional(1, 0, 0) is True
+    assert _MODULE.is_conditional(2, 0, 0) is True
+    assert _MODULE.is_conditional(0, 0, 0) is False
+
+
+def test_instance_implicit_proposition_is_a_premise() -> None:
+    """An instance-implicit proposition is a premise unless synthesis supplies it.
+
+    A binder of the form `[h : Fact p]` needs a proof of `p` from the
+    caller, because instance synthesis cannot conjure one, so the result
+    carries a hypothesis. An instance that synthesis does supply carries
+    none.
+    """
+    assert _MODULE.is_conditional(1, 1, 1) is True
+    assert _MODULE.is_conditional(1, 1, 0) is False
 
 
 def test_binder_style_result_is_recorded_as_conditional() -> None:
