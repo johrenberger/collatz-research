@@ -432,7 +432,7 @@
       "name": "CollatzResearch.StandardReachesOne",
       "simple_name": "StandardReachesOne",
       "module": "CollatzResearch.StandardMapBridge",
-      "location": "Lean/CollatzResearch/StandardMapBridge.lean:82",
+      "location": "Lean/CollatzResearch/StandardMapBridge.lean:85",
       "tier": "kernel_proof",
       "approved_axioms": [],
       "native_axiom_owners": {},
@@ -731,7 +731,7 @@
       "name": "CollatzResearch.exists_odd_normalization",
       "simple_name": "exists_odd_normalization",
       "module": "CollatzResearch.StandardMapBridge",
-      "location": "Lean/CollatzResearch/StandardMapBridge.lean:101",
+      "location": "Lean/CollatzResearch/StandardMapBridge.lean:107",
       "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
@@ -999,7 +999,7 @@
       "name": "CollatzResearch.trajectory_eq_accelerated_orbit",
       "simple_name": "trajectory_eq_accelerated_orbit",
       "module": "CollatzResearch.StandardMapBridge",
-      "location": "Lean/CollatzResearch/StandardMapBridge.lean:62",
+      "location": "Lean/CollatzResearch/StandardMapBridge.lean:65",
       "tier": "kernel_proof",
       "approved_axioms": [
         "Classical.choice",
@@ -1211,7 +1211,7 @@
       "name": "CollatzResearch.universal_standard_convergence_of_universal_odd_convergence",
       "simple_name": "universal_standard_convergence_of_universal_odd_convergence",
       "module": "CollatzResearch.StandardMapBridge",
-      "location": "Lean/CollatzResearch/StandardMapBridge.lean:133",
+      "location": "Lean/CollatzResearch/StandardMapBridge.lean:139",
       "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",

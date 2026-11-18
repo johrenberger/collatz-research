@@ -8,11 +8,14 @@ import CollatzResearch.CoverageTree
 # map and the standard Collatz map
 
 Story R02 makes the standard-Collatz theorem boundary explicit. The accelerated
-map `T` (`CollatzResearch.Basic.acceleratedStep`) is defined only on the odd
-domain, while the standard map `C` (`CollatzResearch.Dynamics.standardStep`)
-is defined on every natural number. The two agree on the odd domain but
-diverge elsewhere, so a statement about the Collatz theorem is ambiguous
-until the domain is written down.
+map `T` (`CollatzResearch.Basic.acceleratedStep`) lands on the odd part of
+`3n + 1` and is meaningful only on the odd domain, while the standard map `C`
+(`CollatzResearch.Dynamics.standardStep`) is defined on every natural number.
+The two are not the same map: on an odd `n` the standard map's one step is
+`3n + 1`, and the accelerated value is reached by the standard map only after
+`1 + ν₂(3n + 1)` standard steps (`acceleratedStep_equiv_standardStep`), never
+after one. A statement about the Collatz theorem is ambiguous until the
+domain is written down.
 
 This module supplies the pieces that make the boundary explicit:
 
@@ -88,9 +91,12 @@ For every positive `n` there are `a` and `q` with `q` odd and positive,
 halves `n` exactly `a` times and lands on its odd part.
 
 This is the statement that makes the boundary explicit. The odd part `q` is the
-point where the accelerated map's odd-domain invariant holds, so the two maps
-coincide from `q` onward; before it, the standard map is halving while the
-accelerated map is not defined as a map of the same thing.
+point where the accelerated map's odd-domain invariant holds, so from `q` onward
+the accelerated orbit and the standard trajectory visit the same odd values:
+the standard trajectory reaches `acceleratedStep q` after `1 + ν₂(3q + 1)`
+steps (`acceleratedStep_equiv_standardStep`), and likewise at every later step.
+Before `q`, the standard map is halving while the accelerated map is not
+defined as a map of the same thing.
 
 **Proof.** `Nat.exists_eq_two_pow_mul_odd` splits `n` into its power of two
 and its odd part. The odd part is positive because `n` is positive and the
