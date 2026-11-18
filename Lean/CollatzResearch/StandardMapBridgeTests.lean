@@ -17,11 +17,12 @@ themselves live in `CollatzResearch.StandardMapBridge`.
 The concrete `acceleratedStep` values use `native_decide`, because
 `Nat.factorization` does not reduce in the kernel; they are data-side
 obligations about the arithmetic of one map step, following the sibling
-`CollatzResearch.CoverageTreeOrbitTests` convention. No example here asserts
-that an orbit reaches 1: an orbit equation is a reachability conclusion, and
-`native_decide` may never discharge one. The odd-domain bridge is instead
-kernel-checked through `acceleratedStep_odd_of_odd`, and the orbit-to-one fact
-for the base case is the definitional `accelerated_orbit 1 0 = 1`.
+`CollatzResearch.CoverageTreeOrbitTests` convention. No example uses
+`native_decide` to discharge an orbit equation: an orbit equation is a
+reachability conclusion, and `native_decide` may never discharge one. The
+odd-domain bridge is instead kernel-checked through `acceleratedStep_odd_of_odd`,
+and the one orbit-equation example, the base case `accelerated_orbit 1 0 = 1`,
+is definitional and proved by `rfl`.
 -/
 
 namespace CollatzResearch
