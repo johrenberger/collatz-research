@@ -70,6 +70,8 @@ Caps bound investigation before a decision; they are not effort estimates calibr
 
 **Completion artifact:** one named public bridge theorem and exact domain documentation.
 
+**Delivered:** the bridge theorem is `CollatzResearch.StandardMapBridge.universal_standard_convergence_of_universal_odd_convergence` in the new module `Lean/CollatzResearch/StandardMapBridge.lean`, with its regression module `Lean/CollatzResearch/StandardMapBridgeTests.lean`. The supporting declarations are `trajectory_eq_accelerated_orbit` (the two accelerated-iteration definitions are the same function), `StandardReachesOne` (standard-map reachability, kept distinct from the totalized accelerated `ReachesOne`), and `exists_odd_normalization` (every positive `n` is `2 ^ a * q` with `q` odd and positive, and the standard trajectory reaches `q` after exactly `a` halvings). The domain documentation is the module docstring plus the `docs/theorem-status.md` rows. The bridge is a conditional re-statement of one domain in the terms of another: it asserts neither convergence, and the odd-domain premise remains an open obligation.
+
 ## R03 — Prove the descent-to-convergence reduction
 
 **Story:** As a researcher, I need the remaining mathematical obligation to be a precise strict-descent proposition rather than a vague missing leaf certificate.

@@ -4,6 +4,11 @@ import CollatzResearch.DescentWitness
 import CollatzResearch.Dynamics
 import CollatzResearch.Equivalence
 import CollatzResearch.Residues
+-- Story R02: the standard-map boundary (odd-domain accelerated map versus
+-- the standard Collatz map). Root-imported so `make ci` and `lake build`
+-- validate the bridge theorem and its regression module on every run.
+import CollatzResearch.StandardMapBridge
+import CollatzResearch.StandardMapBridgeTests
 
 -- Story: extend default `lake build` coverage to the Q5 + bounded-input
 -- infrastructure. These modules were previously only exercised by
