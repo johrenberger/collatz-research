@@ -429,6 +429,16 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.StandardReachesOne",
+      "simple_name": "StandardReachesOne",
+      "module": "CollatzResearch.StandardMapBridge",
+      "location": "Lean/CollatzResearch/StandardMapBridge.lean:82",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.acceleratedStep_equiv_standardStep",
       "simple_name": "acceleratedStep_equiv_standardStep",
       "module": "CollatzResearch.Equivalence",
@@ -718,6 +728,20 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.exists_odd_normalization",
+      "simple_name": "exists_odd_normalization",
+      "module": "CollatzResearch.StandardMapBridge",
+      "location": "Lean/CollatzResearch/StandardMapBridge.lean:101",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.orbit_predecessor_reaches_one",
       "simple_name": "orbit_predecessor_reaches_one",
       "module": "CollatzResearch.CoverageTree",
@@ -972,6 +996,20 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.trajectory_eq_accelerated_orbit",
+      "simple_name": "trajectory_eq_accelerated_orbit",
+      "module": "CollatzResearch.StandardMapBridge",
+      "location": "Lean/CollatzResearch/StandardMapBridge.lean:62",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.trajectory_succ",
       "simple_name": "trajectory_succ",
       "module": "CollatzResearch.Basic",
@@ -1168,6 +1206,20 @@
         "CollatzResearch.twoLeafRoutingPartition._native.native_decide.ax_5",
         "CollatzResearch.twoLeaf_routing_partition_leaf_certificate._native.native_decide.ax_1"
       ]
+    },
+    {
+      "name": "CollatzResearch.universal_standard_convergence_of_universal_odd_convergence",
+      "simple_name": "universal_standard_convergence_of_universal_odd_convergence",
+      "module": "CollatzResearch.StandardMapBridge",
+      "location": "Lean/CollatzResearch/StandardMapBridge.lean:133",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
     }
   ]
 }
