@@ -10,6 +10,12 @@ import CollatzResearch.Residues
 import CollatzResearch.StandardMapBridge
 import CollatzResearch.StandardMapBridgeTests
 
+-- Story R03: the descent-to-convergence reduction. Root-imported so
+-- `make ci` and `lake build` validate the reduction, its boundary tests,
+-- and the axiom audit on every run.
+import CollatzResearch.DescentToConvergence
+import CollatzResearch.DescentToConvergenceTests
+
 -- Story: extend default `lake build` coverage to the Q5 + bounded-input
 -- infrastructure. These modules were previously only exercised by
 -- conditional Lean CI jobs ("when present"); making them root imports
