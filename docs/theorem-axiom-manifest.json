@@ -208,6 +208,20 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.EventuallyDescends",
+      "simple_name": "EventuallyDescends",
+      "module": "CollatzResearch.DescentToConvergence",
+      "location": "Lean/CollatzResearch/DescentToConvergence.lean:78",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.FiniteOrbitClaim",
       "simple_name": "FiniteOrbitClaim",
       "module": "CollatzResearch.CoverageTree",
@@ -435,6 +449,20 @@
       "location": "Lean/CollatzResearch/StandardMapBridge.lean:85",
       "tier": "kernel_proof",
       "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.UniversalOddDescent",
+      "simple_name": "UniversalOddDescent",
+      "module": "CollatzResearch.DescentToConvergence",
+      "location": "Lean/CollatzResearch/DescentToConvergence.lean:96",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
       "native_axiom_owners": {},
       "native_axiom_names": []
     },
@@ -728,10 +756,38 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.eventually_descends_of_reaches_one",
+      "simple_name": "eventually_descends_of_reaches_one",
+      "module": "CollatzResearch.DescentToConvergence",
+      "location": "Lean/CollatzResearch/DescentToConvergence.lean:192",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.exists_odd_normalization",
       "simple_name": "exists_odd_normalization",
       "module": "CollatzResearch.StandardMapBridge",
       "location": "Lean/CollatzResearch/StandardMapBridge.lean:107",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.odd_reaches_one_of_universal_descent",
+      "simple_name": "odd_reaches_one_of_universal_descent",
+      "module": "CollatzResearch.DescentToConvergence",
+      "location": "Lean/CollatzResearch/DescentToConvergence.lean:142",
       "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
@@ -788,6 +844,34 @@
       "simple_name": "per_leaf_available_bounded_of_hCert",
       "module": "CollatzResearch.Q5Integration",
       "location": "Lean/CollatzResearch/Q5Integration.lean:261",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.reaches_one_of_descent_step",
+      "simple_name": "reaches_one_of_descent_step",
+      "module": "CollatzResearch.DescentToConvergence",
+      "location": "Lean/CollatzResearch/DescentToConvergence.lean:114",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.reaches_one_three_of_descent",
+      "simple_name": "reaches_one_three_of_descent",
+      "module": "CollatzResearch.DescentToConvergenceTests",
+      "location": "Lean/CollatzResearch/DescentToConvergenceTests.lean:69",
       "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
@@ -978,6 +1062,34 @@
       "location": "Lean/CollatzResearch/Equivalence.lean:35",
       "tier": "kernel_proof",
       "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.standard_convergence_from_descent",
+      "simple_name": "standard_convergence_from_descent",
+      "module": "CollatzResearch.DescentToConvergenceTests",
+      "location": "Lean/CollatzResearch/DescentToConvergenceTests.lean:81",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.terminal_base_reaches_one",
+      "simple_name": "terminal_base_reaches_one",
+      "module": "CollatzResearch.DescentToConvergenceTests",
+      "location": "Lean/CollatzResearch/DescentToConvergenceTests.lean:32",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
       "native_axiom_owners": {},
       "native_axiom_names": []
     },
@@ -1212,6 +1324,20 @@
       "simple_name": "universal_standard_convergence_of_universal_odd_convergence",
       "module": "CollatzResearch.StandardMapBridge",
       "location": "Lean/CollatzResearch/StandardMapBridge.lean:139",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.universal_standard_convergence_of_universal_odd_descent",
+      "simple_name": "universal_standard_convergence_of_universal_odd_descent",
+      "module": "CollatzResearch.DescentToConvergence",
+      "location": "Lean/CollatzResearch/DescentToConvergence.lean:168",
       "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
