@@ -13,18 +13,21 @@ VALIDATE runs the narrowest meaningful gate first, then progressively broader ga
 
 ## Recommended Validation Order
 
-```text
-1. target-specific Lean/Python test or file build
-2. affected subsystem tests
-3. make lean and/or make test
-4. make cert-test when certificate logic is affected
-5. make ci before story completion
-```bash
-# Canonical: FULL_VALIDATE.v1 — see formal-math-extracted-full_validate-v1
-call(FULL_VALIDATE.v1)
-```
+1. During repair, run the narrowest target-specific Lean/Python check first, then
+   affected subsystem checks. Keep these checks narrow while iterating.
+2. Before story completion, run the canonical final gate exactly once:
 
-Use `make ci` as the full project gate. Use narrower targets for work-packet-level validation.
+   ```bash
+   python3 scripts/full_validate.py
+   ```
+
+The tested helper runs `make ci` once and retains its complete output in a log
+outside the controller's stdout. `make ci` runs format-check, lint, the full
+pytest suite, Lean, and the axiom audit. The explicit `cert-test` target is a
+subset of that full pytest suite (`tests/test_checker.py` and
+`tests/test_checker_lean.py`), so the final gate does not repeat it. A nonzero
+exit or timeout fails closed and transitions to `CLASSIFY_FAILURE`; do not skip
+or retry the gate without a new hypothesis.
 
 Per-leaf `c_max` for VALIDATE (default — overridable per work packet):
 
