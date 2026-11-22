@@ -10,22 +10,25 @@ description: "Canonical FAOP extracted via L2/L5 from the formal-math skills lib
 ## Procedure
 
 ```bash
-make format-check
-make lint
-make test
-make lean
-make cert-test
-make ci
-
+python3 scripts/full_validate.py
 ```
+
+The helper runs `make ci` once, fails closed on any nonzero result or timeout,
+and writes complete output to a log outside stdout. `make ci` includes the full
+pytest suite; `cert-test` is covered by the two checker test files collected by
+that suite and is not invoked a second time. During repair, use the narrow
+checks in `formal-math-validate`; this helper is the final gate.
 
 ## Inputs / Outputs
 
 ```yaml
 inputs:
-  - (declared by the call site; this FAOP is reusable)
+  - repository root
+  - optional log directory
 outputs:
-  - (declared by the call site)
+  - exit code
+  - concise pass/fail summary
+  - path to complete log
 ```
 
 ## Effect Label
@@ -37,7 +40,7 @@ outputs:
 ```yaml
 c_max:
   tokens: 0
-  wallclock_seconds: 60
+  wallclock_seconds: 1800
 ```
 
 ## Call Sites (rewritten)
