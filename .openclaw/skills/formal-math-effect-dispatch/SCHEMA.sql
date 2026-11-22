@@ -1,14 +1,10 @@
 -- ============================================================================
 -- formal-math-effect-dispatch / SCHEMA.sql
 -- ============================================================================
--- Persistent storage for the EFFECT_DISPATCH dispatch_log and the
--- PR_REVIEW round rows. Apply with:
---
---   sqlite3 /data/.openclaw/state/openclaw.sqlite < SCHEMA.sql
---
--- This file is idempotent for new installs. For existing installs with
--- an older dispatch_log table, run the migration block at the bottom
--- (the runner MUST catch "duplicate column" errors on re-application).
+-- Design-time schema for the proposed EFFECT_DISPATCH log and PR_REVIEW rows.
+-- This repository has no executable formal-math dispatcher or migration runner;
+-- do not apply it to the live OpenClaw database as though these contracts were
+-- enforced. Validate migrations against an isolated SQLite fixture first.
 -- ============================================================================
 
 PRAGMA foreign_keys = ON;
@@ -31,8 +27,10 @@ CREATE TABLE IF NOT EXISTS dispatch_log (
     tokens_used      INTEGER,                                   -- null for deterministic
     started_at       TEXT    NOT NULL,                          -- ISO-8601
     finished_at      TEXT,                                      -- ISO-8601
-    failure_signature TEXT,                                     -- JSON: {tool,category,symbol,target,normalized_message}
-    data_json        TEXT,                                      -- leaf-specific typed payload, JSON
+    failure_signature TEXT,                                     -- error identity, not strategy identity
+    strategy_id      TEXT,                                      -- only for explicit repair_attempt events
+    usage_kind       TEXT NOT NULL DEFAULT 'leaf' CHECK (usage_kind IN ('leaf','aggregate') AND (usage_kind = 'leaf' OR tokens_used IS NULL)),
+    data_json        TEXT,                                      -- leaf payload; aggregate usage is informational JSON
     PRIMARY KEY (story_id, work_packet_id, cycle_index, primitive)
 );
 
@@ -46,20 +44,22 @@ CREATE INDEX IF NOT EXISTS idx_dispatch_log_story_time
 CREATE INDEX IF NOT EXISTS idx_dispatch_log_effect
     ON dispatch_log (effect_label, started_at);
 
+CREATE INDEX IF NOT EXISTS idx_dispatch_log_strategy
+    ON dispatch_log (story_id, strategy_id);
+
 -- ----------------------------------------------------------------------------
 -- pr_review_round: one row per round of the PR_REVIEW cycle
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS pr_review_round (
     story_id          TEXT    NOT NULL,
-    -- The collatz-research PR-review protocol allows three rounds
-    -- (docs/codex-pr-review-gate.md); a third round is recorded when it
-    -- resolves. Capping at two makes a three-round story unrecordable.
+    -- Review round counts include the initial review; the protocol permits at most
+    -- three total rows for a story (default story budget is two).
     round             INTEGER NOT NULL CHECK (round >= 1 AND round <= 3),
     pr_number         INTEGER,
     pr_url            TEXT,
     head_sha          TEXT    NOT NULL,
-    reviewer_model    TEXT    NOT NULL,                         -- pinned: 'openai/gpt-5.6-terra'
+    reviewer_model    TEXT    NOT NULL,                         -- openai/gpt-6.1-terra; effort=high
     verdict           TEXT    CHECK (verdict IN ('approve','request_changes','comment')),
     findings_json     TEXT,                                     -- JSON array of typed findings
     disposition_json  TEXT,                                     -- JSON array of typed dispositions
@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS story_budget (
     story_id              TEXT PRIMARY KEY,
     max_tokens            INTEGER NOT NULL DEFAULT 40000 CHECK (max_tokens > 0),
     max_wallclock_seconds INTEGER NOT NULL DEFAULT 1800 CHECK (max_wallclock_seconds > 0),
-    max_rounds            INTEGER NOT NULL DEFAULT 2 CHECK (max_rounds >= 1 AND max_rounds <= 2),
+    max_rounds            INTEGER NOT NULL DEFAULT 2 CHECK (max_rounds >= 1 AND max_rounds <= 3),
     max_cycles            INTEGER NOT NULL DEFAULT 8 CHECK (max_cycles >= 1 AND max_cycles <= 8),
     declared_at           TEXT    NOT NULL,
     updated_at            TEXT    NOT NULL,
@@ -149,34 +149,9 @@ CREATE TABLE IF NOT EXISTS story_budget (
 );
 
 -- ============================================================================
--- Migration: apply against an existing dispatch_log from before Stage 1
--- ============================================================================
--- The runner MUST catch "duplicate column name" errors per statement.
--- New columns added in Stage 1 (logging-verification patch):
---
---   ALTER TABLE dispatch_log ADD COLUMN parent_state TEXT;
---   ALTER TABLE dispatch_log ADD COLUMN sub_state    TEXT;
---
--- The new indexes on dispatch_log may also need to be added if the table
--- pre-dates them:
---
---   CREATE INDEX IF NOT EXISTS idx_dispatch_log_parent_state
---       ON dispatch_log (parent_state, started_at);
---   CREATE INDEX IF NOT EXISTS idx_dispatch_log_story_time
---       ON dispatch_log (story_id, started_at);
---   CREATE INDEX IF NOT EXISTS idx_dispatch_log_effect
---       ON dispatch_log (effect_label, started_at);
---
--- A minimal Python runner (executed by the dispatcher at startup) is:
---
---   import sqlite3
---   con = sqlite3.connect('/data/.openclaw/state/openclaw.sqlite')
---   cur = con.cursor()
---   columns_present = {row[1] for row in cur.execute("PRAGMA table_info(dispatch_log)")}
---   for col, decl in [("parent_state","TEXT"), ("sub_state","TEXT")]:
---       if col not in columns_present:
---           cur.execute(f"ALTER TABLE dispatch_log ADD COLUMN {col} {decl}")
---   con.commit()
+-- Schema upgrades are not applied here. See `migrations/002_pilot_contracts.sql`;
+-- it is a one-time migration for an isolated copy of a legacy schema. There is
+-- no runtime migration runner in this repository.
 -- ============================================================================
 
 -- ============================================================================
@@ -233,11 +208,11 @@ CREATE TABLE IF NOT EXISTS story_budget (
 --
 --   SELECT
 --       (SELECT COALESCE(SUM(tokens_used), 0) FROM dispatch_log
---         WHERE story_id = ? AND tokens_used IS NOT NULL)      AS tokens_used,
+--         WHERE story_id = ? AND usage_kind = 'leaf' AND tokens_used IS NOT NULL) AS tokens_used,
 --       (SELECT COALESCE(SUM(
 --           (julianday(finished_at) - julianday(started_at)) * 86400
 --         ), 0) FROM dispatch_log
---         WHERE story_id = ? AND finished_at IS NOT NULL)      AS wallclock_used,
+--         WHERE story_id = ? AND usage_kind = 'leaf' AND finished_at IS NOT NULL)      AS wallclock_used,
 --       (SELECT COUNT(*) FROM pr_review_round WHERE story_id = ?) AS rounds_used
 --   ;
 --

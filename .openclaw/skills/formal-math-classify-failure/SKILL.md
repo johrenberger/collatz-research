@@ -97,7 +97,7 @@ repair_hypothesis:
   files_affected: []
   expected_result: ""
   falsification_condition: ""
-  strategy_id: ""
+  strategy_id: ""  # stable repair-approach identity; do not derive from the error fingerprint
 ```
 
 ## Transition

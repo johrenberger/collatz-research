@@ -5,7 +5,7 @@ description: "Run the mandatory internal GPT-6.1 Terra PR review and remediation
 
 # Collatz PR Review Gate
 
-> **Stage 1 routing:** steps 2–9 below that perform a code-review action are `effect_label = "code_review"` and MUST route through `formal-math-effect-dispatch`. The reviewer subagent runs on `openai/gpt-6.1-terra` (per step 3) — explicitly *not* the orchestrator's model — and gets the restricted `tools_allow` declared by the dispatcher. Pushing remediation steps that modify source code remain `op_LLM` with `trust_boundary_change=true` and may NOT be performed by the reviewer subagent.
+> **Stage 1 routing:** steps 2–9 below that perform a code-review action are `effect_label = "code_review"` and MUST route through `formal-math-effect-dispatch`. The reviewer subagent runs on `openai/gpt-6.1-terra` at `high` reasoning effort (per step 3) — explicitly *not* the orchestrator's model — and gets the restricted `tools_allow` declared by the dispatcher. Pushing remediation steps that modify source code remain `op_LLM` with `trust_boundary_change=true` and may NOT be performed by the reviewer subagent.
 
 Use for every implementation pull request in `johrenberger/collatz-research` after a pushed head exists.
 

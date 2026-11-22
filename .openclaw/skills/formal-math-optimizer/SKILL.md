@@ -39,7 +39,7 @@ The optimizer computes the independence graph (Convention 3 in FAOP: one node pe
 
 ### The `par` Dispatcher
 
-The dispatcher already routes single primitives by `effect_label`. Stage 4 extends the dispatcher to accept a `par_request`:
+The repository has no executable formal-math dispatcher. This describes the target contract; it must not be presented as an implemented capability. The proposed dispatcher would accept a `par_request`:
 
 ```yaml
 par_request:
@@ -50,7 +50,7 @@ par_request:
   failure_mode: "fail_fast" | "best_effort" | "all_required"
 ```
 
-The dispatcher executes `par_request` by:
+The proposed dispatcher would execute `par_request` by:
 
 1. **FAN-OUT**: for each leaf in `leaves`, call `sessions_spawn(taskName=<leaf.primitive>, context: "fork", toolsAllow=<leaf.scope.tools_allow>, ...)` with the leaf's full `dispatch_request`. Each leaf's tokens_used and wallclock are scoped to that subagent.
 2. **WAIT**: wait for all subagent returns, capped by `par_request.timeout_seconds`.
@@ -65,8 +65,8 @@ The dispatcher executes `par_request` by:
      started_at: iso8601
      finished_at: iso8601
    ```
-4. **RECORD**: append one `dispatch_log` row for the `par` itself, with `parent_state` set and `sub_state = "par"`. The leaf rows are recorded separately so the existing dispatch_log query patterns still work.
-5. **ENFORCE BOUNDS**: `formal-math-bounds.composite_bound(story_id)` is updated by the SUM of leaf tokens_used; the next non-par dispatch sees the incremented composite.
+4. **RECORD**: append one aggregate `dispatch_log` row with `usage_kind="aggregate"`, `tokens_used=NULL`, and summary usage only in `data_json`; append one `usage_kind="leaf"` row per leaf with that leaf's actual usage.
+5. **ENFORCE BOUNDS**: composite queries sum only `usage_kind="leaf"` rows. Never count the aggregate envelope and its leaves together. The aggregate token sum remains a summary, not another usage event.
 
 ### Independence Requirements for `par`
 
