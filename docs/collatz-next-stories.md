@@ -90,6 +90,8 @@ Caps bound investigation before a decision; they are not effort estimates calibr
 
 **Non-goal:** claiming the universal premise has been established.
 
+**Delivered:** the strict-descent predicate is `CollatzResearch.EventuallyDescends` in the new module `Lean/CollatzResearch/DescentToConvergence.lean`, and the universal premise is `CollatzResearch.UniversalOddDescent` — a `def`, not an `axiom`, so it contributes no trusted assumption and every dependent result takes it as an explicit hypothesis. The reduction is `CollatzResearch.odd_reaches_one_of_universal_descent` (strong induction on the input, consuming oddness preservation `DescentWitness.trajectory_odd` and orbit composition `CoverageTree.accelerated_orbit_compose`), composed with R02 as `CollatzResearch.universal_standard_convergence_of_universal_odd_descent`. The converse on the odd domain is `CollatzResearch.eventually_descends_of_reaches_one`: convergence implies eventual strict descent for `n > 1`, so the residual obligation is exactly the classical statement written as a strict descent. The boundary tests are in `Lean/CollatzResearch/DescentToConvergenceTests.lean`; the dependency graph and the obligation ledger are in `docs/story-r03-descent-to-convergence.md`; the ledger rows are in `docs/theorem-status.md`. **The universal descent premise remains OPEN**: nothing here establishes it, and no certificate or default field carries it.
+
 ## R04 — Verify arithmetic step witnesses without native evaluation
 
 **Story:** As a certificate consumer, I need finite trajectories certified by explicit arithmetic equations and generic lemmas, without trusting native evaluation of `Nat.factorization`.
