@@ -50,8 +50,11 @@ certificate, leaf structure, or default field carries it.
 
 The converse matters for the story's stated purpose: it makes the residual
 obligation mathematically precise rather than apparently weaker than Collatz.
-On the odd domain, descent and convergence are equivalent, so the open
-premise is exactly the classical statement written as a strict descent.
+Universally quantified over odd `n > 1`, eventual strict descent is equivalent
+to reachability of one (with `n = 1` handled as the terminal base case). The
+forward implication is the strong-induction theorem above; the converse is
+`eventually_descends_of_reaches_one`. Thus the open premise is exactly the
+classical statement written as a strict descent.
 
 ## Dependency graph
 
@@ -110,4 +113,3 @@ axiom set only; the transitive-axiom manifest records them.
 
 Claiming the universal premise has been established. Nothing in this change
 does, and the premise remains the open research obligation.
-

@@ -186,9 +186,11 @@ domain.
 
 **Why this direction matters.** It shows the open premise
 `UniversalOddDescent` is not a weaker-looking surrogate for the Collatz
-statement: on the odd domain, descent and convergence are equivalent, so the
-residual obligation is exactly the classical one, written as a strict
-descent. -/
+statement: universally quantified over odd `n > 1`, eventual strict descent is
+equivalent to reachability of one, with `n = 1` handled as the terminal base
+case. The forward implication is the strong-induction theorem above; this
+converse is proved here. Thus the residual obligation is exactly the classical
+one, written as a strict descent. -/
 theorem eventually_descends_of_reaches_one {n : Nat} (hOdd : Odd n) (hGt : 1 < n)
     (h : ReachesOne n) :
     ∃ k, 0 < k ∧ 0 < trajectory n k ∧ trajectory n k < n ∧ Odd (trajectory n k) := by
@@ -207,4 +209,3 @@ theorem eventually_descends_of_reaches_one {n : Nat} (hOdd : Odd n) (hGt : 1 < n
     exact hGt
 
 end CollatzResearch
-
