@@ -744,8 +744,29 @@ def measure(
             ) from error
     if proc.returncode != 0:
         # Lean reports elaboration errors on stdout, not stderr.
-        detail = " ".join(part for part in (proc.stdout, proc.stderr) if part).strip()
-        raise RuntimeError("the measurement program failed: " + detail[-1500:])
+        output = "\n".join(part for part in (proc.stdout, proc.stderr) if part).strip()
+        lines = output.splitlines()
+        error_lines = [
+            index for index, line in enumerate(lines) if re.search(r"(?:^|: )error:", line)
+        ]
+        if error_lines:
+            # The program prints one `#print axioms` report per target after
+            # the binder probe. Those reports can be much longer than Lean's
+            # diagnostic, so taking only the tail can hide the actual error.
+            # Keep a small context window around each diagnostic, then retain
+            # a short tail as evidence of which measurement completed.
+            diagnostic_lines: list[str] = []
+            seen: set[int] = set()
+            for index in error_lines:
+                for line_index in range(max(0, index - 1), min(len(lines), index + 9)):
+                    if line_index not in seen:
+                        diagnostic_lines.append(lines[line_index])
+                        seen.add(line_index)
+            detail = "\n".join(diagnostic_lines)
+            detail += "\n... final Lean output ...\n" + "\n".join(lines[-20:])
+        else:
+            detail = "\n".join(lines[-40:])
+        raise RuntimeError("the measurement program failed:\n" + detail)
     measured = parse_axiom_report(proc.stdout)
     conditions = parse_prop_binder_report(proc.stdout)
     unresolved = [name for name in names if name not in measured]
