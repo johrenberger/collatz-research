@@ -5,7 +5,7 @@ description: "FAOP +B (composite bounds) and +V (verified termination). Owns the
 
 # Formal Math Engineering — Bounds (+B and +V)
 
-> Companion skill invoked by `formal-math-effect-dispatch` for every dispatch and by the controller at PLAN and at STORY_COMPLETE. Implements FAOP `+B` (declared per-leaf time and cost bounds composed into a story-level cap) and `+V` (verified termination via bounded loops and acyclic call graph).
+> Companion skill defining the FAOP `+B`/`+V` budget and termination contract. Repository audit found no executable formal-math dispatcher or budget checker; the enforcement statements below are requirements, not runtime guarantees.
 
 This skill is the gate. It refuses to dispatch a leaf whose declared `c_max` would push the story over budget. It also owns the termination certificate that says "this story cannot run forever."
 
@@ -31,7 +31,8 @@ A story's `story_budget` row is the cap. It is the *sum* of all leaves the story
 story_budget_defaults:
   max_tokens: 40000             # aggregate cap; raise only with explicit human approval
   max_wallclock_seconds: 1800   # 30 minutes aggregate active work
-  max_rounds: 2                 # one review plus at most one remediation re-review
+  max_rounds: 2                 # default total rounds, including the initial review
+                                # protocol ceiling: 3 total rounds
   max_cycles: 8                 # repair cycles; replan or escalate instead of churning
 ```
 
@@ -53,7 +54,7 @@ rounds_used           = count(pr_review_round rows for this story)
 cycles_used           = count(repair cycles = current_strategy_attempt_count flips for this story)
 ```
 
-The dispatcher computes these on every dispatch by querying `dispatch_log` and `pr_review_round` for the story.
+The specified dispatcher computes these on every dispatch by querying `dispatch_log` and `pr_review_round` for the story. The repository currently has no executable formal-math dispatcher; this remains a contract until one is implemented and tested.
 
 ### Pre-Dispatch Check (the +B gate)
 
@@ -93,7 +94,7 @@ The controller's state machine has three kinds of loops. Each is bounded and the
 
 | Loop | Bound | Where enforced |
 |---|---|---|
-| PR_REVIEW cycle | `max_rounds = 2` (declared in `story_budget`, default 2) | `formal-math-pr-review` increments `pr_review_round`; `HUMAN_GATE` if exceeded |
+| PR_REVIEW cycle | `max_rounds` defaults to 2; protocol ceiling is 3 total review rows, including the initial review | the specified dispatcher must enforce the budget; `HUMAN_GATE` before a fourth round |
 | Repair cycle (IMPLEMENT → VALIDATE → CLASSIFY_FAILURE → BUDGET_CHECK → IMPLEMENT) | `max_cycles = 8` | `formal-math-budget-check` refuses further IMPLEMENT transitions above threshold |
 | Acyclic call graph | implicit | the controller's state diagram is a DAG; FNF-3 forbids recursive `call(id)` |
 

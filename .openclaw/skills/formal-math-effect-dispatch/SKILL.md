@@ -7,7 +7,9 @@ description: "FAOP-style effect-labeled dispatcher: routes every controller step
 
 > Companion skill invoked by every other companion skill before performing work. Implements FNF-1 (every step declares exactly one mutating effect) and FNF-4 (scope confinement per step) for the formal-math-engineering controller.
 
-The dispatcher is the **only** path through which the controller runs side-effects. It enforces that:
+The contract below describes the intended EFFECT_DISPATCH behavior. Repository audit found no executable formal-math dispatcher, state store, or composite-budget checker; these statements are requirements, not verified runtime guarantees. The separate `scripts/agent_lifecycle.py` enforces per-turn model/tool/time limits and review handoffs, not formal story budgets or strategy history. Do not claim enforcement until executable code and recovery tests exist.
+
+When implemented, EFFECT_DISPATCH must be the only path through which the formal-math controller runs side effects. It must enforce that:
 
 1. Every primitive action is declared with exactly one `effect_label` from the closed set below.
 2. Routing is determined by `effect_label`, not by where the call sits in the agent's reasoning context.
@@ -48,7 +50,7 @@ dispatch_request:
     tools_deny:  [...]
 ```
 
-The dispatcher **refuses** to launch any leaf whose declared `c_max` is below the `estimated_cost`, or whose `trust_boundary_change` is true without an architecture-decision artifact present in the working state. **Stage 3** extends this to include the composite bound check against `story_budget`; the refusal payload includes `data.bound` (`tokens` | `wallclock` | `rounds` | `cycles`) and `data.budget_remaining` (the int that was breached) so the controller can produce a precise HUMAN_GATE message.
+The runtime contract **requires refusal** when a leaf exceeds `c_max` or a trust-boundary change lacks its architecture-decision artifact. A future implementation must also check the composite `story_budget` and return typed bound details. None of these checks is executable in this repository yet.
 
 ## Routing Rules
 
@@ -115,7 +117,7 @@ The **parent reasoning context** of the controller only ever sees `dispatch_resu
 
 ## Cost Discipline (FAOP +B lightweight)
 
-Per-leaf declared `c_max` is the single most important number in Stage 1. The dispatcher enforces:
+Per-leaf declared `c_max` is the single most important number in Stage 1. The target dispatcher must enforce:
 
 ```text
 1. If estimated_cost.tokens > c_max.tokens                    -> refuse, return ok:false, signature:"budget_exceeded"

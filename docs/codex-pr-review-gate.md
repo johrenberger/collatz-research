@@ -44,6 +44,23 @@ IMPLEMENTING
 pull request, required CI green at that same SHA, and no unresolved P0/P1
 finding. It is not merge authority.
 
+## Round counting and reviewer route
+
+A review round is one recorded handoff/receipt, including the initial review,
+a remediation review of a new head, or a serial independent second opinion.
+The default budget is two total rounds; the protocol ceiling is three total
+rounds. A plan may choose a lower finite budget. The third unresolved round
+ends in `HUMAN_GATE`; no fourth round is dispatched. Each round after the
+first resumes the same reviewer session when its receipt has a continuation
+handle.
+
+The reviewer route is `openai/gpt-6.1-terra` at `high` reasoning effort,
+pinned by `scripts/dispatch_codex_pr_review.py`. That file is the executable
+source of truth; update this protocol, the skill, and its tests with any route
+change. The continuation key is the prior receipt
+`continuation_handle.session_key`; the dispatcher resumes that session and
+requests only the new-head delta plus unresolved prior findings.
+
 ## Controller procedure
 
 1. Open or update the PR as a draft and record validation evidence for its
@@ -82,11 +99,12 @@ finding. It is not merge authority.
 
 ## Bounded remediation
 
-Allow at most three remediation-review rounds for one PR. Do not repeat a
-rejected strategy. On the third unresolved round, a P0, or a requested
-architecture/mathematical decision, create the project diagnostic and escalate
-with the reviewed SHAs, review URLs, findings, hypotheses, validation output,
-and last-green commit.
+Allow at most three total review rounds for one PR, including the initial
+review. The default budget is two; the third round is the protocol ceiling,
+not an additional remediation round. Do not repeat a rejected strategy. On
+the third unresolved round, a P0, or a requested architecture/mathematical
+decision, create the project diagnostic and escalate with the reviewed SHAs,
+review URLs, findings, hypotheses, validation output, and last-green commit.
 
 Each round after the first resumes the same reviewer session rather than
 opening a fresh one, and presents it the new head SHA together with its own
@@ -101,8 +119,9 @@ genuinely independent second opinion.
 
 That P0 second opinion is **serial, not parallel**: it starts only after the
 first review of the same SHA has completed and been classified, so it never
-puts two reviewers on one SHA at once, and it is recorded as its own
-round-keyed handoff linked to the prior round's receipt and findings.
+puts two reviewers on one SHA at once. It consumes one of the three total
+rounds and is recorded as its own round-keyed handoff linked to the prior
+round's receipt and findings. If no round remains, escalate instead.
 
 ## Internal reviewer handoff
 

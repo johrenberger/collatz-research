@@ -39,9 +39,10 @@ never substitute an unbounded continuation.
   validate it, push it, and start a new round for the new SHA.
 - **P2:** fix when inexpensive; otherwise only a maintainer may defer it.
 
-At most two review rounds are permitted. Any unresolved third round is
-`HUMAN_GATE`, with the reviewed SHAs, typed findings, hypotheses, validation
-records, and last-green commit.
+Two total review rounds are permitted by default; the repository protocol
+allows at most three total rounds, including the initial review. Any unresolved
+third round is `HUMAN_GATE`; no fourth round may start. Include reviewed SHAs,
+typed findings, hypotheses, validation records, and the last-green commit.
 
 ## Validation scope
 

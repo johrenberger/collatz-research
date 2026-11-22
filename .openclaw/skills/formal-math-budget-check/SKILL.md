@@ -9,7 +9,9 @@ description: "Compute the Repair Cost Score and decide whether repair continues,
 
 BUDGET_CHECK enforces the Repair Cost Score (RCS) thresholds. It determines whether further repair is allowed, or whether the controller must transition to structural reassessment, Codex review, or hard stop.
 
-> **Effect label:** RCS arithmetic and threshold comparison are `deterministic` — performed by the orchestrator via EFFECT_DISPATCH on a typed reading of `dispatch_log`. Any narrative interpretation of "what does this RCS level mean for this work packet" is `op_LLM`. The numeric state stays in the typed record; only the policy *decision* is model-attended.
+> **Implementation status:** these are controller requirements, not executable behavior in this repository. No formal-math EFFECT_DISPATCH or budget-check runtime exists here.
+>
+> **Effect label contract:** RCS arithmetic and threshold comparison are `deterministic`, computed from typed history; narrative interpretation is `op_LLM`.
 
 ## Repair Cost Score (RCS)
 
@@ -63,7 +65,7 @@ strategy_history:
 
 Persist strategy history in the runtime state. A new context window must NOT reset retry counts or make an exhausted strategy appear new.
 
-**Stage 1 addition:** strategy_history is also keyed against `dispatch_log` rows so that any `failure_signature` repeating across cycles is matched deterministically. Two `dispatch_result`s with the same `failure_signature.fingerprint` after normalisation count as the same strategy. The dispatcher computes fingerprints on append.
+**Strategy identity is not error identity.** `strategy_id` names the proposed repair approach for a target and is stable across context recovery; it is recorded on explicit repair-attempt rows. A normalized `failure_signature.fingerprint` names an observed error. The same strategy may produce different errors, and distinct strategies may produce the same error. Use strategy IDs to enforce the same-strategy attempt limit; use distinct normalized error signatures only in the RCS error term. The repository has no executable formal-math dispatcher to enforce this yet.
 
 ## Same Target + Materially Same Strategy + 2 Failed Attempts → Block Strategy
 

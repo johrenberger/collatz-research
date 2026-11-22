@@ -13,7 +13,7 @@ This is the load-bearing skill for the "context loss" regression. **The agent's 
 
 The previous failure mode: the agent accumulated its working memory as a side-effect of conversation. When the model's context was cleared or compacted, the agent lost `current_hypothesis`, `last_validation`, `strategy_history`, the in-flight `pr_review_round`, and every other piece of "what am I doing right now." Re-deriving these from a transcript was expensive (token cost) and unreliable (drift between what was true at compaction time and what the agent thinks is true after).
 
-After this skill, none of that state lives in the prompt. The agent reads from the store.
+The intended contract keeps this state out of the prompt. This repository currently has no executable formal-math working-state API: the schema and pseudocode below describe the target, not a runtime guarantee. Do not claim persistence or enforcement until an implementation and recovery tests exist.
 
 ## The Typed Schema
 
@@ -120,7 +120,7 @@ Disposition:
   followup_url: str | null
 ```
 
-The FNF-2 guarantee: a step that reads `working_state.current_hypothesis` is statically guaranteed to find it present (or null with a declared `current_hypothesis | null` type). A step that reads an undeclared field is rejected at the API level.
+The intended FNF-2 contract is that declared reads are typed and undeclared fields are rejected. No executable API in this repository currently provides that guarantee.
 
 ## The Read / Write / Checkpoint / Restore API
 
@@ -142,8 +142,8 @@ checkpoint(story_id)
    -> this is the χ call
 
 restore_after_compaction(story_id) -> WorkingState
-   -> read_working_state + emit "context_recovered" dispatch_log row
-   -> returns a "Recovery Manifest" the agent uses to resume
+   -> target contract: read current state + append a context_recovered record
+   -> returns a Recovery Manifest; must preserve budgets, RCS, and strategy history
 ```
 
 ### χ-Semantics: When to Checkpoint

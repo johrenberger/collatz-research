@@ -57,7 +57,8 @@ proof strategies, create a diagnostic and request independent review. At RCS
 
 `formal-math-bounds` is authoritative. A story must have finite token and
 wall-clock limits before its first dispatch. Defaults are 40,000 aggregate
-tokens, 30 minutes active work, two PR-review rounds, and eight repair cycles.
+tokens, 30 minutes active work, two PR-review rounds by default (three total
+rounds maximum), and eight repair cycles.
 A larger budget requires explicit human approval in the plan. Refuse a leaf
 that exceeds its remaining composite budget, record `bound_violation`, and
 route to replan or `HUMAN_GATE`.

@@ -60,6 +60,8 @@ If the failed experiment touched any trust-boundary (FFI, native code, external 
 
 ## Transitions
 
+RESTORE_GREEN changes source state, not experiment history. Preserve append-only dispatch/failure records, cumulative RCS, the story budget, and per-strategy attempt history. Context recovery and rollback must not reset them.
+
 After RESTORE_GREEN completes:
 - If restoration succeeded and the failure was resolved → transition to `VALIDATE` (re-run validation) or `STORY_COMPLETE?` if the story is done.
 - If restoration succeeded but a decision is still needed → transition to `HUMAN_GATE` (escalate).
@@ -75,8 +77,7 @@ After RESTORE_GREEN completes:
 | write | `current_head_sha` | str |
 | write | `state_updated_at` | iso8601 |
 | write | `current_hypothesis_json` | `null` (cleared on rollback) |
-| write | `current_strategy_id` | `null` |
-| write | `current_strategy_attempt_count` | `0` |
-| write | `current_rcs` | `0.0` (reset on restore to last-green) |
+| preserve | `current_strategy_id`, `current_strategy_attempt_count` | Keep the current attempt identity/count until a new strategy is explicitly selected.
+| preserve | `current_rcs` | Restore source files only; never refund cumulative repair cost. Recompute from append-only history if the cache is stale. |
 | checkpoint (χ) on exit | — | — |
 | read | `last_green_commit`, `branch` | str |
