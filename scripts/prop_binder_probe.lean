@@ -21,7 +21,7 @@ private def synthesizable (ty : Expr) : MetaM Bool := do
   | .undef => pure false
 
 -- PROBE-RULE
-/-- Count the Prop-valued binders of each probed constant.
+/-- Count the Prop-valued binders of one probed constant.
 
 The source text cannot answer this reliably: a Lean hypothesis is usually
 written as a binder (theorem t (h : P) : Q), not as an arrow in the type.
@@ -33,36 +33,32 @@ PROP|<name>|<propBinders>|<instanceImplicitPropBinders>|<unsynthesizedInstancePr
 where the last number counts the instance-implicit proposition binders whose
 instance cannot be synthesized without extra assumptions.
 -/
-elab "#probePropBinders" : command => do
+elab "#probePropBinder " target:str : command => do
   let env ← liftCoreM (Lean.getEnv)
-  let rows ← liftCoreM <| MetaM.run' (do
-    let mut rows : Array String := #[]
-    for target in probeTargets do
-      let some (_, ci) :=
-        env.constants.toList.find? (fun (n, _) => n.toString == target) | continue
-      -- The theorem own parameters are opaque metavariables here, so
-      -- instance synthesis cannot specialize them while looking for an
-      -- instance, and a global instance that matches only one
-      -- specialization of a parameter cannot be mistaken for an instance
-      -- that is available for every argument.
-      let (fvars, bis, _body) ←
-        Meta.forallMetaTelescopeReducing ci.type (kind := MetavarKind.syntheticOpaque)
-      let mut propBinders := 0
-      let mut instPropBinders := 0
-      let mut unsynthesized := 0
-      for i in [:fvars.size] do
-        let ft ← Meta.inferType fvars[i]!
-        if ← Meta.isProp ft then
-          propBinders := propBinders + 1
-          match bis[i]! with
-          | BinderInfo.instImplicit =>
-            instPropBinders := instPropBinders + 1
-            if ← synthesizable ft then
-              pure ()
-            else
-              unsynthesized := unsynthesized + 1
-          | _ => pure ()
-      rows := rows.push s!"PROP|{target}|{propBinders}|{instPropBinders}|{unsynthesized}"
-    pure rows.toList) {} {}
-  for row in rows do
-    logInfo row
+  let targetName := target.getString
+  let row ← liftCoreM <| MetaM.run' (do
+    let some (_, ci) :=
+      env.constants.toList.find? (fun (n, _) => n.toString == targetName)
+      | throwError "probe target not found: {targetName}"
+    -- The theorem's own parameters are opaque metavariables here, so
+    -- instance synthesis cannot specialize the theorem for a single
+    -- argument and mistake that instance for a globally available one.
+    let (fvars, bis, _body) ←
+      Meta.forallMetaTelescopeReducing ci.type (kind := MetavarKind.syntheticOpaque)
+    let mut propBinders := 0
+    let mut instPropBinders := 0
+    let mut unsynthesized := 0
+    for i in [:fvars.size] do
+      let ft ← Meta.inferType fvars[i]!
+      if ← Meta.isProp ft then
+        propBinders := propBinders + 1
+        match bis[i]! with
+        | BinderInfo.instImplicit =>
+          instPropBinders := instPropBinders + 1
+          if ← synthesizable ft then
+            pure ()
+          else
+            unsynthesized := unsynthesized + 1
+        | _ => pure ()
+    pure s!"PROP|{targetName}|{propBinders}|{instPropBinders}|{unsynthesized}") {} {}
+  logInfo row
