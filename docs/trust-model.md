@@ -54,3 +54,34 @@ directly and records it.
   what the tier was for.
 
 Decision record: `docs/adr/0013-transitive-axiom-tiers.md`.
+
+## Descent-to-convergence reduction (story R03)
+
+- **The universal descent premise is not a trusted assumption.**
+  `UniversalOddDescent` (`Lean/CollatzResearch/DescentToConvergence.lean:96`)
+  is a `def`, not an `axiom`. It contributes no trusted assumption to any
+  result: every theorem that depends on it takes it as an explicit hypothesis
+  (`H : UniversalOddDescent`), so each conclusion stays visibly conditional.
+  No certificate, leaf structure, or default field carries it.
+- **The reduction claims nothing about convergence on its own.**
+  `odd_reaches_one_of_universal_descent` (`:142`) and
+  `universal_standard_convergence_of_universal_odd_descent` (`:168`) are
+  conditional on that premise. `eventually_descends_of_reaches_one` (`:194`)
+  is unconditional on the odd domain and asserts that convergence implies
+  eventual strict descent - not that either of them holds.
+- **No orbit equation is evaluated.** The reduction is kernel-checked. The
+  boundary tests in `Lean/CollatzResearch/DescentToConvergenceTests.lean`
+  *assume* a descent hypothesis where a concrete input is applied
+  (`reaches_one_three_of_descent`), and no example discharges an orbit
+  equation by evaluation, so ADR 0009's tier is untouched by this story.
+- **The trusted base is the approved standard set.** `#print axioms` on the six
+  R03 declarations reports `propext`, `Classical.choice`, `Quot.sound` and
+  nothing else. `docs/theorem-axiom-manifest.json` records the four theorems
+  as `conditional_generic_theorem` and the two predicates as `kernel_proof`.
+- **The trust boundary is unchanged.** R03 relocates the residual obligation
+  into one precise proposition. It does not widen what may be claimed, does
+  not discharge the premise, and changes neither ADR 0009 nor ADR 0013.
+
+Record: `docs/story-r03-descent-to-convergence.md` (dependency graph and
+obligation ledger; the premise is recorded **OPEN**), and
+`docs/theorem-status.md` rows 78-83.

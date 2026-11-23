@@ -17,6 +17,17 @@ landed the ADR 0009 terminal-value-one tier, which discharges the reachability
 premise by evidence tier instead of assuming it. Layer 2' records that; section 3
 records what is still missing.
 
+**Reconciled against `main` at `3001c25` (2026-11-23).** Sections 1, 6, 8 and
+11 were re-read against that state. R02 (PR #128) and R03 (PR #130) changed
+the *shape* of the residual obligation without changing the trust boundary:
+R02 made the standard-map boundary explicit, and R03 reduced the remaining
+obligation to one strict-descent proposition, `UniversalOddDescent`, which is
+still OPEN. Section 1 states the frontier in those terms, section 6 names the
+precise formulation of the open mathematics, and section 11 records how each
+new claim was checked. The reducibility measurements in section 4 were taken
+at `3f28799` on definitions that are unchanged at `3001c25`, so they still
+hold.
+
 It states precisely where the formalization stops, separates what is
 mechanically closable from what is open mathematics, and proposes the bounded
 work packets that close the closable part.
@@ -30,7 +41,7 @@ boundary described in [`docs/trust-model.md`](trust-model.md).
 ## 1. The frontier, stated
 
 [`docs/theorem-status.md`](theorem-status.md) records exactly two rows as
-unclaimed (lines 74-75):
+unclaimed (lines 84-85):
 
 | Identifier | Status | Lean location | Claim scope |
 | --- | --- | --- | --- |
@@ -42,6 +53,19 @@ function, structure, or inductive type); no row is `Admitted`. Those two
 unclaimed rows are the *stated* frontier. This
 document explains what they actually require, and what sits between them and
 the current results.
+
+Since R03, that frontier is stated as **one precise strict-descent
+proposition**. `UniversalOddDescent` (`DescentToConvergence.lean:96`) is
+`∀ n, Odd n → 1 < n → EventuallyDescends n`, where `EventuallyDescends n`
+(`DescentToConvergence.lean:78`) is
+`∃ k, 0 < k ∧ 0 < trajectory n k ∧ trajectory n k < n`. R03 proves the
+reduction from that premise to universal standard convergence by strong
+induction (`odd_reaches_one_of_universal_descent`, `:142`, composed with R02
+as `universal_standard_convergence_of_universal_odd_descent`, `:168`) and
+proves the converse on the odd domain (`eventually_descends_of_reaches_one`,
+`:194`). The premise is a `def`, not an `axiom`: it contributes no trusted
+assumption, every dependent theorem takes it as an explicit hypothesis, and
+**nothing in this repository discharges it**.
 
 ## 2. The structural pattern: routing is proven, reachability is assumed -
 except at the ADR 0009 tier
@@ -276,6 +300,14 @@ schedule:
    This is the Collatz conjecture. `README.md` states the project "does **not**
    claim a proof of the Collatz conjecture"; `docs/mathematical-model.md`
    states it "asserts no global convergence result".
+   R03 fixed the *statement* of this obligation without discharging it: on the
+   odd domain universal strict descent is **equivalent** to universal
+   convergence (`eventually_descends_of_reaches_one` for the converse,
+   `odd_reaches_one_of_universal_descent` for the forward direction), and R02
+   transports the result to the standard map
+   (`universal_standard_convergence_of_universal_odd_descent`). The residual
+   obligation is therefore exactly the classical statement written as a strict
+   descent, `UniversalOddDescent` - **OPEN**, and assumed by no certificate.
 2. **Nontrivial cycle exclusion** - excluding cycles other than the trivial one.
 
 A third item is a claim shape whose obligation is restricted but still
@@ -372,6 +404,11 @@ Note the constraint from section 4: a packet may only claim a *kernel-checked*
 result if every orbit equation it relies on reduces in the kernel. In practice
 that means the terminal value is 1 (witness `k := 0`). WP-CF-2 is where that
 constraint becomes a maintainer decision rather than an engineering step.
+
+**Status (as of `3001c25`).** R02 (PR #128) and R03 (PR #130) landed after the
+packets below were written; neither adds a work packet here, because both are
+conditional on an obligation that section 6 keeps open. The packet status
+below is otherwise unchanged.
 
 **Status (as of `52e5654`).** WP-CF-1 landed in PR #110 (commit `5854029`); the
 WP-CF-2 decision was taken on 2026-11-04 (ADR 0009, PR #107) and recorded in
@@ -548,7 +585,9 @@ the record of what each call was made against.
 ## 11. How each claim above was checked
 
 Structural claims were read from `main` at `3f28799` and re-read against `main` at
-`52e5654` on 2026-11-08; no claim rests on prose alone. The reducibility claims in
+`52e5654` on 2026-11-08, and the sections touched by R02 and R03 were re-read
+against `main` at `3001c25` on 2026-11-23; no claim rests on prose alone. The
+reducibility claims in
 section 4 were measured by compiling one standalone file per proposition with
 `lake env lean` against the pinned toolchain and recording the compiler exit code.
 toolchain and recording the compiler exit code. Those probe files were written
@@ -559,7 +598,10 @@ validation of a change.
 
 | Claim | How verified |
 | --- | --- |
-| two unclaimed rows | `git show origin/main:docs/theorem-status.md` lines 74-75 |
+| two unclaimed rows | `git show origin/main:docs/theorem-status.md` lines 84-85 |
+| the R03 reduction and its converse | `git show origin/main:Lean/CollatzResearch/DescentToConvergence.lean` (`:78`, `:96`, `:114`, `:142`, `:168`, `:194`); each dependent theorem takes the premise as an explicit hypothesis (`H : UniversalOddDescent`) |
+| `UniversalOddDescent` is not an assumed axiom | `git grep -n 'UniversalOddDescent' origin/main -- Lean/`; it occurs only as a `def` and as an explicit hypothesis - never as an `axiom`/`opaque` declaration, and never in a certificate or default field |
+| the R03 results rest on the approved axiom set only | `#print axioms` on the six R03 declarations -> `[propext, Classical.choice, Quot.sound]`; recorded in `docs/theorem-axiom-manifest.json` as `conditional_generic_theorem` (the two predicates `kernel_proof`) |
 | routing proven, reachability assumed outside the tier | `git show` of each theorem statement; `git grep` for `hLeaf`, `hCert`, `hClaimReachesOne` |
 | the tier discharge holds for any registry of terminal-value-one claims | enumeration of every `*-reaches_one` / `ReachesOne*` declaration in `Lean/` with its premises, read at `52e5654` |
 | claim shapes and their obligations | `CoverageTree.lean:368`, `:378`, `:471`, `:490` |
