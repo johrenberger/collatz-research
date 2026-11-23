@@ -81,8 +81,8 @@ LEAN_ROOT = ROOT / "Lean"
 # binder is a proposition.
 PROBE_PROGRAM = ROOT / "scripts" / "prop_binder_probe.lean"
 
-# The probe file marks the start of the rule, so that the target list can be
-# generated between the imports and the rule.
+# The probe file marks the start of its command so generated sources can emit
+# one independently budgeted binder-probe command per declaration.
 PROBE_RULE_MARKER = "-- PROBE-RULE"
 
 # The binder self-test fixtures. Each measures one theorem through the probe
@@ -659,10 +659,9 @@ def discover() -> list[dict]:
 def build_measurement_source(names: list[str]) -> str:
     """Build the single Lean program that measures the manifest's inputs.
 
-    The axiom closures and the binder structure come from one Lean run.
-    The binder structure is only available from the elaborated
-    environment, and a second run would pay the whole Mathlib start-up
-    twice.
+    The axiom closures and binder structure come from one Lean run. Each
+    declaration gets a separate binder-probe command so Lean's heartbeat
+    budget is reset per target rather than consumed by the whole manifest.
     """
     template = PROBE_PROGRAM.read_text(encoding="utf-8")
     # The rule is split off the template here so that the target list can
@@ -670,15 +669,10 @@ def build_measurement_source(names: list[str]) -> str:
     # the marker in front of the rule, which keeps the rule's docstring
     # attached to the rule itself.
     head, rule = template.split(PROBE_RULE_MARKER, 1)
-    targets = "def probeTargets : List String := [\n"
-    targets += "".join(f'  "{name}",\n' for name in names)
-    targets += "]\n\n"
-    # The library is imported here rather than in the probe file, so the
-    # probe rule itself does not depend on the library and the binder
-    # self-test can reuse it.
-    source = (
-        "import CollatzResearch\n" + head + targets + rule.lstrip("\n") + "\n#probePropBinders\n\n"
-    )
+    # Each target is a top-level command, which gives it an independent Lean
+    # heartbeat budget and leaves its location in the generated source.
+    source = "import CollatzResearch\n" + head + rule.lstrip("\n")
+    source += "".join(f'#probePropBinder "{name}"\n' for name in names)
     source += "".join(f"#print axioms {name}\n" for name in names)
     return source
 
@@ -838,17 +832,13 @@ def run_binder_selftest() -> list[str]:
     head, rule = template.split(PROBE_RULE_MARKER, 1)
     failures: list[str] = []
     for label, fixture, probe_name, expected in BINDER_SELFTEST_CASES:
-        targets = "def probeTargets : List String := [\n"
-        targets += f'  "{probe_name}",\n'
-        targets += "]\n\n"
         source = (
             "import Mathlib.Logic.Basic\n"
             + head
             + fixture
             + "\n\n"
-            + targets
             + rule.lstrip("\n")
-            + "\n#probePropBinders\n"
+            + f'\n#probePropBinder "{probe_name}"\n'
         )
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "AxiomBinderSelftest.lean"
