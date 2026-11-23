@@ -94,9 +94,19 @@ per-PR counts, because files touched by more than one PR get counted twice.
   51 `conditional_generic_theorem`, 38 `kernel_proof`, 8
   `compiler_dependent_instance`.
 - The repo's own gate suites (`tests/test_pr_review_gate.py`,
-  `tests/test_theorem_axioms.py`) are the executable evidence for findings 1–6;
-  the result recorded in the closing pull request is the observed outcome of
-  that run.
+  `tests/test_theorem_axioms.py`) are the executable evidence for findings 1–6.
+  **Observed outcome of a local run of both suites: 41 tests collected, 40
+  passed, 0 failed.** The 41st test —
+  `test_recorded_manifest_matches_a_fresh_measurement` — was still running its
+  Lean binder probe over the 97 recorded results when the local run hit its
+  wall-clock budget, so it reported **no verdict** rather than a failure.
+  That test is the local equivalent of the hosted CI step
+  `Audit transitive theorem axioms`, which **passed** on `main` at `f56f25ea`
+  (run 45226969120) and on this closing pull request's own head (run
+  45232620625). The hosted job runs on the reviewed tree, so for that
+  conclusion the protocol prefers the hosted step over the local re-run; the
+  local run is reported here exactly as observed, including the test that did
+  not finish.
 
 ## What is NOT closed
 
