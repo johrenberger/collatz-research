@@ -83,4 +83,3 @@ theorem standard_convergence_from_descent (H : UniversalOddDescent)
   universal_standard_convergence_of_universal_odd_descent H n hn
 
 end CollatzResearch
-

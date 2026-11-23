@@ -5,7 +5,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 MODULE_PATH = Path(__file__).parents[1] / "extract.py"
 SPEC = importlib.util.spec_from_file_location("extract", MODULE_PATH)
 extract = importlib.util.module_from_spec(SPEC)
@@ -41,7 +40,9 @@ class PatternClassificationTests(unittest.TestCase):
 
     def test_existing_full_validate_canonical_is_not_an_inlined_candidate(self):
         canonical_name = "formal-math-extracted-full_validate-v1"
-        canonical = site(canonical_name, extract.KNOWN_PATTERNS["FULL_VALIDATE.v1"]["canonical_body"])
+        canonical = site(
+            canonical_name, extract.KNOWN_PATTERNS["FULL_VALIDATE.v1"]["canonical_body"]
+        )
         classified = extract.classify_pattern_sites("FULL_VALIDATE.v1", [canonical])
         self.assertEqual(classified["canonical_definitions"], [canonical])
         self.assertEqual(classified["inlined"], [])
@@ -57,7 +58,11 @@ class PatternClassificationTests(unittest.TestCase):
 
 class MatchingTests(unittest.TestCase):
     def test_prose_and_sections_do_not_match(self):
-        rows = [site("prose", "The commands make format-check, make lint, and make test are recommended.")]
+        rows = [
+            site(
+                "prose", "The commands make format-check, make lint, and make test are recommended."
+            )
+        ]
         rows[0]["source_type"] = "section"
         self.assertNotIn("NARROW_VALIDATE.v1", extract.match_known_patterns(rows))
 
@@ -92,7 +97,9 @@ class ApplySafetyTests(unittest.TestCase):
             before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
-                self.assertTrue(extract.apply_pattern("NARROW_VALIDATE.v1", sites, matches, skills_dir=root))
+                self.assertTrue(
+                    extract.apply_pattern("NARROW_VALIDATE.v1", sites, matches, skills_dir=root)
+                )
             self.assertEqual(before, {p: p.read_bytes() for p in before})
             self.assertFalse((root / "formal-math-extracted-narrow_validate-v1").exists())
             self.assertIn("--- ", output.getvalue())
@@ -102,7 +109,11 @@ class ApplySafetyTests(unittest.TestCase):
         block = "Before\n\n```bash\n" + NARROW + "\n```\nAfter\n"
         temp, root, sites, matches = self._fixture({"one": block, "two": block})
         with temp:
-            self.assertTrue(extract.apply_pattern("NARROW_VALIDATE.v1", sites, matches, commit=True, skills_dir=root))
+            self.assertTrue(
+                extract.apply_pattern(
+                    "NARROW_VALIDATE.v1", sites, matches, commit=True, skills_dir=root
+                )
+            )
             for name in ("one", "two"):
                 text = (root / f"formal-math-{name}" / "SKILL.md").read_text()
                 self.assertIn("call(NARROW_VALIDATE.v1)", text)
@@ -117,19 +128,29 @@ class ApplySafetyTests(unittest.TestCase):
             sites[0]["offset"] += 1
             before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
             with contextlib.redirect_stderr(io.StringIO()):
-                self.assertFalse(extract.apply_pattern("NARROW_VALIDATE.v1", sites, matches, commit=True, skills_dir=root))
+                self.assertFalse(
+                    extract.apply_pattern(
+                        "NARROW_VALIDATE.v1", sites, matches, commit=True, skills_dir=root
+                    )
+                )
             self.assertEqual(before, {p: p.read_bytes() for p in before})
             self.assertFalse((root / "formal-math-extracted-narrow_validate-v1").exists())
 
     def test_duplicate_sites_in_one_file_are_rewritten(self):
         block = "```bash\n" + NARROW + "\n```"
         content = "First\n" + block + "\nMiddle\n" + block + "\nLast\n"
-        temp, root, sites, matches = self._fixture({
-            "one": content,
-            "two": "Second site\n```bash\n" + NARROW + "\n```\n",
-        })
+        temp, root, sites, matches = self._fixture(
+            {
+                "one": content,
+                "two": "Second site\n```bash\n" + NARROW + "\n```\n",
+            }
+        )
         with temp:
-            self.assertTrue(extract.apply_pattern("NARROW_VALIDATE.v1", sites, matches, commit=True, skills_dir=root))
+            self.assertTrue(
+                extract.apply_pattern(
+                    "NARROW_VALIDATE.v1", sites, matches, commit=True, skills_dir=root
+                )
+            )
             text = (root / "formal-math-one" / "SKILL.md").read_text()
             self.assertEqual(text.count("call(NARROW_VALIDATE.v1)"), 2)
 

@@ -16,7 +16,6 @@ Usage:
 
 import argparse
 import difflib
-import json
 import os
 import re
 import sqlite3
@@ -37,7 +36,9 @@ KNOWN_PATTERNS = {
         "required": ["git rev-parse", "git status", "git branch"],
         "min_sites": 2,
         "tolerance_extra": 0,
-        "canonical_body": "git status\ngit branch --show-current\ngit rev-parse HEAD\ngit remote -v\n",
+        "canonical_body": (
+            "git status\ngit branch --show-current\ngit rev-parse HEAD\ngit remote -v\n"
+        ),
     },
     "NARROW_VALIDATE.v1": {
         "description": "Run narrow validation gates (format-check, lint, test)",
@@ -48,10 +49,19 @@ KNOWN_PATTERNS = {
     },
     "FULL_VALIDATE.v1": {
         "description": "Run full validation gates (format-check, lint, test, lean, cert-test, ci)",
-        "required": ["make format-check", "make lint", "make test", "make lean", "make cert-test", "make ci"],
+        "required": [
+            "make format-check",
+            "make lint",
+            "make test",
+            "make lean",
+            "make cert-test",
+            "make ci",
+        ],
         "min_sites": 1,
         "tolerance_extra": 0,
-        "canonical_body": "make format-check\nmake lint\nmake test\nmake lean\nmake cert-test\nmake ci\n",
+        "canonical_body": (
+            "make format-check\nmake lint\nmake test\nmake lean\nmake cert-test\nmake ci\n"
+        ),
     },
 }
 
@@ -60,9 +70,9 @@ KNOWN_PATTERNS = {
 # Block extraction
 # --------------------------------------------------------------------------------------
 
-CODE_BLOCK_RE = re.compile(r'```(?:bash|text|sh)?\n(.*?)\n```', re.DOTALL)
+CODE_BLOCK_RE = re.compile(r"```(?:bash|text|sh)?\n(.*?)\n```", re.DOTALL)
 SECTION_RE = re.compile(
-    r'## (?:Required|Capture) (?:Commands|Steps|Sections?)\s*\n(.*?)(?=\n## |\n---|\Z)',
+    r"## (?:Required|Capture) (?:Commands|Steps|Sections?)\s*\n(.*?)(?=\n## |\n---|\Z)",
     re.DOTALL,
 )
 
@@ -99,8 +109,8 @@ def normalize_lines(text):
 # Scanning
 # --------------------------------------------------------------------------------------
 
-def scan_skills(skills_dir=SKILLS_DIR, skill_glob="formal-math-*"):
 
+def scan_skills(skills_dir=SKILLS_DIR, skill_glob="formal-math-*"):
     results = []
     for skill_dir in sorted(Path(skills_dir).glob(skill_glob)):
         skill_path = skill_dir / "SKILL.md"
@@ -163,10 +173,10 @@ def match_known_patterns(scan_results):
     for r in scan_results:
         if r["source_type"] != "code_block":
             continue
-        block_lines = set(l.strip().lower() for l in r["block"].split("\n") if l.strip())
+        block_lines = {line.strip().lower() for line in r["block"].split("\n") if line.strip()}
         for pattern_id, spec in KNOWN_PATTERNS.items():
             canonical_lines = set(
-                l.strip().lower() for l in spec["canonical_body"].split("\n") if l.strip()
+                line.strip().lower() for line in spec["canonical_body"].split("\n") if line.strip()
             )
             required = set(req.lower() for req in spec["required"])
             # All required commands must be present
@@ -218,11 +228,11 @@ def find_runtime_patterns(db_path=DB_PATH):
         return {}
 
     by_story_state = defaultdict(list)
-    for story_id, parent_state, primitive, started_at in rows:
+    for story_id, parent_state, primitive, _started_at in rows:
         by_story_state[(story_id, parent_state)].append(primitive)
 
     pattern_count = defaultdict(int)
-    for (story_id, parent_state), primitives in by_story_state.items():
+    for (_story_id, _parent_state), primitives in by_story_state.items():
         # Use 2-grams as a coarse pattern
         for i in range(len(primitives) - 1):
             pattern = (primitives[i], primitives[i + 1])
@@ -240,6 +250,7 @@ def find_runtime_patterns(db_path=DB_PATH):
 # --------------------------------------------------------------------------------------
 # Report
 # --------------------------------------------------------------------------------------
+
 
 def print_scan_report(scan_results, known_matches, drift, runtime=None):
     print("=" * 70)
@@ -265,18 +276,30 @@ def print_scan_report(scan_results, known_matches, drift, runtime=None):
             f"inlined={len(inlined)} across {len(skills)} skill(s): {', '.join(skills) or '(none)'}"
         )
         for s in sites:
-            print(f"      - {s['skill']} (offset={s['offset']}, lines={s['line_count']}, type={s['source_type']})")
+            print(
+                f"      - {s['skill']} (offset={s['offset']}, lines={s['line_count']}, "
+                f"type={s['source_type']})"
+            )
     print()
 
     # Aspirational patterns: in the catalog but with no genuine sites today
-    aspirational = [pid for pid in KNOWN_PATTERNS
-                    if not classify_pattern_sites(pid, known_matches.get(pid, []))["inlined"]]
+    aspirational = [
+        pid
+        for pid in KNOWN_PATTERNS
+        if not classify_pattern_sites(pid, known_matches.get(pid, []))["inlined"]
+    ]
     if aspirational:
         print("--- Catalog Patterns Without Inlined Sites (informational only) ---")
         for pid in aspirational:
             spec = KNOWN_PATTERNS[pid]
-            canonical = classify_pattern_sites(pid, known_matches.get(pid, []))["canonical_definitions"]
-            state = "canonical definition exists; no inlined call sites" if canonical else "catalog target; no inlined call sites"
+            canonical = classify_pattern_sites(pid, known_matches.get(pid, []))[
+                "canonical_definitions"
+            ]
+            state = (
+                "canonical definition exists; no inlined call sites"
+                if canonical
+                else "catalog target; no inlined call sites"
+            )
             print(f"  {pid}  {spec['description']}.  {state}.")
         print()
 
@@ -286,9 +309,7 @@ def print_scan_report(scan_results, known_matches, drift, runtime=None):
     else:
         for d in drift[:15]:
             a, b = d["a"], d["b"]
-            print(
-                f"  sim={d['similarity']:.2f}  {a['skill']} <-> {b['skill']}"
-            )
+            print(f"  sim={d['similarity']:.2f}  {a['skill']} <-> {b['skill']}")
             print(f"      A: {a['fingerprint']}")
             print(f"      B: {b['fingerprint']}")
     print()
@@ -322,12 +343,16 @@ def print_scan_report(scan_results, known_matches, drift, runtime=None):
 
 CANONICAL_TEMPLATE = """---
 name: formal-math-extracted-{slug}
-description: "Canonical FAOP extracted via L2/L5 from the formal-math skills library. Replaces inlined reconstructions at the call sites listed in `formal-math-extractor`'s catalog."
+description: >-
+  Canonical FAOP extracted via L2/L5 from the formal-math skills library.
+  Replaces inlined reconstructions at the call sites listed in the
+  `formal-math-extractor` catalog.
 ---
 
 # Formal Math Engineering — Extracted `{id}`
 
-> L2/L5 auto-extracted by `formal-math-extractor`. The procedure below is the single canonical form. All inlined reconstructions at the listed call sites have been replaced with `call({id})`.
+> L2/L5 auto-extracted by `formal-math-extractor`. The procedure below is the single canonical form.
+> All inlined reconstructions at the listed call sites have been replaced with `call({id})`.
 
 ## Procedure
 
@@ -411,20 +436,31 @@ def apply_pattern(pattern_id, scan_results, known_matches, commit=False, skills_
             print(f"REFUSED: cannot read {skill_path}: {e}", file=sys.stderr)
             return False
         blocks = extract_procedure_blocks(content)
-        matches = [(t, txt, off) for t, txt, off in blocks
-                   if t == site["source_type"] and off == site["offset"]
-                   and normalize_lines(txt) == site["fingerprint"]]
+        matches = [
+            (t, txt, off)
+            for t, txt, off in blocks
+            if t == site["source_type"]
+            and off == site["offset"]
+            and normalize_lines(txt) == site["fingerprint"]
+        ]
         if len(matches) != 1 or site["source_type"] != "code_block":
-            print(f"REFUSED: stale or ambiguous site {skill_path} at offset {site['offset']}", file=sys.stderr)
+            print(
+                f"REFUSED: stale or ambiguous site {skill_path} at offset {site['offset']}",
+                file=sys.stderr,
+            )
             return False
         _, _, offset = matches[0]
         start = offset
         if not content.startswith("```", start) or content.find("\n```", start) < 0:
-            print(f"REFUSED: malformed code fence in {skill_path} at offset {offset}", file=sys.stderr)
+            print(
+                f"REFUSED: malformed code fence in {skill_path} at offset {offset}", file=sys.stderr
+            )
             return False
         end = content.find("\n```", start) + len("\n```")
-        replacement = (f"```bash\n# Canonical: {pattern_id} — see formal-math-extracted-{slug}\n"
-                       f"call({pattern_id})\n```")
+        replacement = (
+            f"```bash\n# Canonical: {pattern_id} — see formal-math-extracted-{slug}\n"
+            f"call({pattern_id})\n```"
+        )
         spans_by_path[skill_path].append((start, end, replacement))
 
     rewrites = {}
@@ -442,14 +478,34 @@ def apply_pattern(pattern_id, scan_results, known_matches, commit=False, skills_
         return False
     originals_text = {path: path.read_text() for path in rewrites}
     if not commit:
-        print("DRY-RUN: no files written. Preflight succeeded; proposed diff follows. Pass --commit to write.")
-        print("".join(difflib.unified_diff([], canonical_body.splitlines(keepends=True),
-                                           fromfile="/dev/null", tofile=str(target_file))), end="")
+        print(
+            "DRY-RUN: no files written. Preflight succeeded; proposed diff follows. "
+            "Pass --commit to write."
+        )
+        print(
+            "".join(
+                difflib.unified_diff(
+                    [],
+                    canonical_body.splitlines(keepends=True),
+                    fromfile="/dev/null",
+                    tofile=str(target_file),
+                )
+            ),
+            end="",
+        )
         for path, updated in sorted(rewrites.items()):
             original = originals_text[path]
-            print("".join(difflib.unified_diff(original.splitlines(keepends=True),
-                                               updated.splitlines(keepends=True),
-                                               fromfile=str(path), tofile=str(path) + " (rewritten)")), end="")
+            print(
+                "".join(
+                    difflib.unified_diff(
+                        original.splitlines(keepends=True),
+                        updated.splitlines(keepends=True),
+                        fromfile=str(path),
+                        tofile=str(path) + " (rewritten)",
+                    )
+                ),
+                end="",
+            )
         return True
 
     # Stage all bytes before replacing targets; on any write failure, restore
@@ -483,6 +539,7 @@ def apply_pattern(pattern_id, scan_results, known_matches, commit=False, skills_
 # Verify no drift
 # --------------------------------------------------------------------------------------
 
+
 def verify_no_drift(pattern_id, scan_results):
     spec = KNOWN_PATTERNS.get(pattern_id)
     if not spec:
@@ -503,12 +560,12 @@ def verify_no_drift(pattern_id, scan_results):
         if f"# canonical: {pattern_id.lower()}" in r["block"].lower():
             continue
         # Same strict matching as the matcher
-        block_lines = set(l.strip().lower() for l in r["block"].split("\n") if l.strip())
+        block_lines = {line.strip().lower() for line in r["block"].split("\n") if line.strip()}
         required = set(req.lower() for req in spec["required"])
         if not required.issubset(block_lines):
             continue
         canonical_lines = set(
-            l.strip().lower() for l in spec["canonical_body"].split("\n") if l.strip()
+            line.strip().lower() for line in spec["canonical_body"].split("\n") if line.strip()
         )
         tolerance = spec.get("tolerance_extra", 0)
         extras = block_lines - canonical_lines - required
@@ -528,12 +585,17 @@ def verify_no_drift(pattern_id, scan_results):
 # CLI
 # --------------------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(description="L2/L5 auto-extraction tool")
     parser.add_argument("command", choices=["scan", "apply", "apply-all-known", "verify-no-drift"])
     parser.add_argument("pattern", nargs="?")
-    parser.add_argument("--commit", action="store_true", help="Actually write files (default: dry-run)")
-    parser.add_argument("--runtime", action="store_true", help="Include dispatch_log runtime analysis")
+    parser.add_argument(
+        "--commit", action="store_true", help="Actually write files (default: dry-run)"
+    )
+    parser.add_argument(
+        "--runtime", action="store_true", help="Include dispatch_log runtime analysis"
+    )
     args = parser.parse_args()
 
     scan_results = scan_skills()
