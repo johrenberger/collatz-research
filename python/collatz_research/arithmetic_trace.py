@@ -84,6 +84,11 @@ def build_trace(start: int, length: int) -> ArithmeticTrace:
 def trace_to_one(start: int, limit: int = 100_000) -> ArithmeticTrace:
     """Build the raw trace from a start value until it reaches 1.
 
+    The step limit bounds the number of accelerated steps the trace may take.
+    A trace that reaches 1 on the *final* permitted step is accepted, and so
+    is the zero-step trace from 1 when no step is permitted: reaching 1 within
+    the permitted number of steps is the acceptance condition.
+
     Raises ValueError if the trace does not reach 1 within the step limit.
     A bound that is hit is an unknown outcome, never a claim that the
     trajectory does not converge.
@@ -98,6 +103,10 @@ def trace_to_one(start: int, limit: int = 100_000) -> ArithmeticTrace:
         witness = accelerated_step_witness(value)
         steps.append(witness)
         value = witness.successor
+    if value == 1:
+        # The last permitted step reached 1, so the trace is within the bound.
+        # Checking only before each step would reject this trace.
+        return ArithmeticTrace(start=start, steps=tuple(steps), endpoint=value)
     raise ValueError(f"trace from {start} did not reach 1 within {limit} steps")
 
 

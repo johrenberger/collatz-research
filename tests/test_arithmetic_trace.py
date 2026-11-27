@@ -101,6 +101,33 @@ def test_trace_to_one_bound_is_unknown_not_a_claim():
         trace_to_one(27, limit=1)
 
 
+def test_trace_to_one_accepts_reaching_one_on_the_final_step():
+    """A trace that reaches 1 on the last permitted step is accepted.
+
+    The step limit bounds the number of steps the trace may take, so a trace
+    that reaches 1 exactly on that final step is within the bound. Checking
+    only before each step would wrongly reject it.
+    """
+    trace = trace_to_one(3, limit=2)
+    assert trace.start == 3
+    assert trace.steps == (ArithmeticStep(1, 5), ArithmeticStep(4, 1))
+    assert trace.endpoint == 1
+    assert trace.equation_holds()
+
+
+def test_trace_to_one_accepts_zero_step_trace_from_one():
+    """The zero-step trace from 1 is accepted when no step is permitted.
+
+    Input 1 is already at the target, so no step is needed and the trace is
+    empty. This is the same zero-step representation the Lean side uses.
+    """
+    trace = trace_to_one(1, limit=0)
+    assert trace.start == 1
+    assert trace.steps == ()
+    assert trace.endpoint == 1
+    assert trace.equation_holds()
+
+
 def test_trace_values_matches_step_successors():
     """The visited values are the start followed by the step successors."""
     assert trace_values(3, 2) == [3, 5, 1]
