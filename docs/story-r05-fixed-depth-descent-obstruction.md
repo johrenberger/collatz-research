@@ -118,11 +118,17 @@ exactly as R04 does.
 | `Lean/CollatzResearch/FixedDepthDescent.lean` | the ascent family, the closed form, and the obstruction |
 | `Lean/CollatzResearch/FixedDepthDescentTests.lean` | the concrete `L = 1, 2, 3` examples and the obstruction regressions |
 
-## A note on the duplicate valuation lemma
+## The valuation lemma comes from R04
 
-`twoAdicValuation_of_odd_factorization_generic` restates the lemma R04
-proves, because R05 is built on `main`, where R04 has not yet been merged.
-When R04 lands, this should become R04's lemma and the duplicate dropped
-in favour of it. The duplication is deliberate and temporary, and it is
-flagged here so a reviewer sees it as a known, bounded redundancy rather
-than an oversight.
+R05 needs exactly one fact about the two-adic valuation: from
+`3 * n + 1 = 2 ^ k * m` with `Odd m`, the valuation of `3 * n + 1` is `k`.
+That is R04's `twoAdicValuation_of_odd_factorization` in
+`CollatzResearch.ArithmeticWitness`, and its shape matches the shape used
+here exactly, so R05 **imports and reuses** it rather than restating it.
+The arithmetic-to-step bridge is therefore proved once, in R04.
+
+This module was originally developed against a `main` that predated R04,
+where the lemma had to be restated locally. When R04 merged (PR #133,
+commit `3724b31`) the local restatement was dropped in favour of R04's
+lemma, and this note records the change so a reviewer can see that the
+dependency is deliberate.

@@ -1,4 +1,5 @@
 import Mathlib.Order.Bounds.Basic
+import CollatzResearch.ArithmeticWitness
 import CollatzResearch.Basic
 import CollatzResearch.DescentToConvergence
 
@@ -86,37 +87,12 @@ theorem EventuallyDescendsWithin.of_descends {L n : Nat} (h : EventuallyDescends
 
 /-! ## Arithmetic helpers -/
 
-/-- **A factorization determines the two-adic valuation.**
-
-If `a = 2^k * m` and `m` is odd, then `twoAdicValuation a = k`. The
-proof uses the Mathlib factorization *lemmas* symbolically, so the
-valuation is never evaluated.
-
-This is the lemma R04 proves for the shape `3 * n + 1 = 2^k * m`. It is
-restated here under a distinct name because R05 is built on `main`, where
-R04 has not yet been merged; when R04 lands this should become R04's
-lemma and the duplicate dropped in favour of it. -/
-theorem twoAdicValuation_of_odd_factorization_generic (a k m : Nat)
-    (h : a = 2 ^ k * m) (hm : Odd m) :
-    twoAdicValuation a = k := by
-  have h2k : 2 ^ k ≠ 0 := by
-    have hpos : 0 < 2 ^ k := by positivity
-    exact Nat.pos_iff_ne_zero.mp hpos
-  have hm0 : m ≠ 0 := by
-    intro hmz
-    have hmod : m % 2 = 1 := Nat.odd_iff.mp hm
-    rw [hmz] at hmod
-    simp at hmod
-  have hnotdvd : ¬ (2 : Nat) ∣ m := by
-    intro hh
-    have hmod : m % 2 = 0 := Nat.dvd_iff_mod_eq_zero.mp hh
-    have hmod1 : m % 2 = 1 := Nat.odd_iff.mp hm
-    omega
-  unfold twoAdicValuation
-  rw [h, Nat.factorization_mul h2k hm0]
-  simp only [Finsupp.add_apply, Nat.factorization_pow_self Nat.prime_two,
-    Nat.factorization_eq_zero_of_not_dvd hnotdvd]
-  omega
+/-! The valuation lemma this module needs is **R04's**:
+`twoAdicValuation_of_odd_factorization` in `CollatzResearch.ArithmeticWitness`
+states that from `3 * n + 1 = 2 ^ k * m` and `Odd m` one gets
+`twoAdicValuation (3 * n + 1) = k`. Its shape is exactly the shape used
+below, so R05 reuses it rather than restating it: the arithmetic-to-step
+bridge is proved once, in R04. -/
 
 /-- **A power of two in successor form.** -/
 theorem two_pow_succ (k : Nat) : 2 ^ (k + 1) = 2 * 2 ^ k := by
@@ -199,7 +175,7 @@ theorem acceleratedStep_of_two_mul (x Y : Nat) (hY : 0 < Y) (h : x + 1 = 2 * Y)
     have hfac2 : 3 * x + 1 = 2 ^ 1 * (3 * Y - 1) := by
       rw [hfac]
       norm_num
-    exact twoAdicValuation_of_odd_factorization_generic _ 1 _ hfac2 hodd
+    exact twoAdicValuation_of_odd_factorization _ 1 _ hfac2 hodd
   unfold acceleratedStep
   rw [hval, Nat.pow_one]
   have hdiv : (3 * x + 1) / 2 = 3 * Y - 1 := by
@@ -327,7 +303,7 @@ theorem ascent_valuation_one (K j : Nat) (hj1 : j + 1 ≤ K) :
   have hfac2 : 3 * trajectory (ascentStart K) j + 1 = 2 ^ 1 * (3 * Y - 1) := by
     rw [hfac]
     norm_num
-  exact twoAdicValuation_of_odd_factorization_generic _ 1 _ hfac2 hodd
+  exact twoAdicValuation_of_odd_factorization _ 1 _ hfac2 hodd
 
 /-! ## Ascent: the value exceeds the start -/
 
