@@ -453,6 +453,50 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.StepWitness",
+      "simple_name": "StepWitness",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:71",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.StepWitness.Valid",
+      "simple_name": "StepWitness.Valid",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:222",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.TraceWitness",
+      "simple_name": "TraceWitness",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:85",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.TraceWitness.Valid",
+      "simple_name": "TraceWitness.Valid",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:239",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.UniversalOddDescent",
       "simple_name": "UniversalOddDescent",
       "module": "CollatzResearch.DescentToConvergence",
@@ -485,6 +529,20 @@
       "simple_name": "acceleratedStep_odd_of_odd",
       "module": "CollatzResearch.Basic",
       "location": "Lean/CollatzResearch/Basic.lean:39",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.acceleratedStep_of_odd_factorization",
+      "simple_name": "acceleratedStep_of_odd_factorization",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:153",
       "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
@@ -756,6 +814,34 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.even_start_six_odd_part",
+      "simple_name": "even_start_six_odd_part",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:108",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.even_start_six_reaches_one",
+      "simple_name": "even_start_six_reaches_one",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:139",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.eventually_descends_of_reaches_one",
       "simple_name": "eventually_descends_of_reaches_one",
       "module": "CollatzResearch.DescentToConvergence",
@@ -774,6 +860,48 @@
       "simple_name": "exists_odd_normalization",
       "module": "CollatzResearch.StandardMapBridge",
       "location": "Lean/CollatzResearch/StandardMapBridge.lean:107",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.generic_bridge_applies_three",
+      "simple_name": "generic_bridge_applies_three",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:249",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.generic_soundness_applies_three",
+      "simple_name": "generic_soundness_applies_three",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:257",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.odd_of_two_pow_mul_odd",
+      "simple_name": "odd_of_two_pow_mul_odd",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:173",
       "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
@@ -850,6 +978,16 @@
         "Quot.sound",
         "propext"
       ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.reached",
+      "simple_name": "reached",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:99",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
       "native_axiom_owners": {},
       "native_axiom_names": []
     },
@@ -1023,6 +1161,20 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.standardTrajectory_of_odd_factorization",
+      "simple_name": "standardTrajectory_of_odd_factorization",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:200",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.standardTrajectory_pow_div",
       "simple_name": "standardTrajectory_pow_div",
       "module": "CollatzResearch.Equivalence",
@@ -1080,6 +1232,84 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.stepOk",
+      "simple_name": "stepOk",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:253",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.stepOk_iff",
+      "simple_name": "stepOk_iff",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:279",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.stepsOk",
+      "simple_name": "stepsOk",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:261",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.stepsOk_iff",
+      "simple_name": "stepsOk_iff",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:286",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.stepsOk_sound",
+      "simple_name": "stepsOk_sound",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:315",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.stepsValid",
+      "simple_name": "stepsValid",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:231",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.terminal_base_reaches_one",
       "simple_name": "terminal_base_reaches_one",
       "module": "CollatzResearch.DescentToConvergenceTests",
@@ -1102,6 +1332,216 @@
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceEmptyRequired_rejected",
+      "simple_name": "traceEmptyRequired_rejected",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:202",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceEvenStart_rejected",
+      "simple_name": "traceEvenStart_rejected",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:242",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceNonOddSuccessor_rejected",
+      "simple_name": "traceNonOddSuccessor_rejected",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:180",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceOk",
+      "simple_name": "traceOk",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:273",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceOk_iff",
+      "simple_name": "traceOk_iff",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:295",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceOk_sound",
+      "simple_name": "traceOk_sound",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:346",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceOne",
+      "simple_name": "traceOne",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:73",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceOne_endpoint",
+      "simple_name": "traceOne_endpoint",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:82",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceThreeFiveOne",
+      "simple_name": "traceThreeFiveOne",
+      "module": "CollatzResearch.ArithmeticWitnessTraces",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTraces.lean:21",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceThreeFiveOneAlteredExponent_rejected",
+      "simple_name": "traceThreeFiveOneAlteredExponent_rejected",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:165",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceThreeFiveOne_endpoint",
+      "simple_name": "traceThreeFiveOne_endpoint",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:40",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceThreeFiveOne_reaches_one",
+      "simple_name": "traceThreeFiveOne_reaches_one",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:46",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceTwentySeven",
+      "simple_name": "traceTwentySeven",
+      "module": "CollatzResearch.ArithmeticWitnessTraces",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTraces.lean:27",
+      "tier": "kernel_proof",
+      "approved_axioms": [],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceTwentySeven_endpoint",
+      "simple_name": "traceTwentySeven_endpoint",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:61",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceWrongEndpoint_rejected",
+      "simple_name": "traceWrongEndpoint_rejected",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:229",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceWrongEquation_rejected",
+      "simple_name": "traceWrongEquation_rejected",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:191",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.traceWrongStart_rejected",
+      "simple_name": "traceWrongStart_rejected",
+      "module": "CollatzResearch.ArithmeticWitnessTests",
+      "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:215",
+      "tier": "kernel_proof",
+      "approved_axioms": [
         "propext"
       ],
       "native_axiom_owners": {},
@@ -1141,6 +1581,20 @@
       "module": "CollatzResearch.Basic",
       "location": "Lean/CollatzResearch/Basic.lean:23",
       "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.twoAdicValuation_of_odd_factorization",
+      "simple_name": "twoAdicValuation_of_odd_factorization",
+      "module": "CollatzResearch.ArithmeticWitness",
+      "location": "Lean/CollatzResearch/ArithmeticWitness.lean:120",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
