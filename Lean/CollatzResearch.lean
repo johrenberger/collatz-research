@@ -16,6 +16,14 @@ import CollatzResearch.StandardMapBridgeTests
 import CollatzResearch.DescentToConvergence
 import CollatzResearch.DescentToConvergenceTests
 
+-- Story R04: arithmetic step witnesses without native evaluation. Root-imported
+-- so `make ci` and `lake build` validate the generic arithmetic-to-step
+-- bridge, the generated concrete traces, and the rejection tests on every
+-- run.
+import CollatzResearch.ArithmeticWitness
+import CollatzResearch.ArithmeticWitnessTraces
+import CollatzResearch.ArithmeticWitnessTests
+
 -- Story: extend default `lake build` coverage to the Q5 + bounded-input
 -- infrastructure. These modules were previously only exercised by
 -- conditional Lean CI jobs ("when present"); making them root imports

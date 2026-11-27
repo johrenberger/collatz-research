@@ -152,6 +152,27 @@ jobs:
         if: success()
         run: lake build CollatzResearch.Q5Stage4Tests
 
+      # Story R04: the arithmetic-witness bridge, the generated concrete
+      # trace fixtures, and their rejection tests are built directly so an
+      # elaboration error cannot hide behind the library's default targets.
+      - name: Build arithmetic witness bridge
+        if: success()
+        run: lake build CollatzResearch.ArithmeticWitness
+
+      - name: Build arithmetic witness traces when present
+        if: success()
+        run: |
+          if [ -f Lean/CollatzResearch/ArithmeticWitnessTraces.lean ]; then
+            lake build CollatzResearch.ArithmeticWitnessTraces
+          fi
+
+      - name: Build arithmetic witness tests when present
+        if: success()
+        run: |
+          if [ -f Lean/CollatzResearch/ArithmeticWitnessTests.lean ]; then
+            lake build CollatzResearch.ArithmeticWitnessTests
+          fi
+
       # The admission budget is counted from Lean's own diagnostics, so it
       # has to run after the Lean build: elaborating a file loads its
       # imports from the build cache.
