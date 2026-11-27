@@ -154,6 +154,12 @@ The Python side (`python/collatz_research/arithmetic_trace.py`) is untrusted
 proposal machinery in the sense of ADR 0003: it may propose, Lean disposes.
 No Python result is consumed as a Lean hypothesis.
 
+The producer's step limit bounds how many accelerated steps a trace may take:
+a trace that reaches 1 within that many steps is accepted, including the
+zero-step trace from 1 when no step is permitted. A limit that is reached
+without hitting 1 raises, which is an unknown outcome and never a claim that
+the trajectory does not converge.
+
 ## Non-goals honoured
 
 - Million-input verification is **not** attempted; the checker is a bounded
