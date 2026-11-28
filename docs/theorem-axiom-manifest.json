@@ -222,6 +222,20 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.EventuallyDescendsWithin",
+      "simple_name": "EventuallyDescendsWithin",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:81",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.FiniteOrbitClaim",
       "simple_name": "FiniteOrbitClaim",
       "module": "CollatzResearch.CoverageTree",
@@ -637,6 +651,74 @@
       "native_axiom_names": []
     },
     {
+      "name": "CollatzResearch.ascentStart_gt_one",
+      "simple_name": "ascentStart_gt_one",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:199",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.ascentStart_odd",
+      "simple_name": "ascentStart_odd",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:191",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.ascentValue_gt_start",
+      "simple_name": "ascentValue_gt_start",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:330",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.ascent_no_descent_within",
+      "simple_name": "ascent_no_descent_within",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:348",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.ascent_valuation_one",
+      "simple_name": "ascent_valuation_one",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:283",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
       "name": "CollatzResearch.checkBoundedCertificateTree_sound",
       "simple_name": "checkBoundedCertificateTree_sound",
       "module": "CollatzResearch.BoundedInputCertificateTree",
@@ -889,6 +971,34 @@
       "module": "CollatzResearch.ArithmeticWitnessTests",
       "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:257",
       "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.no_fixed_depth_descent_bound",
+      "simple_name": "no_fixed_depth_descent_bound",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:358",
+      "tier": "kernel_proof",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.no_fixed_depth_descent_bound_except_finite",
+      "simple_name": "no_fixed_depth_descent_bound_except_finite",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:374",
+      "tier": "conditional_generic_theorem",
       "approved_axioms": [
         "Classical.choice",
         "Quot.sound",
@@ -1542,6 +1652,34 @@
       "location": "Lean/CollatzResearch/ArithmeticWitnessTests.lean:215",
       "tier": "kernel_proof",
       "approved_axioms": [
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.trajectory_ascentFormula",
+      "simple_name": "trajectory_ascentFormula",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:223",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "native_axiom_owners": {},
+      "native_axiom_names": []
+    },
+    {
+      "name": "CollatzResearch.trajectory_ascentFormula_sub",
+      "simple_name": "trajectory_ascentFormula_sub",
+      "module": "CollatzResearch.FixedDepthDescent",
+      "location": "Lean/CollatzResearch/FixedDepthDescent.lean:270",
+      "tier": "conditional_generic_theorem",
+      "approved_axioms": [
+        "Classical.choice",
+        "Quot.sound",
         "propext"
       ],
       "native_axiom_owners": {},

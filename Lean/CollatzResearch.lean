@@ -65,3 +65,9 @@ import CollatzResearch.ReachabilityEvidenceTierTests
 import CollatzResearch.DynamicsHelpersTests
 import CollatzResearch.BoundedInputCertificateParser
 import CollatzResearch.BoundedInputCertificateParserTests
+
+-- Story R05: the fixed-depth descent obstruction. Root-imported so `make ci`
+-- and `lake build` validate the ascent family, the closed form, and the
+-- obstruction on every run.
+import CollatzResearch.FixedDepthDescent
+import CollatzResearch.FixedDepthDescentTests

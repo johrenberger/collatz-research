@@ -117,6 +117,16 @@
 | `traceEvenStart_rejected` | Checked | `CollatzResearch.ArithmeticWitnessTests` | An even start is rejected by the odd-domain checker; the even start is handled on the standard map through the R02 bridge instead (Story R04) |
 | `generic_bridge_applies_three` | Checked | `CollatzResearch.ArithmeticWitnessTests` | The generic arithmetic-to-step bridge applies to a concrete step, so the exported generic theorem is exercised and not merely restated (Story R04) |
 | `generic_soundness_applies_three` | Checked | `CollatzResearch.ArithmeticWitnessTests` | The generic checker soundness theorem applies to the concrete trace (Story R04) |
+| `EventuallyDescendsWithin` | Defined (predicate) | `CollatzResearch.FixedDepthDescent` | Bounded-depth descent: `n` descends within `L` steps when some positive `k <= L` reaches a strictly smaller positive value. Stronger than `EventuallyDescends`, which puts no bound on `k`: `EventuallyDescendsWithin L n` implies `EventuallyDescends n` (Story R05) |
+| `ascentStart_odd` | Checked | `CollatzResearch.FixedDepthDescent` | The ascent family starts at `2^(K+1) - 1`, which is odd for every `K` (Story R05) |
+| `ascentStart_gt_one` | Checked | `CollatzResearch.FixedDepthDescent` | The ascent family start exceeds one for `K >= 1`, so it is a positive odd input above the terminal case (Story R05) |
+| `trajectory_ascentFormula` | Checked | `CollatzResearch.FixedDepthDescent` | The closed form in subtraction-free form: for `0 <= j <= K` the accelerated trajectory from `2^(K+1) - 1` reaches a value one below `3^j * 2^(K+1-j)`. Stated as `trajectory n j + 1 = ...` so that no natural subtraction is truncated (Story R05) |
+| `trajectory_ascentFormula_sub` | Checked | `CollatzResearch.FixedDepthDescent` | The closed form in the subtraction form the story states, `trajectory n j = 3^j * 2^(K+1-j) - 1`, with the side condition `0 < 3^j * 2^(K+1-j)` explicit so the subtraction is exact rather than truncated (Story R05) |
+| `ascent_valuation_one` | Checked | `CollatzResearch.FixedDepthDescent` | Each of the first `K` transitions of the ascent family has two-adic valuation exactly one, so every step is a single halving and the recurrence unrolls exactly (Story R05) |
+| `ascentValue_gt_start` | Checked | `CollatzResearch.FixedDepthDescent` | The ascent family ascends: for `1 <= j <= K`, `trajectory (ascentStart K) j > ascentStart K`, so no `k <= K` can witness a descent (Story R05) |
+| `no_fixed_depth_descent_bound` | Checked | `CollatzResearch.FixedDepthDescent` | **The obstruction.** No fixed `L` bounds the first descent of every positive odd input: for every `L` there is a positive odd `n > 1` with no descent within `L` steps (Story R05) |
+| `no_fixed_depth_descent_bound_except_finite` | Checked | `CollatzResearch.FixedDepthDescent` | **The stronger obstruction.** For every `L` and every finite set `E` of exceptions, some positive odd `n > 1` outside `E` still has no descent within `L` steps: a fixed-depth bound cannot be rescued by excepting finitely many inputs (Story R05) |
+| `ascent_no_descent_within` | Checked | `CollatzResearch.FixedDepthDescent` | The ascent family of depth `K` does not descend within `K` steps (Story R05) |
 | Global convergence | Not started | — | No claim |
 | Nontrivial cycle exclusion | Not started | — | No claim |
 

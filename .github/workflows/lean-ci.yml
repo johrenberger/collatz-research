@@ -173,6 +173,20 @@ jobs:
             lake build CollatzResearch.ArithmeticWitnessTests
           fi
 
+      # Story R05: the fixed-depth descent obstruction and its regression
+      # tests are built directly so an elaboration error cannot hide behind
+      # the library's default targets.
+      - name: Build fixed-depth descent obstruction
+        if: success()
+        run: lake build CollatzResearch.FixedDepthDescent
+
+      - name: Build fixed-depth descent tests when present
+        if: success()
+        run: |
+          if [ -f Lean/CollatzResearch/FixedDepthDescentTests.lean ]; then
+            lake build CollatzResearch.FixedDepthDescentTests
+          fi
+
       # The admission budget is counted from Lean's own diagnostics, so it
       # has to run after the Lean build: elaborating a file loads its
       # imports from the build cache.
