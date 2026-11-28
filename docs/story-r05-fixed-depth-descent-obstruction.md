@@ -15,8 +15,11 @@ outside that set still escapes. A bound cannot be rescued by excepting a
 handful of cases.
 
 This is a **negative** result. It does not settle the Collatz conjecture and
-it does not settle the descent obligation: the ascent family does descend
-eventually, just not within a bounded number of steps.
+it does not settle the descent obligation. What it establishes is only
+that the ascent family does not descend *within* a bounded number of
+steps. This story does **not** establish that the ascent family descends
+eventually; that is simply not claimed here, and nothing below depends
+on it.
 
 ## The ascent family
 
@@ -79,10 +82,14 @@ witness a descent: `ascent_no_descent_within` states that directly.
 - `no_fixed_depth_descent_bound_except_finite : ∀ L E, E.Finite → ∃ n, Odd n ∧ 1 < n ∧ n ∉ E ∧ ¬ EventuallyDescendsWithin L n`.
 
 `EventuallyDescendsWithin L n` is the bounded-depth predicate: some
-positive `k <= L` reaches a strictly smaller positive value. It is weaker
-than R03's `EventuallyDescends`, which puts no bound on `k`; the bridge
-`EventuallyDescendsWithin.of_descends` records that direction, so the
-obstruction is exactly about *bounded* descent and nothing stronger.
+positive `k <= L` reaches a strictly smaller positive value. It is
+**stronger** than R03's `EventuallyDescends`, which puts no bound on `k`:
+the bridge `EventuallyDescendsWithin.of_descends` proves
+`EventuallyDescendsWithin L n -> EventuallyDescends n`, so a bounded
+descent witness is in particular an unbounded one. The implication runs
+that way and not the other way round. The obstruction therefore says that
+no uniform `L` supplies a descent witness for every input; it says
+nothing at all about whether a given input descends.
 
 ## The architectural consequence
 
@@ -101,9 +108,10 @@ obstruction is about *fixed depth*, not about descent itself.
 **This story proves no convergence, no descent, and no cycle exclusion.**
 
 The universal descent premise of R03 (`UniversalOddDescent`) remains
-**OPEN**. This module does not assume it, refute it, or weaken it, and it
-is consistent with that premise holding: the ascent family descends
-eventually, just not within a bounded number of steps.
+**OPEN**. This module does not assume it, refute it, or weaken it. This
+story is also consistent with that premise holding: the obstruction is
+about the existence of a *uniform* bound on the depth of the first
+descent, and says nothing about whether a given input descends.
 
 No `sorry`, no `admit`, no `axiom`, and no `native_decide`. The
 two-adic valuation is never *evaluated*: the proofs use the Mathlib

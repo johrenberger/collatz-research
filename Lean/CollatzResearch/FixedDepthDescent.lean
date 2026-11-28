@@ -53,9 +53,10 @@ This module proves **no convergence, no descent, and no cycle
 exclusion**. It proves a *negative* statement about a fixed-depth
 strategy: such a strategy cannot work on the whole domain. The
 universal descent premise of R03 (`UniversalOddDescent`) remains
-**OPEN**; this module does not assume it, refute it, or weaken it. It is
-consistent with `UniversalOddDescent` holding, because the ascent family
-descends *eventually*, just not within a bounded number of steps.
+**OPEN**; this module does not assume it, refute it, or weaken it. The
+story is also consistent with `UniversalOddDescent` holding: the
+obstruction is about the existence of a *uniform* bound on the depth of
+the first descent, and says nothing about whether a given input descends.
 
 No `sorry`, no `admit`, no `axiom`, and no `native_decide`.
 -/
@@ -74,8 +75,9 @@ def ascentValue (K j : Nat) : Nat := 3 ^ j * 2 ^ (K + 1 - j) - 1
 
 `n` descends within `L` steps when some positive `k <= L` reaches a
 strictly smaller positive value. This is the bounded-depth notion the
-story asks about; it is weaker than `EventuallyDescends`, which puts no
-bound on `k`. -/
+story asks about; it is *stronger* than `EventuallyDescends`, which puts
+no bound on `k`: `EventuallyDescendsWithin L n` implies
+`EventuallyDescends n` (see `EventuallyDescendsWithin.of_descends`). -/
 def EventuallyDescendsWithin (L : Nat) (n : Nat) : Prop :=
   ∃ k, 0 < k ∧ k ≤ L ∧ 0 < trajectory n k ∧ trajectory n k < n
 
