@@ -117,9 +117,11 @@ theorem obstruction_except_finite_holds :
 
 /-- **A bounded descent is still a descent.**
 
-The obstruction is about *bounded* descent only: the unbounded descent
-predicate is strictly stronger, so the obstruction does not by itself
-settle the descent question. -/
+The obstruction is about *bounded* descent only. The bounded predicate
+`EventuallyDescendsWithin L n` is the *stronger* of the two: it implies the
+unbounded `EventuallyDescends n`, and not the other way round. So the
+obstruction says that no uniform `L` supplies a descent witness for every
+input, and it does not by itself settle whether a given input descends. -/
 theorem bounded_descent_is_descent {L n : Nat} (h : EventuallyDescendsWithin L n) :
     EventuallyDescends n :=
   EventuallyDescendsWithin.of_descends h
